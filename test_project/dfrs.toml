@@ -1,0 +1,8 @@
+[sending]
+api = "codeclient"
+
+[debug]
+tokens=true
+nodes=true
+compile=true
+connection=false

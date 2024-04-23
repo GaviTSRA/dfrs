@@ -1,0 +1,86 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "DiamondFire.rs",
+	"patterns": [
+		{
+			"include": "#comments"
+		},
+		{
+			"include": "#events"
+		},
+		{
+			"include": "#actions"
+		},
+		{
+			"include": "#values"
+		},
+		{
+			"include": "#strings"
+		},
+		{
+			"include": "#text"
+		},
+		{
+			"include": "#keywords"
+		}
+	],
+	"repository": {
+		"comments": {
+			"patterns": [
+				{
+					"match": "\/\/.*",
+					"name": "comment"
+				}
+			]	
+		},
+		"events": {
+			"name": "keyword",
+			"match": "@[A-z]*"
+		},
+		"actions": {
+			"patterns": [
+				{
+					"name": "support.function",
+					"match": "\\b(p|g|e)(:[A-z]*)?(.[A-z]*)\\b",
+					"captures": {
+						"1": { "name": "markup.italic" },
+						"2": { "name": "markup.italic" }
+					}
+				}
+			]
+		},
+		"keywords": {
+			"patterns": [{
+				"name": "keyword.control.dfrs",
+				"match": "\\b(if|while|for|return)\\b"
+			}]
+		},
+		"values": {
+			"name": "support.class",
+			"match": "\\b(Location|Vector|Sound|Potion)\\b"
+		},
+		"strings": {
+			"name": "string.quoted.double.dfrs",
+			"begin": "'",
+			"end": "'",
+			"patterns": [
+				{
+					"name": "constant.character.escape.dfrs",
+					"match": "\\\\."
+				}
+			]
+		},
+		"text": {
+			"name": "string.quoted.double.dfrs",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.dfrs",
+					"match": "\\\\."
+				}
+			]
+		}
+	},
+	"scopeName": "source.dfrs"
+}
