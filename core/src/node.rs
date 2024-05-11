@@ -1,4 +1,4 @@
-use crate::{definitions::ArgType, token::{Position, Selector}};
+use crate::{definitions::{ArgType, DefinedTag}, token::{Position, Selector}};
 
 pub trait Node {
     fn json(&self) -> String;
@@ -60,7 +60,7 @@ pub enum ArgValue {
     Vector { x: f32, y: f32, z: f32},
     Sound { sound: String, volume: f32, pitch: f32 },
     Potion { potion: String, amplifier: f32, duration: f32 },
-    Tag { tag: String, value: String }
+    Tag { tag: String, value: String, definition: Option<DefinedTag> }
 }
 
 #[derive(Clone, Debug, PartialEq)]

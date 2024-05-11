@@ -25,9 +25,9 @@ impl PlayerActions {
                     DefinedArg::text("Message to send", 0, true, true)
                 ],
                 vec![
-                    DefinedTag::new("inherit_styles", vec!["True","False"]),
-                    DefinedTag::new("merge_values", vec!["Add spaces","No spaces"]),
-                    DefinedTag::new("alignment", vec!["Regular", "Centered"])
+                    DefinedTag::new("inherit_styles", "Inherit Styles", 24, vec!["True","False"]),
+                    DefinedTag::new("merge_values", "Text Value Merging", 25, vec!["Add spaces","No spaces"]),
+                    DefinedTag::new("alignment", "Alignment Mode", 26, vec!["Regular", "Centered"])
                 ]
             ),
 

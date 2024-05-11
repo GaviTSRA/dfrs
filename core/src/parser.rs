@@ -175,7 +175,7 @@ impl Parser {
                 ArgValue::Potion { potion: _, amplifier: _, duration: _ } => ArgType::POTION,
                 ArgValue::Sound { sound: _, volume: _, pitch: _ } => ArgType::SOUND,
                 ArgValue::Vector { x: _, y: _, z: _ } => ArgType::VECTOR,
-                ArgValue::Tag { tag: _, value: _ } => ArgType::TAG
+                ArgValue::Tag { tag: _, value: _, definition: _ } => ArgType::TAG
             };
             args.push(Arg { value: param, index: i, arg_type});
             i += 1
@@ -223,7 +223,7 @@ impl Parser {
                 is_tag = false;
                 match token.token.clone() {
                     Token::String { value } => {
-                        params.push(ArgValue::Tag { tag: tag_name.clone(), value });
+                        params.push(ArgValue::Tag { tag: tag_name.clone(), value, definition: None });
                         is_value = true;
                     }
                     _ => {

@@ -46,17 +46,20 @@ pub enum ArgType {
     TAG
 }
 
+#[derive(Clone, Debug)]
 pub struct DefinedTag {
     pub dfrs_name: String,
+    pub df_name: String,
+    pub slot: i8,
     pub options: Vec<String>
 }
 
 impl DefinedTag {
-    pub fn new(dfrs_name: &str, options: Vec<&str>) -> DefinedTag {
+    pub fn new(dfrs_name: &str, df_name: &str, slot: i8, options: Vec<&str>) -> DefinedTag {
         let mut new_options = vec![];
         for option in options {
             new_options.push(option.to_owned());
         }
-        return DefinedTag {dfrs_name: dfrs_name.to_owned(), options: new_options}
+        return DefinedTag {dfrs_name: dfrs_name.to_owned(), df_name: df_name.to_owned(), slot, options: new_options}
     }
 }

@@ -102,7 +102,9 @@ pub enum ValidateError {
     UnknownAction { node: ActionNode },
     MissingArgument { node: ActionNode, index: i32, name: String },
     WrongArgumentType { node: ActionNode, index: i32, name: String, expected_type: ArgType, found_type: ArgType },
-    TooManyArguments { node: ActionNode }
+    TooManyArguments { node: ActionNode },
+    InvalidTagOption { node:ActionNode, tag_name: String, provided: String, options: Vec<String> },
+    UnknownTag { node: ActionNode, tag_name: String, available: Vec<String> }
 }
 
 pub struct Validator {
@@ -159,7 +161,7 @@ impl Validator {
                         let mut args: Vec<Arg> = vec![];
                         let mut index: i32 = -1;
 
-                        // TODO allow_multiple ; tags
+                        // TODO tags
                         for arg in action.args.clone() {
                             let mut match_more = true;
                             let mut matched_one = false;
@@ -186,6 +188,7 @@ impl Validator {
 
                                 if provided_arg.arg_type != arg.arg_type {
                                     if arg.allow_multiple && matched_one {
+                                        action_node.args.insert(0, provided_arg);
                                         break;
                                     }
                                     return Err(ValidateError::WrongArgumentType { node: action_node, index: index, name: arg.name, expected_type: arg.arg_type, found_type: provided_arg.arg_type })
@@ -196,8 +199,63 @@ impl Validator {
                                 matched_one = true;
                             }
                         }
+                        let mut tags = vec![];
                         if action_node.args.len() > 0 {
-                            return Err(ValidateError::TooManyArguments { node: action_node })
+                            for val in action_node.args.clone() {
+                                if val.arg_type != ArgType::TAG {
+                                    return Err(ValidateError::TooManyArguments { node: action_node })
+                                }
+                                tags.push(val.value)
+                            }
+                        }
+
+                        for given_tag in tags.clone() {
+                            match given_tag {
+                                ArgValue::Tag { tag: tag_name, value: _, definition: _ } => {
+                                    let mut found = false;
+                                    let mut available = vec![];
+                                    for tag in action.tags.clone() {
+                                        available.push(tag.dfrs_name.clone());
+                                        if tag.dfrs_name == tag_name {
+                                            found = true;
+                                        }
+                                    }
+                                    if !found {
+                                        return Err(ValidateError::UnknownTag { node: action_node, tag_name, available });
+                                    }
+                                }
+                                _ => unreachable!()
+                            }
+                        }
+
+                        for tag in action.tags.clone() {
+                            let mut matched = false;
+                            for given_tag in tags.clone() {
+                                match given_tag {
+                                    ArgValue::Tag { tag: tag_name, value, .. } => {
+                                        if tag.dfrs_name == tag_name {
+                                            if tag.options.contains(&value) {
+                                                matched = true;
+                                                args.push(Arg {
+                                                    arg_type: ArgType::TAG,
+                                                    value: ArgValue::Tag { tag: tag.df_name.clone(), value, definition: Some(tag.clone()) },
+                                                    index: tag.slot as i32
+                                                });
+                                            } else {
+                                                return Err(ValidateError::InvalidTagOption { node: action_node, tag_name, provided: value, options: tag.options });
+                                            }
+                                        }
+                                    }
+                                    _ => unreachable!()
+                                }
+                            }
+                            if !matched {
+                                args.push(Arg {
+                                    arg_type: ArgType::TAG,
+                                    value: ArgValue::Tag { tag: tag.df_name.clone(), value: tag.options.get(0).unwrap().to_owned(), definition: Some(tag.clone()) },
+                                    index: tag.slot as i32
+                                });
+                            }
                         }
 
                         action_node.args = args;
@@ -217,5 +275,4 @@ impl Validator {
     }
 }
 
-// TODO validate params
 // TODO validate potions, sounds

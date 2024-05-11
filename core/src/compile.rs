@@ -81,8 +81,13 @@ fn action_node(node: ActionNode) -> Block {
             ArgValue::Potion { potion, amplifier, duration } => {
                 args.push( Arg { item: ArgItem { data: ArgValueData::Potion { potion, amplifier, duration }, id: String::from("pot") }, slot: arg.index } );  
             }
-            ArgValue::Tag { tag, value } => {
-                println!("TODO: insert tag arg with {} = {}", tag, value);
+            ArgValue::Tag { tag, value, definition } => {
+               args.push( Arg { item: ArgItem { data: ArgValueData::Tag {
+                action: node.name.clone(),
+                block: block.to_owned(),
+                option: value,
+                tag
+               }, id: String::from("bl_tag")}, slot: definition.unwrap().slot as i32})
             }
         }
     }
@@ -136,6 +141,7 @@ enum ArgValueData {
     Vector { x: f32, y: f32, z: f32 },
     Sound { sound: String, volume: f32, pitch: f32 },
     Potion { potion: String, amplifier: f32, duration: f32 },
+    Tag { action: String, block: String, option: String, tag: String }
 }
 
 impl Serialize for ArgValueData {
@@ -174,6 +180,14 @@ impl Serialize for ArgValueData {
                 state.serialize_field("pot", potion)?;
                 state.serialize_field("amp", amplifier)?;
                 state.serialize_field("dur", duration)?;
+                state.end()
+            }
+            ArgValueData::Tag { action, block, option, tag } => {
+                let mut state = serializer.serialize_struct("MyEnum", 4)?;
+                state.serialize_field("action", action)?;
+                state.serialize_field("block", block)?;
+                state.serialize_field("option", option)?;
+                state.serialize_field("tag", tag)?;
                 state.end()
             }
         }

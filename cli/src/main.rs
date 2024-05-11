@@ -176,6 +176,14 @@ fn main() {
                     // TODO pos
                     print_err(format!("Too many arguments for action '{}'", node.name), data, start_pos, Some(end_pos));
                 }
+                ValidateError::InvalidTagOption { node, tag_name, provided, options } => {
+                    // TODO pos
+                    print_err(format!("Invalid option '{}' for tag '{}', expected one of {:?}", provided, tag_name, options), data, node.start_pos.clone(), Some(node.start_pos));
+                }
+                ValidateError::UnknownTag { node, tag_name, available } => {
+                    // TODO pos
+                    print_err(format!("Unknown tag '{}', found tags: {:?}", tag_name, available), data, node.start_pos.clone(), Some(node.start_pos));
+                }
             }
             std::process::exit(0);
         }
