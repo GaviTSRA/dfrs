@@ -59,7 +59,8 @@ pub enum ArgValue {
     Location { x: f32, y: f32, z: f32, pitch: Option<f32>, yaw: Option<f32> },
     Vector { x: f32, y: f32, z: f32},
     Sound { sound: String, volume: f32, pitch: f32 },
-    Potion { potion: String, amplifier: f32, duration: f32 }
+    Potion { potion: String, amplifier: f32, duration: f32 },
+    Tag { tag: String, value: String }
 }
 
 #[derive(Clone, Debug, PartialEq)]

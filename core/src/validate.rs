@@ -101,7 +101,8 @@ pub enum ValidateError {
     UnknownEvent { node: EventNode },
     UnknownAction { node: ActionNode },
     MissingArgument { node: ActionNode, index: i32, name: String },
-    WrongArgumentType { node: ActionNode, index: i32, name: String, expected_type: ArgType, found_type: ArgType }
+    WrongArgumentType { node: ActionNode, index: i32, name: String, expected_type: ArgType, found_type: ArgType },
+    TooManyArguments { node: ActionNode }
 }
 
 pub struct Validator {
@@ -158,32 +159,47 @@ impl Validator {
                         let mut args: Vec<Arg> = vec![];
                         let mut index: i32 = -1;
 
-                        // TODO allow_multiple ; too many args
+                        // TODO allow_multiple ; tags
                         for arg in action.args.clone() {
-                            index += 1;
-                            let mut provided_arg = match action_node.args.get(index as usize) {
-                                Some(provided) => provided.clone(),
-                                None => {
+                            let mut match_more = true;
+                            let mut matched_one = false;
+                            while match_more {
+                                if !arg.allow_multiple {
+                                    match_more = false;
+                                }
+                                index += 1;
+                                if action_node.args.len() == 0 {
                                     if arg.optional {
-                                        args.push(Arg { arg_type: ArgType::EMPTY, value: ArgValue::Empty , index} );
-                                        continue;
+                                        if !matched_one {
+                                            args.push(Arg { arg_type: ArgType::EMPTY, value: ArgValue::Empty , index} );
+                                        }
+                                        break;
                                     } else {
                                         return Err(ValidateError::MissingArgument { node: action_node, index, name: arg.name})
                                     }
                                 }
-                            };
-                            
-                            if provided_arg.arg_type == ArgType::EMPTY && !arg.optional {
-                                return Err(ValidateError::MissingArgument { node: action_node, index, name: arg.name})
-                            }
+                                let mut provided_arg = action_node.args.remove(0);
+                                
+                                if provided_arg.arg_type == ArgType::EMPTY && !arg.optional {
+                                    return Err(ValidateError::MissingArgument { node: action_node, index, name: arg.name})
+                                }
 
-                            if provided_arg.arg_type != arg.arg_type {
-                                return Err(ValidateError::WrongArgumentType { node: action_node, index: index, name: arg.name, expected_type: arg.arg_type, found_type: provided_arg.arg_type })
-                            }
+                                if provided_arg.arg_type != arg.arg_type {
+                                    if arg.allow_multiple && matched_one {
+                                        break;
+                                    }
+                                    return Err(ValidateError::WrongArgumentType { node: action_node, index: index, name: arg.name, expected_type: arg.arg_type, found_type: provided_arg.arg_type })
+                                }
 
-                            provided_arg.index = index;
-                            args.push(provided_arg);
+                                provided_arg.index = index;
+                                args.push(provided_arg);
+                                matched_one = true;
+                            }
                         }
+                        if action_node.args.len() > 0 {
+                            return Err(ValidateError::TooManyArguments { node: action_node })
+                        }
+
                         action_node.args = args;
                     }
                     None => return Err(ValidateError::UnknownAction { node: action_node })

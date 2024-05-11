@@ -81,6 +81,9 @@ fn action_node(node: ActionNode) -> Block {
             ArgValue::Potion { potion, amplifier, duration } => {
                 args.push( Arg { item: ArgItem { data: ArgValueData::Potion { potion, amplifier, duration }, id: String::from("pot") }, slot: arg.index } );  
             }
+            ArgValue::Tag { tag, value } => {
+                println!("TODO: insert tag arg with {} = {}", tag, value);
+            }
         }
     }
 

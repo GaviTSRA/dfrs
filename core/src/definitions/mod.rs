@@ -42,7 +42,8 @@ pub enum ArgType {
     LOCATION,
     VECTOR,
     SOUND,
-    POTION
+    POTION,
+    TAG
 }
 
 pub struct DefinedTag {

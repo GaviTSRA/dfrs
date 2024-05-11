@@ -154,12 +154,27 @@ fn main() {
                     print_err(format!("Unknown action '{}'", node.name), data, start_pos, Some(end_pos));
                 }
                 ValidateError::MissingArgument { node, index, name } => {
-                    // TODO
+                    // TODO pos
                     print_err(format!("Missing argument '{}'", name), data, node.start_pos, None);
                 }
                 ValidateError::WrongArgumentType { node, index, name, expected_type, found_type } => {
-                    // TODO
+                    // TODO pos
                     print_err(format!("Wrong argument type for '{}', expected '{:?}' but found '{:?}'", name, expected_type, found_type), data, node.start_pos, None);
+                }
+                ValidateError::TooManyArguments { node } => {
+                    let mut start_pos = node.start_pos;
+                    let mut end_pos = start_pos.clone();
+                    end_pos.col += node.name.chars().count() as u32;
+                    if !node.implicit_selector {
+                        for (name, selector) in SELECTORS.entries() {
+                            if selector == &node.selector {
+                                start_pos.col += 1 + name.len() as u32;
+                                end_pos.col += 1 + name.len() as u32;
+                            }
+                        }
+                    }
+                    // TODO pos
+                    print_err(format!("Too many arguments for action '{}'", node.name), data, start_pos, Some(end_pos));
                 }
             }
             std::process::exit(0);

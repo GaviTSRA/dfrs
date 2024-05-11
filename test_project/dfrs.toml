@@ -2,7 +2,7 @@
 api = "codeclient"
 
 [debug]
-tokens=true
-nodes=true
-compile=true
+tokens=false
+nodes=false
+compile=false
 connection=false

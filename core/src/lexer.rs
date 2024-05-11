@@ -234,6 +234,10 @@ impl Lexer {
                     result.push(self.token(Token::Comma));
                     self.advance();
                 }
+                '=' => {
+                    result.push(self.token(Token::Equal));
+                    self.advance();
+                }
                 '0'..='9' => result.push(self.make_number()?),
                 '\'' => result.push(self.make_string()?),
                 '"' => result.push(self.make_text()?),

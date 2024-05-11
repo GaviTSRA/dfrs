@@ -174,7 +174,8 @@ impl Parser {
                 ArgValue::Location { x: _, y: _, z: _, pitch: _, yaw: _ } => ArgType::LOCATION,
                 ArgValue::Potion { potion: _, amplifier: _, duration: _ } => ArgType::POTION,
                 ArgValue::Sound { sound: _, volume: _, pitch: _ } => ArgType::SOUND,
-                ArgValue::Vector { x: _, y: _, z: _ } => ArgType::VECTOR
+                ArgValue::Vector { x: _, y: _, z: _ } => ArgType::VECTOR,
+                ArgValue::Tag { tag: _, value: _ } => ArgType::TAG
             };
             args.push(Arg { value: param, index: i, arg_type});
             i += 1
@@ -192,6 +193,10 @@ impl Parser {
 
         let mut params: Vec<ArgValue> = vec![];
         let mut is_value = false;
+        let mut could_be_tag = false;
+        let mut tag_name: String = "".into();
+        let mut is_tag = false;
+
         let expected = vec![Token::CloseParen, Token::Text { value: "<any>".into() }, Token::String { value: "<any>".into() }, Token::Number { value: 0.0 }, Token::Identifier { value: "Location".into() }];
         loop {
             let token = self.advance_err()?;
@@ -203,6 +208,27 @@ impl Parser {
                     }
                     Token::CloseParen => break,
                     _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Comma, Token::CloseParen] })
+                }
+            } else if could_be_tag {
+                could_be_tag = false;
+                match token.token.clone() {
+                    Token::Equal => {
+                        is_tag = true;
+                    }
+                    _ => {
+                        return Err(ParseError::InvalidToken { found: Some(token), expected: vec![Token::Equal] })
+                    }
+                }
+            } else if is_tag {
+                is_tag = false;
+                match token.token.clone() {
+                    Token::String { value } => {
+                        params.push(ArgValue::Tag { tag: tag_name.clone(), value });
+                        is_value = true;
+                    }
+                    _ => {
+                        return Err(ParseError::InvalidToken { found: Some(token), expected: vec![Token::String { value: "<any>".into() }] })
+                    }
                 }
             } else {
                 match token.token.clone() {
@@ -349,7 +375,8 @@ impl Parser {
                                 is_value = true;
                             }
                             _ => {
-                                return Err(ParseError::InvalidToken { found: Some(token), expected })
+                                could_be_tag = true;
+                                tag_name = value;
                             }
                         }
                     }
