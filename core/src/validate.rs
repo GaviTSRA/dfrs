@@ -161,7 +161,6 @@ impl Validator {
                         let mut args: Vec<Arg> = vec![];
                         let mut index: i32 = -1;
 
-                        // TODO tags
                         for arg in action.args.clone() {
                             let mut match_more = true;
                             let mut matched_one = false;
@@ -177,7 +176,11 @@ impl Validator {
                                         }
                                         break;
                                     } else {
-                                        return Err(ValidateError::MissingArgument { node: action_node, index, name: arg.name})
+                                        if !matched_one {
+                                            return Err(ValidateError::MissingArgument { node: action_node, index, name: arg.name})
+                                        } else {
+                                            break;
+                                        }
                                     }
                                 }
                                 let mut provided_arg = action_node.args.remove(0);
