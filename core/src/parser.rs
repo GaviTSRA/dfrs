@@ -226,8 +226,12 @@ impl Parser {
                         params.push(ArgValue::Tag { tag: tag_name.clone(), value, definition: None });
                         is_value = true;
                     }
+                    Token::Text { value } => {
+                        params.push(ArgValue::Tag { tag: tag_name.clone(), value, definition: None });
+                        is_value = true;
+                    }
                     _ => {
-                        return Err(ParseError::InvalidToken { found: Some(token), expected: vec![Token::String { value: "<any>".into() }] })
+                        return Err(ParseError::InvalidToken { found: Some(token), expected: vec![Token::String { value: "<any>".into() }, Token::Text { value: "<any>".into() }] })
                     }
                 }
             } else {
