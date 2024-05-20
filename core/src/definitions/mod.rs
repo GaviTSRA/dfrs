@@ -5,31 +5,30 @@ pub struct DefinedArg {
     pub arg_type: ArgType,
     pub name: String,
     pub allow_multiple: bool,
-    pub slot: i32,
     pub optional: bool
 }
 
 impl DefinedArg {
-    pub fn number(name: &str, slot: i32, optional: bool, allow_multiple: bool) -> DefinedArg {
-        return DefinedArg {name: name.to_owned(), arg_type: ArgType::NUMBER, slot, allow_multiple, optional};
+    pub fn number(name: &str, optional: bool, allow_multiple: bool) -> DefinedArg {
+        return DefinedArg {name: name.to_owned(), arg_type: ArgType::NUMBER, allow_multiple, optional};
     }
-    pub fn text(name: &str, slot: i32, optional: bool, allow_multiple: bool) -> DefinedArg {
-        return DefinedArg {name: name.to_owned(), arg_type: ArgType::TEXT, slot, allow_multiple, optional};
+    pub fn text(name: &str, optional: bool, allow_multiple: bool) -> DefinedArg {
+        return DefinedArg {name: name.to_owned(), arg_type: ArgType::TEXT, allow_multiple, optional};
     }
-    pub fn string(name: &str, slot: i32, optional: bool, allow_multiple: bool) -> DefinedArg {
-        return DefinedArg {name: name.to_owned(), arg_type: ArgType::STRING, slot, allow_multiple, optional};
+    pub fn string(name: &str, optional: bool, allow_multiple: bool) -> DefinedArg {
+        return DefinedArg {name: name.to_owned(), arg_type: ArgType::STRING, allow_multiple, optional};
     }   
-    pub fn location(name: &str, slot: i32, optional: bool, allow_multiple: bool) -> DefinedArg {
-        return DefinedArg {name: name.to_owned(), arg_type: ArgType::LOCATION, slot, allow_multiple, optional};
+    pub fn location(name: &str, optional: bool, allow_multiple: bool) -> DefinedArg {
+        return DefinedArg {name: name.to_owned(), arg_type: ArgType::LOCATION, allow_multiple, optional};
     }
-    pub fn vector(name: &str, slot: i32, optional: bool, allow_multiple: bool) -> DefinedArg {
-        return DefinedArg {name: name.to_owned(), arg_type: ArgType::VECTOR, slot, allow_multiple, optional};
+    pub fn vector(name: &str, optional: bool, allow_multiple: bool) -> DefinedArg {
+        return DefinedArg {name: name.to_owned(), arg_type: ArgType::VECTOR, allow_multiple, optional};
     }
-    pub fn sound(name: &str, slot: i32, optional: bool, allow_multiple: bool) -> DefinedArg {
-        return DefinedArg {name: name.to_owned(), arg_type: ArgType::SOUND, slot, allow_multiple, optional};
+    pub fn sound(name: &str, optional: bool, allow_multiple: bool) -> DefinedArg {
+        return DefinedArg {name: name.to_owned(), arg_type: ArgType::SOUND, allow_multiple, optional};
     }
-    pub fn potion(name: &str, slot: i32, optional: bool, allow_multiple: bool) -> DefinedArg {
-        return DefinedArg {name: name.to_owned(), arg_type: ArgType::POTION, slot, allow_multiple, optional};
+    pub fn potion(name: &str, optional: bool, allow_multiple: bool) -> DefinedArg {
+        return DefinedArg {name: name.to_owned(), arg_type: ArgType::POTION, allow_multiple, optional};
     }
 }
 
