@@ -75,28 +75,6 @@ pub static ENTITY_EVENTS: phf::Map<&'static str, &'static str> = phf_map! {
     "regrowWool" => "RegrowWool"
 };
 
-pub static PLAYER_ACTIONS: phf::Map<&'static str, &'static str> = phf_map! {
-    "giveItems" => "GiveItems(items:item*,amount:number?)",
-    "setHotbar" => "SetHotbar(items:item*)",
-    "setInventory" => "SetInventory(items:item*)",
-    "setSlot" => "SetSlotItem(item:item?,slot:number)",
-    "setEquipment" => "SetEquipment(item:item?,TAG)",
-    "setArmor" => "SetArmor(items:item*)",
-    "replaceItem" => "ReplaceItems(replace:items*?,with:item,amount:number?)",
-    "removeItems" => "RemoveItems(items:item*)",
-    "clearItems" => "ClearItems(items:item*)",
-    "clearInventory" => "ClearInv(TAG,TAG)",
-    "setCursor" => "SetCursorItem(item:item?)",
-    "saveInventory" => "SaveInv",
-    "loadInventory" => "LoadInv",
-    "setItemCcoooldown" => "SetItemCooldown(item:item,time:number)",
-
-    "sendMessage" => "SendMessage(msg:text*,TAG,TAG)",
-    "playSound" => "PlaySound(sound:Sound)",
-    "givePotion" => "GivePotion(sound:Sound)",
-    "sendMessageSeq" => "SendMessageSeq(msg:text*,delay:num?,TAG)"
-};
-
 pub enum ValidateError {
     UnknownEvent { node: EventNode },
     UnknownAction { node: ActionNode },
@@ -189,7 +167,7 @@ impl Validator {
                                     return Err(ValidateError::MissingArgument { node: action_node, index, name: arg.name})
                                 }
 
-                                if provided_arg.arg_type != arg.arg_type {
+                                if provided_arg.arg_type != arg.arg_type && arg.arg_type != ArgType::ANY {
                                     if arg.allow_multiple && matched_one {
                                         action_node.args.insert(0, provided_arg);
                                         break;
@@ -255,7 +233,7 @@ impl Validator {
                             if !matched {
                                 args.push(Arg {
                                     arg_type: ArgType::TAG,
-                                    value: ArgValue::Tag { tag: tag.df_name.clone(), value: tag.options.get(0).unwrap().to_owned(), definition: Some(tag.clone()) },
+                                    value: ArgValue::Tag { tag: tag.df_name.clone(), value: tag.default.clone(), definition: Some(tag.clone()) },
                                     index: tag.slot as i32
                                 });
                             }
@@ -278,4 +256,4 @@ impl Validator {
     }
 }
 
-// TODO validate potions, sounds
+// TODO validate potions, sounds, particles etc
