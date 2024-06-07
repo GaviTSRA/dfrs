@@ -10,6 +10,7 @@ pub mod validate;
 pub mod compile;
 pub mod send;
 pub mod definitions;
+pub mod utility;
 
 pub fn load_config() -> Config {
     let data;

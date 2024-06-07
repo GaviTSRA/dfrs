@@ -1,7 +1,7 @@
 use std::cmp;
 
 use dfrs_core::send::send;
-use dfrs_core::token::{Position, SELECTORS};
+use dfrs_core::token::Position;
 use dfrs_core::compile::compile;
 use dfrs_core::lexer::{Lexer, LexerError};
 use dfrs_core::load_config;
@@ -135,54 +135,28 @@ fn main() {
         Err(err)  => {
             match err {
                 ValidateError::UnknownEvent { node } => {
-                    let mut end_pos = node.start_pos.clone();
-                    end_pos.col += 1 + node.event.chars().count() as u32;
-                    print_err(format!("Unknown event '{}'", node.event), data, node.start_pos, Some(end_pos));
+                    print_err(format!("Unknown event '{}'", node.event), data, node.start_pos, Some(node.name_end_pos));
                 }
                 ValidateError::UnknownAction { node } => {
-                    let mut start_pos = node.start_pos;
-                    let mut end_pos = start_pos.clone();
-                    end_pos.col += node.name.chars().count() as u32;
-                    if !node.implicit_selector {
-                        for (name, selector) in SELECTORS.entries() {
-                            if selector == &node.selector {
-                                start_pos.col += 1 + name.len() as u32;
-                                end_pos.col += 1 + name.len() as u32;
-                            }
-                        }
-                    }
-                    print_err(format!("Unknown action '{}'", node.name), data, start_pos, Some(end_pos));
+                    print_err(format!("Unknown action '{}'", node.name), data, node.start_pos, Some(node.end_pos));
                 }
-                ValidateError::MissingArgument { node, index, name } => {
-                    // TODO pos
-                    print_err(format!("Missing argument '{}'", name), data, node.start_pos, None);
+                ValidateError::MissingArgument { node, name, .. } => {
+                    print_err(format!("Missing argument '{}'", name), data, node.start_pos, Some(node.end_pos));
                 }
                 ValidateError::WrongArgumentType { node, index, name, expected_type, found_type } => {
-                    // TODO pos
-                    print_err(format!("Wrong argument type for '{}', expected '{:?}' but found '{:?}'", name, expected_type, found_type), data, node.start_pos, None);
+                    print_err(format!("Wrong argument type for '{}', expected '{:?}' but found '{:?}'", name, expected_type, found_type), data, node.args.get(index as usize).unwrap().start_pos.clone(), Some(node.args.get(index as usize).unwrap().end_pos.clone()));
                 }
                 ValidateError::TooManyArguments { node } => {
-                    let mut start_pos = node.start_pos;
+                    let start_pos = node.start_pos;
                     let mut end_pos = start_pos.clone();
                     end_pos.col += node.name.chars().count() as u32;
-                    if !node.implicit_selector {
-                        for (name, selector) in SELECTORS.entries() {
-                            if selector == &node.selector {
-                                start_pos.col += 1 + name.len() as u32;
-                                end_pos.col += 1 + name.len() as u32;
-                            }
-                        }
-                    }
-                    // TODO pos
                     print_err(format!("Too many arguments for action '{}'", node.name), data, start_pos, Some(end_pos));
                 }
-                ValidateError::InvalidTagOption { node, tag_name, provided, options } => {
-                    // TODO pos
-                    print_err(format!("Invalid option '{}' for tag '{}', expected one of {:?}", provided, tag_name, options), data, node.start_pos.clone(), Some(node.start_pos));
+                ValidateError::InvalidTagOption { node: _, tag_name, provided, options, start_pos, end_pos } => {
+                    print_err(format!("Invalid option '{}' for tag '{}', expected one of {:?}", provided, tag_name, options), data, start_pos, Some(end_pos));
                 }
-                ValidateError::UnknownTag { node, tag_name, available } => {
-                    // TODO pos
-                    print_err(format!("Unknown tag '{}', found tags: {:?}", tag_name, available), data, node.start_pos.clone(), Some(node.start_pos));
+                ValidateError::UnknownTag { node: _, tag_name, available, start_pos, end_pos } => {
+                    print_err(format!("Unknown tag '{}', found tags: {:?}", tag_name, available), data, start_pos, Some(end_pos));
                 }
             }
             std::process::exit(0);

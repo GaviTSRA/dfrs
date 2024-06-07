@@ -1,4 +1,4 @@
-use crate::definitions::{DefinedArg, DefinedTag};
+use crate::{definitions::{DefinedArg, DefinedTag}, utility::to_camel_case};
 
 use super::{action_dump::ActionDump, ArgType};
 
@@ -72,8 +72,8 @@ impl PlayerActions {
                     options.push(option.name);
                 }
 
-                //TODO dfrs tagnames
-                let new_tag = DefinedTag::new(&tag.name, &tag.name, tag.slot, options, tag.default_option);
+                let dfrs_name = to_camel_case(&tag.name);
+                let new_tag = DefinedTag::new(&dfrs_name, &tag.name, tag.slot, options, tag.default_option);
                 tags.push(new_tag);
             }
 

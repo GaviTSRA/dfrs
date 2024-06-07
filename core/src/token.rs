@@ -86,7 +86,7 @@ impl Display for Token {
             Token::Number { .. } => write!(f, "Number"),
             Token::String { .. } => write!(f, "String"),
             Token::Text { .. } => write!(f, "Text"),
-            Token::Identifier { .. } => write!(f, "Indentifier"),
+            Token::Identifier { .. } => write!(f, "Identifier"),
             Token::Keyword { value } => write!(f, "Keyword:{}", value),
             Token::Selector { .. } => write!(f, "Selector"),
         }

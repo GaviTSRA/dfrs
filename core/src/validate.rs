@@ -1,6 +1,6 @@
 use phf::phf_map;
 
-use crate::{definitions::{player_actions::PlayerActions, ArgType}, node::{ActionNode, ActionType, Arg, ArgValue, EventNode, Expression, FileNode}};
+use crate::{definitions::{player_actions::PlayerActions, ArgType}, node::{ActionNode, ActionType, Arg, ArgValue, EventNode, Expression, FileNode}, token::Position};
 
 pub static PLAYER_EVENTS: phf::Map<&'static str, &'static str> = phf_map! {
     "join" => "Join",
@@ -81,8 +81,8 @@ pub enum ValidateError {
     MissingArgument { node: ActionNode, index: i32, name: String },
     WrongArgumentType { node: ActionNode, index: i32, name: String, expected_type: ArgType, found_type: ArgType },
     TooManyArguments { node: ActionNode },
-    InvalidTagOption { node:ActionNode, tag_name: String, provided: String, options: Vec<String> },
-    UnknownTag { node: ActionNode, tag_name: String, available: Vec<String> }
+    InvalidTagOption { node:ActionNode, tag_name: String, provided: String, options: Vec<String>, start_pos: Position, end_pos: Position },
+    UnknownTag { node: ActionNode, tag_name: String, available: Vec<String>, start_pos: Position, end_pos: Position }
 }
 
 pub struct Validator {
@@ -139,6 +139,9 @@ impl Validator {
                         let mut args: Vec<Arg> = vec![];
                         let mut index: i32 = -1;
 
+                        let mut all_provided_args = action_node.args.clone();
+                        action_node.args = vec![];
+
                         for arg in action.args.clone() {
                             let mut match_more = true;
                             let mut matched_one = false;
@@ -147,10 +150,16 @@ impl Validator {
                                     match_more = false;
                                 }
                                 index += 1;
-                                if action_node.args.len() == 0 {
+                                if all_provided_args.len() == 0 {
                                     if arg.optional {
                                         if !matched_one {
-                                            args.push(Arg { arg_type: ArgType::EMPTY, value: ArgValue::Empty , index} );
+                                            args.push(Arg { 
+                                                arg_type: ArgType::EMPTY, 
+                                                value: ArgValue::Empty , 
+                                                index,
+                                                start_pos: Position::new(0, 0),
+                                                end_pos: Position::new(0, 0)
+                                            });
                                         }
                                         break;
                                     } else {
@@ -161,7 +170,7 @@ impl Validator {
                                         }
                                     }
                                 }
-                                let mut provided_arg = action_node.args.remove(0);
+                                let mut provided_arg = all_provided_args.remove(0);
                                 
                                 if provided_arg.arg_type == ArgType::EMPTY && !arg.optional {
                                     return Err(ValidateError::MissingArgument { node: action_node, index, name: arg.name})
@@ -171,8 +180,9 @@ impl Validator {
                                     if arg.allow_multiple && matched_one {
                                         action_node.args.insert(0, provided_arg);
                                         break;
-                                    }
-                                    return Err(ValidateError::WrongArgumentType { node: action_node, index: index, name: arg.name, expected_type: arg.arg_type, found_type: provided_arg.arg_type })
+                                    }    
+                                    action_node.args.push(provided_arg.clone());
+                                    return Err(ValidateError::WrongArgumentType { node: action_node, index, name: arg.name, expected_type: arg.arg_type, found_type: provided_arg.arg_type })
                                 }
 
                                 provided_arg.index = index;
@@ -180,19 +190,20 @@ impl Validator {
                                 matched_one = true;
                             }
                         }
-                        let mut tags = vec![];
-                        if action_node.args.len() > 0 {
-                            for val in action_node.args.clone() {
+
+                        let mut tags: Vec<Arg> = vec![];
+                        if all_provided_args.len() > 0 {
+                            for val in all_provided_args.clone() {
                                 if val.arg_type != ArgType::TAG {
                                     return Err(ValidateError::TooManyArguments { node: action_node })
                                 }
-                                tags.push(val.value)
+                                tags.push(val)
                             }
                         }
 
                         for given_tag in tags.clone() {
-                            match given_tag {
-                                ArgValue::Tag { tag: tag_name, value: _, definition: _ } => {
+                            match given_tag.value {
+                                ArgValue::Tag { tag: tag_name, value: _, definition: _, name_end_pos, value_start_pos: _ } => {
                                     let mut found = false;
                                     let mut available = vec![];
                                     for tag in action.tags.clone() {
@@ -202,7 +213,7 @@ impl Validator {
                                         }
                                     }
                                     if !found {
-                                        return Err(ValidateError::UnknownTag { node: action_node, tag_name, available });
+                                        return Err(ValidateError::UnknownTag { node: action_node, tag_name, available, start_pos: given_tag.start_pos, end_pos: name_end_pos });
                                     }
                                 }
                                 _ => unreachable!()
@@ -212,18 +223,20 @@ impl Validator {
                         for tag in action.tags.clone() {
                             let mut matched = false;
                             for given_tag in tags.clone() {
-                                match given_tag {
-                                    ArgValue::Tag { tag: tag_name, value, .. } => {
+                                match given_tag.value {
+                                    ArgValue::Tag { tag: tag_name, value, name_end_pos, value_start_pos , ..} => {
                                         if tag.dfrs_name == tag_name {
                                             if tag.options.contains(&value) {
                                                 matched = true;
                                                 args.push(Arg {
                                                     arg_type: ArgType::TAG,
-                                                    value: ArgValue::Tag { tag: tag.df_name.clone(), value, definition: Some(tag.clone()) },
-                                                    index: tag.slot as i32
+                                                    value: ArgValue::Tag { tag: tag.df_name.clone(), value, definition: Some(tag.clone()), name_end_pos, value_start_pos },
+                                                    index: tag.slot as i32,
+                                                    start_pos: given_tag.start_pos,
+                                                    end_pos: given_tag.end_pos
                                                 });
                                             } else {
-                                                return Err(ValidateError::InvalidTagOption { node: action_node, tag_name, provided: value, options: tag.options });
+                                                return Err(ValidateError::InvalidTagOption { node: action_node, tag_name, provided: value, options: tag.options, start_pos: value_start_pos, end_pos: given_tag.end_pos });
                                             }
                                         }
                                     }
@@ -233,8 +246,10 @@ impl Validator {
                             if !matched {
                                 args.push(Arg {
                                     arg_type: ArgType::TAG,
-                                    value: ArgValue::Tag { tag: tag.df_name.clone(), value: tag.default.clone(), definition: Some(tag.clone()) },
-                                    index: tag.slot as i32
+                                    value: ArgValue::Tag { tag: tag.df_name.clone(), value: tag.default.clone(), definition: Some(tag.clone()), name_end_pos: Position::new(0, 0), value_start_pos: Position::new(0, 0) },
+                                    index: tag.slot as i32,
+                                    start_pos: Position::new(0, 0),
+                                    end_pos: Position::new(0, 0)
                                 });
                             }
                         }

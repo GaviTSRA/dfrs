@@ -17,6 +17,7 @@ pub struct EventNode {
     pub event: String,
     pub expressions: Vec<ExpressionNode>,
     pub start_pos: Position,
+    pub name_end_pos: Position,
     pub end_pos: Position
 }
 
@@ -39,15 +40,18 @@ pub struct ActionNode {
     pub name: String,
     pub args: Vec<Arg>,
     pub start_pos: Position,
-    pub end_pos: Position,
-    pub implicit_selector: bool
+    pub selector_start_pos: Position,
+    pub selector_end_pos: Position,
+    pub end_pos: Position
 }
 
 #[derive(Clone, Debug)]
 pub struct Arg {
     pub value: ArgValue,
     pub index: i32,
-    pub arg_type: ArgType
+    pub arg_type: ArgType,
+    pub start_pos: Position,
+    pub end_pos: Position
 }
 
 #[derive(Clone, Debug)]
@@ -60,7 +64,14 @@ pub enum ArgValue {
     Vector { x: f32, y: f32, z: f32},
     Sound { sound: String, volume: f32, pitch: f32 },
     Potion { potion: String, amplifier: f32, duration: f32 },
-    Tag { tag: String, value: String, definition: Option<DefinedTag> }
+    Tag { tag: String, value: String, definition: Option<DefinedTag>, name_end_pos: Position, value_start_pos: Position }
+}
+
+#[derive(Clone, Debug)]
+pub struct ArgValueWithPos {
+    pub value: ArgValue,
+    pub start_pos: Position,
+    pub end_pos: Position
 }
 
 #[derive(Clone, Debug, PartialEq)]
