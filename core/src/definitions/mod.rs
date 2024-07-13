@@ -28,6 +28,7 @@ pub enum ArgType {
     PARTICLE,
     ITEM,
     TAG,
+    VARIABLE,
     ANY
 }
 

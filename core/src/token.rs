@@ -55,6 +55,7 @@ pub enum Token {
     Dot,
     Comma,
     Equal,
+    Semicolon,
     OpenParen,
     CloseParen,
     OpenParenCurly,
@@ -62,6 +63,7 @@ pub enum Token {
     Number { value: f32 },
     String { value: String },
     Text { value: String },
+    Variable { value: String },
     Identifier { value: String },
     Keyword { value: Keyword },
     Selector { value: Selector }
@@ -79,6 +81,7 @@ impl Display for Token {
             Token::Dot => write!(f, "."),
             Token::Comma => write!(f, ","),
             Token::Equal => write!(f, "="),
+            Token::Semicolon => write!(f, ";"),
             Token::OpenParen => write!(f, "("),
             Token::CloseParen => write!(f, ")"),
             Token::OpenParenCurly => write!(f, "{{"),
@@ -86,6 +89,7 @@ impl Display for Token {
             Token::Number { .. } => write!(f, "Number"),
             Token::String { .. } => write!(f, "String"),
             Token::Text { .. } => write!(f, "Text"),
+            Token::Variable { .. } => write!(f, "Variable"),
             Token::Identifier { .. } => write!(f, "Identifier"),
             Token::Keyword { value } => write!(f, "Keyword:{}", value),
             Token::Selector { .. } => write!(f, "Selector"),
@@ -97,7 +101,11 @@ impl Display for Token {
 pub enum Keyword {
     P,
     E,
-    G
+    G,
+    VarLine,
+    VarLocal,
+    VarGame,
+    VarSave,
 }
 
 impl Display for Keyword {
@@ -105,7 +113,11 @@ impl Display for Keyword {
         match self {
             Keyword::P => write!(f, "p"),
             Keyword::E => write!(f, "e"),
-            Keyword::G => write!(f, "g")
+            Keyword::G => write!(f, "g"),
+            Keyword::VarLine => write!(f, "line"),
+            Keyword::VarLocal => write!(f, "local"),
+            Keyword::VarGame => write!(f, "game"),
+            Keyword::VarSave => write!(f, "save"),
         }
     }
 }
@@ -113,7 +125,11 @@ impl Display for Keyword {
 pub static KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
     "p" => Keyword::P,
     "e" => Keyword::E,
-    "g" => Keyword::G
+    "g" => Keyword::G,
+    "line" => Keyword::VarLine,
+    "local" => Keyword::VarLocal,
+    "game" => Keyword::VarGame,
+    "save" => Keyword::VarSave,
 };
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

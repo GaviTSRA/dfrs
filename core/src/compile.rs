@@ -1,6 +1,6 @@
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 
-use crate::{node::{ActionNode, ActionType, EventNode, Expression, FileNode, ArgValue}, token::Selector};
+use crate::{node::{ActionNode, ActionType, ArgValue, EventNode, Expression, FileNode}, token::Selector};
 
 pub fn compile(node: FileNode, debug: bool) -> Vec<String> {
     let mut res: Vec<String> = vec![];
@@ -33,7 +33,10 @@ fn event_node(event_node: EventNode) -> Result<std::string::String, serde_json::
     codeline.blocks.push(event_block);
 
     for expr_node in event_node.expressions {
-        codeline.blocks.push(expression_node(expr_node.node))
+        match expression_node(expr_node.node) {
+            Some(block) => codeline.blocks.push(block),
+            None => {}
+        };
     }
 
     let res = serde_json::to_string(&codeline)?;
@@ -41,9 +44,10 @@ fn event_node(event_node: EventNode) -> Result<std::string::String, serde_json::
     Ok(res)
 }
 
-fn expression_node(node: Expression) -> Block {
+fn expression_node(node: Expression) -> Option<Block> {
     match node {
-        Expression::Action { node } => return action_node(node)
+        Expression::Action { node } => return Some(action_node(node)),
+        Expression::Variable { .. } => return None,
     }
 }
 
@@ -88,6 +92,9 @@ fn action_node(node: ActionNode) -> Block {
                 option: value,
                 tag
                }, id: String::from("bl_tag")}, slot: definition.unwrap().slot as i32})
+            }
+            ArgValue::Variable { value, scope } => {
+                args.push( Arg { item: ArgItem { data: ArgValueData::Variable { value, scope }, id: String::from("var") }, slot: arg.index } ); 
             }
         }
     }
@@ -137,6 +144,7 @@ struct ArgItem {
 #[derive(Deserialize, Debug)]
 enum ArgValueData {
     Simple { name: String },
+    Variable { value: String, scope: String },
     Location { is_block: bool, loc: Location },
     Vector { x: f32, y: f32, z: f32 },
     Sound { sound: String, volume: f32, pitch: f32 },
@@ -153,6 +161,12 @@ impl Serialize for ArgValueData {
             ArgValueData::Simple { name } => {
                 let mut state = serializer.serialize_struct("MyEnum", 1)?;
                 state.serialize_field("name", name)?;
+                state.end()
+            }
+            ArgValueData::Variable { value, scope } => {
+                let mut state = serializer.serialize_struct("MyEnum", 2)?;
+                state.serialize_field("name", value)?;
+                state.serialize_field("scope", scope)?;
                 state.end()
             }
             ArgValueData::Location { is_block, loc } => {

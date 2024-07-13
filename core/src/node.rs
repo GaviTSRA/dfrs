@@ -30,7 +30,8 @@ pub struct ExpressionNode {
 
 #[derive(Clone, Debug)]
 pub enum Expression {
-    Action { node: ActionNode }
+    Action { node: ActionNode },
+    Variable { node: VariableNode }
 }
 
 #[derive(Clone, Debug)]
@@ -55,6 +56,15 @@ pub struct Arg {
 }
 
 #[derive(Clone, Debug)]
+pub struct VariableNode {
+    pub dfrs_name: String,
+    pub df_name: String,
+    pub var_type: VariableType,
+    pub start_pos: Position,
+    pub end_pos: Position
+}
+
+#[derive(Clone, Debug)]
 pub enum ArgValue {
     Empty,
     Number { number: f32 },
@@ -64,7 +74,8 @@ pub enum ArgValue {
     Vector { x: f32, y: f32, z: f32},
     Sound { sound: String, volume: f32, pitch: f32 },
     Potion { potion: String, amplifier: f32, duration: f32 },
-    Tag { tag: String, value: String, definition: Option<DefinedTag>, name_end_pos: Position, value_start_pos: Position }
+    Tag { tag: String, value: String, definition: Option<DefinedTag>, name_end_pos: Position, value_start_pos: Position },
+    Variable { value: String, scope: String }
 }
 
 #[derive(Clone, Debug)]
@@ -79,4 +90,12 @@ pub enum ActionType {
     Player,
     Entity,
     Game
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum VariableType {
+    Line,
+    Local,
+    Game,
+    Save
 }

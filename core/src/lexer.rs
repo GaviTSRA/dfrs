@@ -5,7 +5,8 @@ pub enum LexerError {
     InvalidNumber { pos: Position },
     InvalidToken { token: char, pos: Position },
     UnterminatedString { pos: Position },
-    UnterminatedText { pos: Position }
+    UnterminatedText { pos: Position },
+    UnterminatedVariable { pos: Position }
 }
 
 pub struct Lexer {
@@ -117,6 +118,38 @@ impl Lexer {
         }
 
         Ok(TokenWithPos { token: Token::Text { value: string }, start_pos, end_pos: self.position.clone() })
+    }
+
+    fn make_variable(&mut self) -> Result<TokenWithPos, LexerError> {
+        let mut string: String = String::from("");
+        let mut escape = false;
+        let mut is_escaped;
+        let start_pos = self.position.clone();
+
+        loop {
+            self.advance();
+            if self.current_char.is_none() {
+                return Err(LexerError::UnterminatedVariable { pos: start_pos })
+            }
+
+            is_escaped = escape;
+            escape = false;
+
+            let char = self.current_char.unwrap();
+
+            if !is_escaped && char == '`' {
+                self.advance();
+                break;
+            }
+
+            string.push_str(&char.to_string());
+
+            if !is_escaped && char == '\\' {
+                escape = true;
+            }
+        }
+
+        Ok(TokenWithPos { token: Token::Variable { value: string }, start_pos, end_pos: self.position.clone() })
     }
 
     fn make_identifier_or_keyword(&mut self) -> Result<TokenWithPos, LexerError> {
@@ -238,9 +271,14 @@ impl Lexer {
                     result.push(self.token(Token::Equal));
                     self.advance();
                 }
+                ';' => {
+                    result.push(self.token(Token::Semicolon));
+                    self.advance();
+                }
                 '0'..='9' => result.push(self.make_number()?),
                 '\'' => result.push(self.make_string()?),
                 '"' => result.push(self.make_text()?),
+                '`' => result.push(self.make_variable()?),
                 'a'..='z' => result.push(self.make_identifier_or_keyword()?),
                 'A'..='Z' => result.push(self.make_identifier_or_keyword()?),
                 '_' => result.push(self.make_identifier_or_keyword()?),

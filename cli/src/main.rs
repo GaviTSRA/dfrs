@@ -1,7 +1,7 @@
 use std::cmp;
 
 use dfrs_core::send::send;
-use dfrs_core::token::Position;
+use dfrs_core::token::{Position, Token};
 use dfrs_core::compile::compile;
 use dfrs_core::lexer::{Lexer, LexerError};
 use dfrs_core::load_config;
@@ -66,6 +66,9 @@ fn main() {
                 LexerError::UnterminatedText { pos } => {
                     print_err(format!("Unterminated text in line {pos}"), data, pos, None);
                 }
+                LexerError::UnterminatedVariable { pos } => {
+                    print_err(format!("Unterminated variable in line {pos}"), data, pos, None);
+                }
             }
             std::process::exit(0);
         }
@@ -84,6 +87,10 @@ fn main() {
                             dfrs_core::node::Expression::Action { node } => {
                                 println!("{:?} {:?} {:?} {:?}", node.action_type, node.selector, node.name, node.args)
                             }
+                            dfrs_core::node::Expression::Variable { node } => {
+                                println!("{:?} {:?} {:?}", node.var_type, node.dfrs_name, node.df_name)
+                            },
+                            
                         }
                     }
                 }
@@ -123,6 +130,13 @@ fn main() {
                 }
                 ParseError::InvalidPotion { pos, msg } => {
                     print_err(format!("Invalid Potion: {}", msg), data, pos, None)
+                }
+                ParseError::UnknownVariable { found } => {
+                    let name = match found.token {
+                        Token::Variable { value } => value,
+                        _ => unreachable!()
+                    };
+                    print_err(format!("Unknown variabel: {}", name), data, found.start_pos, Some(found.end_pos))
                 }
             }
             std::process::exit(0);

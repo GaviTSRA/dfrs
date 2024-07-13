@@ -119,9 +119,10 @@ impl Validator {
 
             for expression in event.expressions.iter_mut() {
                 match expression.node.clone() {
-                    crate::node::Expression::Action { node } => {
+                    Expression::Action { node } => {
                         expression.node = Expression::Action { node: self.validate_action(node)? };
                     }
+                    Expression::Variable { .. } => {}
                 }
             }
         }
@@ -176,7 +177,7 @@ impl Validator {
                                     return Err(ValidateError::MissingArgument { node: action_node, index, name: arg.name})
                                 }
 
-                                if provided_arg.arg_type != arg.arg_type && arg.arg_type != ArgType::ANY {
+                                if provided_arg.arg_type != arg.arg_type && arg.arg_type != ArgType::ANY && provided_arg.arg_type != ArgType::VARIABLE {
                                     if arg.allow_multiple && matched_one {
                                         action_node.args.insert(0, provided_arg);
                                         break;

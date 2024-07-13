@@ -1,8 +1,9 @@
-use crate::{definitions::ArgType, node::{ActionNode, ActionType, Arg, ArgValue, ArgValueWithPos, EventNode, Expression, ExpressionNode, FileNode}, token::{Keyword, Position, Selector, Token, TokenWithPos, SELECTORS}};
+use crate::{definitions::ArgType, node::{ActionNode, ActionType, Arg, ArgValue, ArgValueWithPos, EventNode, Expression, ExpressionNode, FileNode, VariableNode, VariableType}, token::{Keyword, Position, Selector, Token, TokenWithPos, SELECTORS}};
 
 #[derive(Debug)]
 pub enum ParseError {
     InvalidToken { found: Option<TokenWithPos>, expected: Vec<Token> },
+    UnknownVariable { found: TokenWithPos },
     InvalidLocation { pos: Position, msg: String },
     InvalidVector { pos: Position, msg: String },
     InvalidSound { pos: Position, msg: String },
@@ -12,12 +13,13 @@ pub enum ParseError {
 pub struct Parser {
     tokens: Vec<TokenWithPos>,
     token_index: i32,
-    current_token: Option<TokenWithPos>
+    current_token: Option<TokenWithPos>,
+    variables: Vec<VariableNode>,
 }
 
 impl Parser {
     pub fn new(tokens: Vec<TokenWithPos>) -> Parser {
-        Parser { tokens, token_index: -1, current_token: None }
+        Parser { tokens, token_index: -1, current_token: None, variables: vec![] }
     }
 
     fn advance(&mut self) -> Option<TokenWithPos> {
@@ -118,6 +120,26 @@ impl Parser {
                         end_pos = res.end_pos.clone();
                         node = Expression::Action { node: res };
                     }
+                    Keyword::VarLine => {
+                        let res = self.variable(VariableType::Line)?;
+                        end_pos = res.end_pos.clone();
+                        node = Expression::Variable { node: res }
+                    },
+                    Keyword::VarLocal => {
+                        let res = self.variable(VariableType::Local)?;
+                        end_pos = res.end_pos.clone();
+                        node = Expression::Variable { node: res }
+                    },
+                    Keyword::VarGame => {
+                        let res = self.variable(VariableType::Game)?;
+                        end_pos = res.end_pos.clone();
+                        node = Expression::Variable { node: res }
+                    },
+                    Keyword::VarSave => {
+                        let res = self.variable(VariableType::Save)?;
+                        end_pos = res.end_pos.clone();
+                        node = Expression::Variable { node: res }
+                    },
                 }
             }
             _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Keyword { value: Keyword::E }, Token::Keyword { value: Keyword::P }] })
@@ -168,14 +190,15 @@ impl Parser {
         for param in params {
             let arg_type = match param.value {
                 ArgValue::Empty => ArgType::EMPTY,
-                ArgValue::Number { number: _ } => ArgType::NUMBER,
-                ArgValue::String { string: _ } => ArgType::STRING,
-                ArgValue::Text { text:_ } => ArgType::TEXT,
-                ArgValue::Location { x: _, y: _, z: _, pitch: _, yaw: _ } => ArgType::LOCATION,
-                ArgValue::Potion { potion: _, amplifier: _, duration: _ } => ArgType::POTION,
-                ArgValue::Sound { sound: _, volume: _, pitch: _ } => ArgType::SOUND,
-                ArgValue::Vector { x: _, y: _, z: _ } => ArgType::VECTOR,
-                ArgValue::Tag { tag: _, value: _, definition: _ , ..} => ArgType::TAG
+                ArgValue::Number { .. } => ArgType::NUMBER,
+                ArgValue::String { .. } => ArgType::STRING,
+                ArgValue::Text { .. } => ArgType::TEXT,
+                ArgValue::Location { .. } => ArgType::LOCATION,
+                ArgValue::Potion { .. } => ArgType::POTION,
+                ArgValue::Sound { .. } => ArgType::SOUND,
+                ArgValue::Vector { .. } => ArgType::VECTOR,
+                ArgValue::Tag { ..} => ArgType::TAG,
+                ArgValue::Variable { .. } => ArgType::VARIABLE
             };
             args.push(Arg { value: param.value, index: i, arg_type, start_pos: param.start_pos, end_pos: param.end_pos});
             i += 1
@@ -192,7 +215,53 @@ impl Parser {
             }
         }
 
+        let token = self.advance_err()?;
+        match token.token {
+            Token::Semicolon => {}
+            _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Semicolon ]})
+        }
+
         Ok(ActionNode { action_type, selector, name, args, start_pos, selector_start_pos, selector_end_pos, end_pos: token.end_pos })
+    }
+
+    fn variable(&mut self, var_type: VariableType) -> Result<VariableNode, ParseError> {
+        let start_pos = self.current_token.clone().unwrap().start_pos;
+        let end_pos = start_pos.clone();
+        
+        let token = self.advance_err()?;
+        let dfrs_name = match token.token {
+            Token::Identifier { value } => value,
+            _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Identifier { value: "any".into() }] })
+        };
+
+        let token = self.advance_err()?;
+        match token.token {
+            Token::Equal => {}
+            Token::Semicolon => {
+                return {
+                    let node = VariableNode { dfrs_name: dfrs_name.clone(), df_name: dfrs_name, var_type, start_pos, end_pos };
+                    self.variables.push(node.clone());
+                    Ok(node)
+                }
+            }
+            _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Equal, Token::Semicolon] })
+        };
+
+        let token = self.advance_err()?;
+        let df_name = match token.token {
+            Token::Variable { value } => value,
+            _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Variable { value: "any".into() }] })
+        };
+
+        let token = self.advance_err()?;
+        match token.token {
+            Token::Semicolon => {}
+            _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Semicolon ]})
+        }
+
+        let node = VariableNode { dfrs_name, df_name, var_type, start_pos, end_pos };
+        self.variables.push(node.clone());
+        Ok(node)
     }
     
     fn make_params(&mut self) -> Result<Vec<ArgValueWithPos>, ParseError> {
@@ -231,7 +300,17 @@ impl Parser {
                         is_tag = true;
                     }
                     _ => {
-                        return Err(ParseError::InvalidToken { found: Some(token), expected: vec![Token::Equal] })
+                        if let Some((var, scope)) = self.get_variable(tag_name.clone()) {
+                            params.push(ArgValueWithPos {
+                                value: ArgValue::Variable { value: var, scope },
+                                start_pos: self.current_token.clone().unwrap().start_pos,
+                                end_pos: self.current_token.clone().unwrap().end_pos,
+                            });
+                            is_value = true;
+                            self.token_index -= 1;
+                        } else {
+                            return Err(ParseError::UnknownVariable { found: token })    
+                        }
                     }
                 }
             } else if is_tag {
@@ -454,5 +533,21 @@ impl Parser {
             return Err(ParseError::InvalidToken { found: Some(TokenWithPos::new(Token::Comma, comma_pos.clone(), comma_pos)), expected })
         }
         Ok(params)
+    }
+
+    fn get_variable(&self, value: String) -> Option<(String, String)> {
+        for node in &self.variables {
+            if node.dfrs_name == value {
+                let scope = match node.var_type {
+                    VariableType::Line => "line",
+                    VariableType::Local => "local",
+                    VariableType::Game => "unsaved",
+                    VariableType::Save => "saved",
+                };
+                return Some((node.df_name.clone(), scope.to_owned()))
+            }
+        }
+
+        None
     }
 }
