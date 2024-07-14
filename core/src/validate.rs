@@ -94,6 +94,17 @@ impl Validator {
         Validator {player_actions: PlayerActions::new()}
     }
     pub fn validate(&self, mut node: FileNode) -> Result<FileNode, ValidateError> {
+        for function in node.functions.iter_mut() {
+            for expression in function.expressions.iter_mut() {
+                match expression.node.clone() {
+                    Expression::Action { node } => {
+                        expression.node = Expression::Action { node: self.validate_action(node)? };
+                    }
+                    Expression::Variable { .. } => {}
+                }
+            }
+        }
+
         for event in node.events.iter_mut() {
             let mut actual_event;
             

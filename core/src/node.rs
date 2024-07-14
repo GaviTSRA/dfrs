@@ -7,6 +7,7 @@ pub trait Node {
 #[derive(Clone, Debug)]
 pub struct FileNode {
     pub events: Vec<EventNode>,
+    pub functions: Vec<FunctionNode>,
     pub start_pos: Position,
     pub end_pos: Position
 }
@@ -15,6 +16,15 @@ pub struct FileNode {
 pub struct EventNode {
     pub event_type: Option<ActionType>,
     pub event: String,
+    pub expressions: Vec<ExpressionNode>,
+    pub start_pos: Position,
+    pub name_end_pos: Position,
+    pub end_pos: Position
+}
+
+#[derive(Clone, Debug)]
+pub struct FunctionNode {
+    pub name: String,
     pub expressions: Vec<ExpressionNode>,
     pub start_pos: Position,
     pub name_end_pos: Position,

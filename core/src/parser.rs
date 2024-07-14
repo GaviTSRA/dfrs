@@ -1,4 +1,4 @@
-use crate::{definitions::ArgType, node::{ActionNode, ActionType, Arg, ArgValue, ArgValueWithPos, EventNode, Expression, ExpressionNode, FileNode, VariableNode, VariableType}, token::{Keyword, Position, Selector, Token, TokenWithPos, SELECTORS}};
+use crate::{definitions::ArgType, node::{ActionNode, ActionType, Arg, ArgValue, ArgValueWithPos, EventNode, Expression, ExpressionNode, FileNode, FunctionNode, VariableNode, VariableType}, token::{Keyword, Position, Selector, Token, TokenWithPos, SELECTORS}};
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -49,12 +49,21 @@ impl Parser {
     fn file(&mut self) -> Result<FileNode, ParseError> {
         let mut token = self.advance();
         let mut events: Vec<EventNode> = vec![];
+        let mut functions: Vec<FunctionNode> = vec![];
         let start_pos = Position::new(1, 0);
 
         while token.is_some() {
             match token.clone().unwrap().token {
                 Token::At => events.push(self.event()?),
-                _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::At] })
+                Token::Keyword { value } => {
+                    match value {
+                        Keyword::Function => {
+                            functions.push(self.function()?);
+                        }
+                        _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::At, Token::Keyword { value: Keyword::Function }] })
+                    }
+                }
+                _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::At, Token::Keyword { value: Keyword::Function }] })
             }
             token = self.advance();
         }
@@ -65,7 +74,7 @@ impl Parser {
         } else {
             end_pos = start_pos.clone();
         }
-        Ok(FileNode { events, start_pos, end_pos })
+        Ok(FileNode { events, functions, start_pos, end_pos })
     }
 
     fn event(&mut self) -> Result<EventNode, ParseError> {
@@ -94,6 +103,34 @@ impl Parser {
         }
 
         Ok(EventNode { event_type: None, event, expressions, start_pos, name_end_pos: name_token.end_pos, end_pos: token.end_pos })
+    }
+
+    fn function(&mut self) -> Result<FunctionNode, ParseError> {
+        let name;
+        let mut expressions: Vec<ExpressionNode> = vec![];
+        let start_pos = self.current_token.clone().unwrap().end_pos;
+
+        let name_token = self.advance_err()?;
+        match name_token.token {
+            Token::Identifier { value } => name = value,
+            _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Identifier { value: String::from("<any>")}] })
+        }
+
+        let mut token = self.advance_err()?;
+        match token.token {
+            Token::OpenParenCurly => {},
+            _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::OpenParenCurly] })
+        }
+
+        loop {
+            token = self.advance_err()?;
+            match token.token {
+                Token::CloseParenCurly => break,
+                _ => expressions.push(self.expression()?)
+            }
+        }
+
+        Ok(FunctionNode { name, expressions, start_pos, name_end_pos: name_token.end_pos, end_pos: token.end_pos })
     }
 
     fn expression(&mut self) -> Result<ExpressionNode, ParseError> {
@@ -140,6 +177,7 @@ impl Parser {
                         end_pos = res.end_pos.clone();
                         node = Expression::Variable { node: res }
                     },
+                    _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Keyword { value: Keyword::E }, Token::Keyword { value: Keyword::P }] })
                 }
             }
             _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Keyword { value: Keyword::E }, Token::Keyword { value: Keyword::P }] })

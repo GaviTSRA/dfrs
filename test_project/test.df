@@ -4,3 +4,12 @@
     p.setFreezeTicks(test_var);
     p.setFreezeTicks(test_var2);
 }
+
+fn test {
+    p.sendMessage("Hello world!");
+}
+
+fn test2 {
+    line testVariable;
+    p.sendMessage(testVariable);
+}

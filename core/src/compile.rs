@@ -1,9 +1,22 @@
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 
-use crate::{node::{ActionNode, ActionType, ArgValue, EventNode, Expression, FileNode}, token::Selector};
+use crate::{node::{ActionNode, ActionType, ArgValue, EventNode, Expression, FileNode, FunctionNode}, token::Selector};
 
 pub fn compile(node: FileNode, debug: bool) -> Vec<String> {
     let mut res: Vec<String> = vec![];
+    for function in node.functions.clone() {
+        match function_node(function) {
+            Ok(result) => {
+                res.push(result.clone());
+                if debug {
+                    println!("{:?}", result);
+                }
+            }
+            Err(err) => {
+                panic!("Failed to compile: {}", err)
+            }
+        }
+    }
     for event in node.events.clone() {
         match event_node(event) {
             Ok(result) => {
@@ -20,19 +33,48 @@ pub fn compile(node: FileNode, debug: bool) -> Vec<String> {
     res
 }
 
-fn event_node(event_node: EventNode) -> Result<std::string::String, serde_json::Error> {
+fn event_node(event_node: EventNode) -> Result<String, serde_json::Error> {
     let mut codeline = Codeline { blocks: vec![] };
 
     let event_block = Block {
         id: "block".to_owned(), 
         block: if event_node.event_type.unwrap() == ActionType::Player { "event".to_owned() } else { "entity_event".to_owned() }, 
-        action: event_node.event,
+        action: Some(event_node.event),
         args: Args { items: vec![] },
-        target: None
+        target: None,
+        data: None
     };
     codeline.blocks.push(event_block);
 
     for expr_node in event_node.expressions {
+        match expression_node(expr_node.node) {
+            Some(block) => codeline.blocks.push(block),
+            None => {}
+        };
+    }
+
+    let res = serde_json::to_string(&codeline)?;
+
+    Ok(res)
+}
+
+fn function_node(function_node: FunctionNode) -> Result<String, serde_json::Error> {
+    let mut codeline = Codeline { blocks: vec![] };
+
+    let function_block = Block {
+        id: "block".to_owned(), 
+        block: "func".to_owned(), 
+        action: None,
+        args: Args { items: vec![
+            Arg { item: ArgItem { data: ArgValueData::Id { id: "function".into() }, id: "hint".into() }, slot: 25 },
+            Arg { item: ArgItem { data: ArgValueData::Tag { action: "dynamic".into(), block: "func".into(), option: "False".into(),tag: "Is Hidden".into() }, id: "bl_tag".into() }, slot: 26 }
+        ] },
+        target: None,
+        data: Some(function_node.name)
+    };
+    codeline.blocks.push(function_block);
+
+    for expr_node in function_node.expressions {
         match expression_node(expr_node.node) {
             Some(block) => codeline.blocks.push(block),
             None => {}
@@ -100,11 +142,12 @@ fn action_node(node: ActionNode) -> Block {
     }
 
     Block {
-        action: node.name,
+        action: Some(node.name),
         block: block.to_string(),
         id: "block".to_string(),
         target: Some(node.selector),
-        args: Args { items: args }
+        args: Args { items: args },
+        data: None
     }
 }
 
@@ -119,9 +162,12 @@ struct Block {
     block: String,
     // #[serde(skip_serializing_if = "Option::is_none")]
     args: Args,
-    action: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    target: Option<Selector>
+    action: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    target: Option<Selector>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    data: Option<String>
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -144,6 +190,7 @@ struct ArgItem {
 #[derive(Deserialize, Debug)]
 enum ArgValueData {
     Simple { name: String },
+    Id { id: String },
     Variable { value: String, scope: String },
     Location { is_block: bool, loc: Location },
     Vector { x: f32, y: f32, z: f32 },
@@ -161,6 +208,11 @@ impl Serialize for ArgValueData {
             ArgValueData::Simple { name } => {
                 let mut state = serializer.serialize_struct("MyEnum", 1)?;
                 state.serialize_field("name", name)?;
+                state.end()
+            }
+            ArgValueData::Id { id } => {
+                let mut state = serializer.serialize_struct("MyEnum", 1)?;
+                state.serialize_field("id", id)?;
                 state.end()
             }
             ArgValueData::Variable { value, scope } => {
