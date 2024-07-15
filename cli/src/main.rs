@@ -1,7 +1,7 @@
 use std::cmp;
 
 use dfrs_core::send::send;
-use dfrs_core::token::{Position, Token};
+use dfrs_core::token::Position;
 use dfrs_core::compile::compile;
 use dfrs_core::lexer::{Lexer, LexerError};
 use dfrs_core::load_config;
@@ -131,12 +131,8 @@ fn main() {
                 ParseError::InvalidPotion { pos, msg } => {
                     print_err(format!("Invalid Potion: {}", msg), data, pos, None)
                 }
-                ParseError::UnknownVariable { found } => {
-                    let name = match found.token {
-                        Token::Variable { value } => value,
-                        _ => unreachable!()
-                    };
-                    print_err(format!("Unknown variabel: {}", name), data, found.start_pos, Some(found.end_pos))
+                ParseError::UnknownVariable { found, start_pos, end_pos } => {
+                    print_err(format!("Unknown variable: {}", found), data, start_pos, Some(end_pos))
                 }
             }
             std::process::exit(0);

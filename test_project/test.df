@@ -12,4 +12,6 @@ fn test {
 fn test2 {
     line testVariable;
     p.sendMessage(testVariable);
+    p.sendMessage(test_var);
+    p.sendMessage(test_var3);
 }

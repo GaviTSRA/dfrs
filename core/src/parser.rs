@@ -3,7 +3,7 @@ use crate::{definitions::ArgType, node::{ActionNode, ActionType, Arg, ArgValue, 
 #[derive(Debug)]
 pub enum ParseError {
     InvalidToken { found: Option<TokenWithPos>, expected: Vec<Token> },
-    UnknownVariable { found: TokenWithPos },
+    UnknownVariable { found: String, start_pos: Position, end_pos: Position },
     InvalidLocation { pos: Position, msg: String },
     InvalidVector { pos: Position, msg: String },
     InvalidSound { pos: Position, msg: String },
@@ -347,7 +347,7 @@ impl Parser {
                             is_value = true;
                             self.token_index -= 1;
                         } else {
-                            return Err(ParseError::UnknownVariable { found: token })    
+                            return Err(ParseError::UnknownVariable { found: tag_name.clone(), start_pos: tag_start_pos, end_pos: tag_end_pos });
                         }
                     }
                 }
