@@ -60,12 +60,21 @@ impl Parser {
                         Keyword::Function => {
                             functions.push(self.function()?);
                         }
+                        Keyword::VarGame => {
+                            let node = self.variable(VariableType::Game)?;
+                            self.variables.push(node);
+                        }
+                        Keyword::VarSave => {
+                            let node = self.variable(VariableType::Save)?;
+                            self.variables.push(node);
+                        }
                         _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::At, Token::Keyword { value: Keyword::Function }] })
                     }
                 }
-                _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::At, Token::Keyword { value: Keyword::Function }] })
+                _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::At, Token::Keyword { value: Keyword::Function }, Token::Keyword { value: Keyword::VarGame }, Token::Keyword { value: Keyword::VarSave }] })
             }
             token = self.advance();
+            self.variables = self.variables.clone().into_iter().filter(|var| var.var_type == VariableType::Game || var.var_type == VariableType::Save).collect::<Vec<VariableNode>>();
         }
         
         let end_pos;
@@ -164,16 +173,6 @@ impl Parser {
                     },
                     Keyword::VarLocal => {
                         let res = self.variable(VariableType::Local)?;
-                        end_pos = res.end_pos.clone();
-                        node = Expression::Variable { node: res }
-                    },
-                    Keyword::VarGame => {
-                        let res = self.variable(VariableType::Game)?;
-                        end_pos = res.end_pos.clone();
-                        node = Expression::Variable { node: res }
-                    },
-                    Keyword::VarSave => {
-                        let res = self.variable(VariableType::Save)?;
                         end_pos = res.end_pos.clone();
                         node = Expression::Variable { node: res }
                     },

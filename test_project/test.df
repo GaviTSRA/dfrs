@@ -1,8 +1,13 @@
+game test_var3;
+save test_var4 = `test 4`;
+
 @swapHands {
-    game test_var = `test var`;
-    save test_var2;
+    line test_var = `test var`;
+    local test_var2;
     p.setFreezeTicks(test_var);
     p.setFreezeTicks(test_var2);
+    p.setFreezeTicks(test_var3);
+    p.setFreezeTicks(test_var4);
 }
 
 fn test {
@@ -12,6 +17,4 @@ fn test {
 fn test2 {
     line testVariable;
     p.sendMessage(testVariable);
-    p.sendMessage(test_var);
-    p.sendMessage(test_var3);
 }
