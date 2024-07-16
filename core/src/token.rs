@@ -44,7 +44,7 @@ impl TokenWithPos {
 }
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Token {
     Plus,
     Minus,
@@ -97,7 +97,7 @@ impl Display for Token {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Keyword {
     P,
     E,
@@ -135,7 +135,7 @@ pub static KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
     "fn" => Keyword::Function
 };
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum Selector {
     Default,
     Selection,

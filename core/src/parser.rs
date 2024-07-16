@@ -42,6 +42,14 @@ impl Parser {
         return Ok(token.unwrap())
     }
 
+    fn require_token(&mut self, required_token: Token) -> Result<TokenWithPos, ParseError> {
+        let token = self.advance_err()?;
+        if token.token == required_token {
+            return Ok(token);
+        }
+        return Err(ParseError::InvalidToken { found: Some(token), expected: vec![required_token] });
+    }
+
     pub fn run(&mut self) -> Result<FileNode, ParseError> {
         Ok(self.file()?)
     }
@@ -97,12 +105,9 @@ impl Parser {
             _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Identifier { value: String::from("<any>")}] })
         }
 
-        let mut token = self.advance_err()?;
-        match token.token {
-            Token::OpenParenCurly => {},
-            _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::OpenParenCurly] })
-        }
+        self.require_token(Token::OpenParenCurly)?;
 
+        let mut token;
         loop {
             token = self.advance_err()?;
             match token.token {
@@ -125,12 +130,9 @@ impl Parser {
             _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Identifier { value: String::from("<any>")}] })
         }
 
-        let mut token = self.advance_err()?;
-        match token.token {
-            Token::OpenParenCurly => {},
-            _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::OpenParenCurly] })
-        }
+        self.require_token(Token::OpenParenCurly)?;
 
+        let mut token;
         loop {
             token = self.advance_err()?;
             match token.token {
@@ -200,7 +202,6 @@ impl Parser {
                     Token::Selector { value } => {
                         selector = value;
                         implicit_selector = false;
-                        token = self.advance_err()?;
                     }
                     _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Selector { value: Selector::AllPlayers }]})
                 }
@@ -208,10 +209,7 @@ impl Parser {
             _ => {}
         }
 
-        match token.token {
-            Token::Dot => {}
-            _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Dot] })
-        }
+        self.require_token(Token::Dot)?;
 
         token = self.advance_err()?;
         match token.token {
@@ -252,11 +250,7 @@ impl Parser {
             }
         }
 
-        let token = self.advance_err()?;
-        match token.token {
-            Token::Semicolon => {}
-            _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Semicolon ]})
-        }
+        self.require_token(Token::Semicolon)?;
 
         Ok(ActionNode { action_type, selector, name, args, start_pos, selector_start_pos, selector_end_pos, end_pos: token.end_pos })
     }
@@ -290,11 +284,7 @@ impl Parser {
             _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Variable { value: "any".into() }] })
         };
 
-        let token = self.advance_err()?;
-        match token.token {
-            Token::Semicolon => {}
-            _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Semicolon ]})
-        }
+        self.require_token(Token::Semicolon)?;
 
         let node = VariableNode { dfrs_name, df_name, var_type, start_pos, end_pos };
         self.variables.push(node.clone());
