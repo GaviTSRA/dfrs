@@ -56,6 +56,7 @@ pub enum Token {
     Comma,
     Equal,
     Semicolon,
+    QuestionMark,
     OpenParen,
     CloseParen,
     OpenParenCurly,
@@ -82,6 +83,7 @@ impl Display for Token {
             Token::Comma => write!(f, ","),
             Token::Equal => write!(f, "="),
             Token::Semicolon => write!(f, ";"),
+            Token::QuestionMark => write!(f, "?"),
             Token::OpenParen => write!(f, "("),
             Token::CloseParen => write!(f, ")"),
             Token::OpenParenCurly => write!(f, "{{"),
@@ -92,7 +94,7 @@ impl Display for Token {
             Token::Variable { .. } => write!(f, "Variable"),
             Token::Identifier { .. } => write!(f, "Identifier"),
             Token::Keyword { value } => write!(f, "Keyword:{}", value),
-            Token::Selector { .. } => write!(f, "Selector"),
+            Token::Selector { .. } => write!(f, "Selector")
         }
     }
 }
@@ -163,3 +165,54 @@ pub static SELECTORS: phf::Map<&'static str, Selector> = phf_map! {
     "allMobs" => Selector::AllMobs,
     "last" => Selector::LastSpawned,
 };
+
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub enum Type {
+    String,
+    Text,
+    Number,
+    Location,
+    Vector,
+    Sound,
+    Particle,
+    Potion,
+    Item,
+    Any,
+    Variable,
+    List,
+    Dict
+}
+
+pub static TYPES: phf::Map<&'static str, Type> = phf_map! {
+    "string" => Type::String,
+    "text" => Type::Text,
+    "number" => Type::Number,
+    "location" => Type::Location,
+    "vector" => Type::Vector,
+    "sound" => Type::Sound,
+    "particle" => Type::Particle,
+    "potion" => Type::Potion,
+    "item" => Type::Item,
+    "any" => Type::Any,
+    "variable" => Type::Variable,
+    "list" => Type::List,
+    "dict" => Type::Dict
+};
+
+pub fn get_type_str(input: Type) -> String {
+    return match input {
+        Type::String => "txt",
+        Type::Text => "comp",
+        Type::Number => "num",
+        Type::Location => "loc",
+        Type::Vector => "vec",
+        Type::Sound => "snd",
+        Type::Particle => "part",
+        Type::Potion => "pot",
+        Type::Item => "item",
+        Type::Any => "any",
+        Type::Variable => "var",
+        Type::List => "list",
+        Type::Dict => "dict"
+    }.into();
+}

@@ -1,6 +1,6 @@
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 
-use crate::{node::{ActionNode, ActionType, ArgValue, EventNode, Expression, FileNode, FunctionNode}, token::Selector};
+use crate::{node::{ActionNode, ActionType, EventNode, Expression, FileNode, FunctionNode}, token::{get_type_str, Selector}};
 
 pub fn compile(node: FileNode, debug: bool) -> Vec<String> {
     let mut res: Vec<String> = vec![];
@@ -61,14 +61,58 @@ fn event_node(event_node: EventNode) -> Result<String, serde_json::Error> {
 fn function_node(function_node: FunctionNode) -> Result<String, serde_json::Error> {
     let mut codeline = Codeline { blocks: vec![] };
 
+    let mut items = vec![
+        Arg { item: ArgItem { data: ArgValueData::Id { id: "function".into() }, id: "hint".into() }, slot: 25 },
+        Arg { item: ArgItem { data: ArgValueData::Tag { action: "dynamic".into(), block: "func".into(), option: "False".into(),tag: "Is Hidden".into() }, id: "bl_tag".into() }, slot: 26 }
+    ];
+
+    let mut slot = 0;
+    for param in function_node.params {
+        let mut default = None;
+        if let Some(param_default) = param.default {
+            let default_data = arg_val_from_arg(crate::node::Arg {
+                value: param_default.value,
+                index: 0,
+                arg_type: crate::definitions::ArgType::ANY,
+                start_pos: param_default.start_pos,
+                end_pos: param_default.end_pos,
+            }, "".into(), "".into()).unwrap().item;
+            
+            default = Some(FunctionDefaultItem {
+                data: match default_data.data {
+                    ArgValueData::Simple { name } => FunctionDefaultItemData::Simple { name },
+                    ArgValueData::Id { id } => FunctionDefaultItemData::Id { id },
+                    ArgValueData::Location { is_block, loc } => FunctionDefaultItemData::Location { is_block, loc },
+                    ArgValueData::Vector { x, y, z } => FunctionDefaultItemData::Vector { x, y, z },
+                    ArgValueData::Sound { sound, volume, pitch } => FunctionDefaultItemData::Sound { sound, volume, pitch },
+                    ArgValueData::Potion { potion, amplifier, duration } => FunctionDefaultItemData::Potion { potion, amplifier, duration },
+                    _ => unreachable!()
+                },
+                id: default_data.id,
+            })
+        }
+        
+        items.push(Arg {
+            item: ArgItem {
+                data: ArgValueData::FunctionParam {
+                    default_value: default,
+                    name: param.name,
+                    optional: param.optional,
+                    plural: param.multiple,
+                    param_type: get_type_str(param.param_type),
+                },
+                id: "pn_el".into(),
+            },
+            slot
+        });
+        slot += 1;
+    }
+
     let function_block = Block {
         id: "block".to_owned(), 
         block: "func".to_owned(), 
         action: None,
-        args: Args { items: vec![
-            Arg { item: ArgItem { data: ArgValueData::Id { id: "function".into() }, id: "hint".into() }, slot: 25 },
-            Arg { item: ArgItem { data: ArgValueData::Tag { action: "dynamic".into(), block: "func".into(), option: "False".into(),tag: "Is Hidden".into() }, id: "bl_tag".into() }, slot: 26 }
-        ] },
+        args: Args { items },
         target: None,
         data: Some(function_node.name)
     };
@@ -104,41 +148,11 @@ fn action_node(node: ActionNode) -> Block {
     let mut args: Vec<Arg> = vec![];
 
     for arg in node.args {
-        match arg.value {
-            ArgValue::Empty => continue,
-            ArgValue::Text { text } => {
-                args.push( Arg { item: ArgItem { data: ArgValueData::Simple { name: text }, id: String::from("comp") }, slot: arg.index } );        
-            }
-            ArgValue::Number { number } => {
-                args.push( Arg { item: ArgItem { data: ArgValueData::Simple { name: number.to_string() }, id: String::from("num") }, slot: arg.index} );        
-            }
-            ArgValue::String { string } => {
-                args.push( Arg { item: ArgItem { data: ArgValueData::Simple { name: string }, id: String::from("txt") }, slot: arg.index } );  
-            }
-            ArgValue::Location { x, y, z, pitch, yaw } => {
-                args.push( Arg { item: ArgItem { data: ArgValueData::Location { is_block: false, loc: Location { x, y, z, pitch, yaw } }, id: String::from("loc") }, slot: arg.index } );  
-            } 
-            ArgValue::Vector { x, y, z } => {
-                args.push( Arg { item: ArgItem { data: ArgValueData::Vector { x, y, z }, id: String::from("vec") }, slot: arg.index } );  
-            }
-            ArgValue::Sound { sound, volume, pitch } => {
-                args.push( Arg { item: ArgItem { data: ArgValueData::Sound { sound, volume, pitch }, id: String::from("snd") }, slot: arg.index } );  
-            }
-            ArgValue::Potion { potion, amplifier, duration } => {
-                args.push( Arg { item: ArgItem { data: ArgValueData::Potion { potion, amplifier, duration }, id: String::from("pot") }, slot: arg.index } );  
-            }
-            ArgValue::Tag { tag, value, definition, .. } => {
-               args.push( Arg { item: ArgItem { data: ArgValueData::Tag {
-                action: node.name.clone(),
-                block: block.to_owned(),
-                option: value,
-                tag
-               }, id: String::from("bl_tag")}, slot: definition.unwrap().slot as i32})
-            }
-            ArgValue::Variable { value, scope } => {
-                args.push( Arg { item: ArgItem { data: ArgValueData::Variable { value, scope }, id: String::from("var") }, slot: arg.index } ); 
-            }
-        }
+        let arg = match arg_val_from_arg(arg, node.name.clone(), block.to_owned()) {
+            Some(res) => res,
+            None => continue
+        };
+        args.push(arg);
     }
 
     Block {
@@ -148,6 +162,44 @@ fn action_node(node: ActionNode) -> Block {
         target: Some(node.selector),
         args: Args { items: args },
         data: None
+    }
+}
+
+fn arg_val_from_arg(arg: crate::node::Arg, node_name: String, block: String) -> Option<Arg> {
+    match arg.value {
+        crate::node::ArgValue::Empty => return None,
+        crate::node::ArgValue::Text { text } => {
+            Some( Arg { item: ArgItem { data: ArgValueData::Simple { name: text }, id: String::from("comp") }, slot: arg.index } )       
+        }
+        crate::node::ArgValue::Number { number } => {
+            Some( Arg { item: ArgItem { data: ArgValueData::Simple { name: number.to_string() }, id: String::from("num") }, slot: arg.index} )
+        }
+        crate::node::ArgValue::String { string } => {
+            Some( Arg { item: ArgItem { data: ArgValueData::Simple { name: string }, id: String::from("txt") }, slot: arg.index } )
+        }
+        crate::node::ArgValue::Location { x, y, z, pitch, yaw } => {
+            Some( Arg { item: ArgItem { data: ArgValueData::Location { is_block: false, loc: Location { x, y, z, pitch, yaw } }, id: String::from("loc") }, slot: arg.index } )
+        } 
+        crate::node::ArgValue::Vector { x, y, z } => {
+            Some( Arg { item: ArgItem { data: ArgValueData::Vector { x, y, z }, id: String::from("vec") }, slot: arg.index } )
+        }
+        crate::node::ArgValue::Sound { sound, volume, pitch } => {
+            Some( Arg { item: ArgItem { data: ArgValueData::Sound { sound, volume, pitch }, id: String::from("snd") }, slot: arg.index } )
+        }
+        crate::node::ArgValue::Potion { potion, amplifier, duration } => {
+            Some( Arg { item: ArgItem { data: ArgValueData::Potion { potion, amplifier, duration }, id: String::from("pot") }, slot: arg.index } )
+        }
+        crate::node::ArgValue::Tag { tag, value, definition, .. } => {
+           Some( Arg { item: ArgItem { data: ArgValueData::Tag {
+            action: node_name,
+            block,
+            option: value,
+            tag
+           }, id: String::from("bl_tag")}, slot: definition.unwrap().slot as i32})
+        }
+        crate::node::ArgValue::Variable { value, scope } => {
+            Some( Arg { item: ArgItem { data: ArgValueData::Variable { value, scope }, id: String::from("var") }, slot: arg.index } )
+        }
     }
 }
 
@@ -196,7 +248,32 @@ enum ArgValueData {
     Vector { x: f32, y: f32, z: f32 },
     Sound { sound: String, volume: f32, pitch: f32 },
     Potion { potion: String, amplifier: f32, duration: f32 },
-    Tag { action: String, block: String, option: String, tag: String }
+    Tag { action: String, block: String, option: String, tag: String },
+    FunctionParam { 
+        #[serde(skip_serializing_if="Option::is_none")]
+        default_value: Option<FunctionDefaultItem>,
+        name: String,
+        optional: bool,
+        plural: bool,
+        #[serde(rename="type")]    
+        param_type: String 
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct FunctionDefaultItem {
+    data: FunctionDefaultItemData, 
+    id: String
+}
+
+#[derive(Deserialize, Debug)]
+enum FunctionDefaultItemData {
+    Simple { name: String },
+    Id { id: String },
+    Location { is_block: bool, loc: Location },
+    Vector { x: f32, y: f32, z: f32 },
+    Sound { sound: String, volume: f32, pitch: f32 },
+    Potion { potion: String, amplifier: f32, duration: f32 },
 }
 
 impl Serialize for ArgValueData {
@@ -254,6 +331,64 @@ impl Serialize for ArgValueData {
                 state.serialize_field("block", block)?;
                 state.serialize_field("option", option)?;
                 state.serialize_field("tag", tag)?;
+                state.end()
+            }
+            ArgValueData::FunctionParam { default_value, name, optional, plural, param_type } => {
+                let mut state = serializer.serialize_struct("MyEnum", 4)?;
+                if default_value.is_some() {
+                    state.serialize_field("default_value", default_value)?;
+                }
+                state.serialize_field("name", name)?;
+                state.serialize_field("optional", optional)?;
+                state.serialize_field("plural", plural)?;
+                state.serialize_field("type", param_type)?;
+                state.end()
+            }
+        }
+    }
+}
+
+impl Serialize for FunctionDefaultItemData {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            FunctionDefaultItemData::Simple { name } => {
+                let mut state = serializer.serialize_struct("MyEnum", 1)?;
+                state.serialize_field("name", name)?;
+                state.end()
+            }
+            FunctionDefaultItemData::Id { id } => {
+                let mut state = serializer.serialize_struct("MyEnum", 1)?;
+                state.serialize_field("id", id)?;
+                state.end()
+            }
+            FunctionDefaultItemData::Location { is_block, loc } => {
+                let mut state = serializer.serialize_struct("MyEnum", 2)?;
+                state.serialize_field("isBlock", is_block)?;
+                state.serialize_field("loc", loc)?;
+                state.end()
+            }
+            FunctionDefaultItemData::Vector { x, y, z } => {
+                let mut state = serializer.serialize_struct("MyEnum", 3)?;
+                state.serialize_field("x", x)?;
+                state.serialize_field("y", y)?;
+                state.serialize_field("z", z)?;
+                state.end()
+            }
+            FunctionDefaultItemData::Sound { sound, volume, pitch } => {
+                let mut state = serializer.serialize_struct("MyEnum", 3)?;
+                state.serialize_field("sound", sound)?;
+                state.serialize_field("vol", volume)?;
+                state.serialize_field("pitch", pitch)?;
+                state.end()
+            }
+            FunctionDefaultItemData::Potion { potion, amplifier, duration } => {
+                let mut state = serializer.serialize_struct("MyEnum", 3)?;
+                state.serialize_field("pot", potion)?;
+                state.serialize_field("amp", amplifier)?;
+                state.serialize_field("dur", duration)?;
                 state.end()
             }
         }

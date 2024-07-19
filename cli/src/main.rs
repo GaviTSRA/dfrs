@@ -95,6 +95,24 @@ fn main() {
                     }
                 }
                 println!("\n");
+                for function in &res.functions {
+                    println!("{}", function.name);
+                    for param in &function.params {
+                        println!("{:?}", param);
+                    }
+                    for expression in &function.expressions {
+                        match &expression.node {
+                            dfrs_core::node::Expression::Action { node } => {
+                                println!("{:?} {:?} {:?} {:?}", node.action_type, node.selector, node.name, node.args)
+                            }
+                            dfrs_core::node::Expression::Variable { node } => {
+                                println!("{:?} {:?} {:?}", node.var_type, node.dfrs_name, node.df_name)
+                            },
+                            
+                        }
+                    }
+                }
+                println!("\n");
             }
             node = res;
         }
@@ -134,6 +152,12 @@ fn main() {
                 ParseError::UnknownVariable { found, start_pos, end_pos } => {
                     print_err(format!("Unknown variable: {}", found), data, start_pos, Some(end_pos))
                 }
+                ParseError::InvalidType { found, start_pos } => {
+                    match found {
+                        Some(found) => print_err(format!("Unknown type: {}", found.token), data, found.start_pos, Some(found.end_pos)),
+                        None => print_err("Missing type".into(), data, start_pos, None)
+                    }
+                },
             }
             std::process::exit(0);
         }

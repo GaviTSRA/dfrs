@@ -1,4 +1,4 @@
-use crate::{definitions::ArgType, node::{ActionNode, ActionType, Arg, ArgValue, ArgValueWithPos, EventNode, Expression, ExpressionNode, FileNode, FunctionNode, VariableNode, VariableType}, token::{Keyword, Position, Selector, Token, TokenWithPos, SELECTORS}};
+use crate::{definitions::ArgType, node::{ActionNode, ActionType, Arg, ArgValue, ArgValueWithPos, EventNode, Expression, ExpressionNode, FileNode, FunctionNode, FunctionParamNode, VariableNode, VariableType}, token::{Keyword, Position, Selector, Token, TokenWithPos, SELECTORS, TYPES}};
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -8,6 +8,7 @@ pub enum ParseError {
     InvalidVector { pos: Position, msg: String },
     InvalidSound { pos: Position, msg: String },
     InvalidPotion { pos: Position, msg: String },
+    InvalidType { found: Option<TokenWithPos>, start_pos: Position }
 }
 
 pub struct Parser {
@@ -36,7 +37,7 @@ impl Parser {
         let token = self.advance();
 
         if token.is_none() {
-            return Err(ParseError::InvalidToken { found: None, expected: vec![] }) //TODO expected
+            return Err(ParseError::InvalidToken { found: None, expected: vec![] })
         }
 
         return Ok(token.unwrap())
@@ -130,6 +131,125 @@ impl Parser {
             _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Identifier { value: String::from("<any>")}] })
         }
 
+
+        self.require_token(Token::OpenParen)?;
+        let mut params: Vec<FunctionParamNode> = vec![];
+
+        loop {
+            let token = self.advance_err()?;
+            let param_name = match token.token {
+                Token::Identifier { value } => value,
+                Token::CloseParen => break,
+                _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Identifier { value: "any".into() }, Token::CloseParen] })
+            };
+
+            let mut optional = false;
+            let mut multiple = false;
+            let mut token;
+            loop {
+                token = self.advance_err()?;
+                match token.token {
+                    Token::Colon => break,
+                    Token::Multiply => {
+                        if !multiple {
+                            multiple = true;
+                        } else {
+                            return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![] })
+                        }
+                    }
+                    Token::QuestionMark => {
+                        if !optional {
+                            optional = true;
+                        } else {
+                            return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![] })
+                        }
+                    }
+                    _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![] })
+                }
+            }
+
+            let token = self.advance_err()?;
+            let param_type = match token.token {
+                Token::Identifier { value } => {
+                    if TYPES.contains_key(&value.clone()) {
+                        TYPES.get(&value).unwrap().to_owned()
+                    } else {
+                        return Err(ParseError::InvalidType { found: self.current_token.clone(), start_pos: token.start_pos })
+                    }
+                }
+                _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Identifier { value: "type".into() }] })
+            };
+
+            let mut default = None;
+            let token = self.advance_err()?;
+            match token.token {
+                Token::Equal => {
+                    let token = self.advance_err()?;
+                    default = Some(match token.token.clone() {
+                        Token::Number { value } => {
+                            ArgValueWithPos {
+                                value: ArgValue::Number { number: value },
+                                start_pos: token.start_pos,
+                                end_pos: token.end_pos
+                            }
+                        }
+                        Token::Text { value } => {
+                            ArgValueWithPos {
+                                value: ArgValue::Text { text: value },
+                                start_pos: token.start_pos,
+                                end_pos: token.end_pos
+                            }
+                        }
+                        Token::String { value } => {
+                            ArgValueWithPos {
+                                value: ArgValue::String { string: value },
+                                start_pos: token.start_pos,
+                                end_pos: token.end_pos
+                            }
+                        }
+                        Token::Identifier { value }  => {
+                            match value.as_str() {
+                                "Location" => {
+                                    self.make_location()?
+                                }
+                                "Vector" => {
+                                    self.make_vector()?
+                                }
+                                "Sound" => {
+                                    self.make_sound()?
+                                }
+                                "Potion" => {
+                                    self.make_potion()?
+                                }
+                                _ => {
+                                    return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![] })
+                                }
+                            }
+                        }
+                        _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Identifier { value: "any".into() }] })
+                    });
+                }
+                _ => {
+                    self.token_index -= 1;
+                }
+            }
+
+            params.push(FunctionParamNode {
+                name: param_name,
+                param_type,
+                optional,
+                multiple,
+                default
+            });
+
+            let token = self.advance_err()?;
+            match token.token {
+                Token::Comma => {},
+                Token::CloseParen => break,
+                _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![] })
+            }
+        }
+
         self.require_token(Token::OpenParenCurly)?;
 
         let mut token;
@@ -141,7 +261,7 @@ impl Parser {
             }
         }
 
-        Ok(FunctionNode { name, expressions, start_pos, name_end_pos: name_token.end_pos, end_pos: token.end_pos })
+        Ok(FunctionNode { name, expressions, start_pos, name_end_pos: name_token.end_pos, end_pos: token.end_pos, params })
     }
 
     fn expression(&mut self) -> Result<ExpressionNode, ParseError> {
@@ -206,10 +326,9 @@ impl Parser {
                     _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Selector { value: Selector::AllPlayers }]})
                 }
             }
-            _ => {}
+            Token::Dot => {}
+            _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![]})
         }
-
-        self.require_token(Token::Dot)?;
 
         token = self.advance_err()?;
         match token.token {
@@ -392,147 +511,19 @@ impl Parser {
                     Token::Identifier { value }  => {
                         match value.as_str() {
                             "Location" => {
-                                let x;
-                                let y;
-                                let z;
-                                let mut pitch = None;
-                                let mut yaw = None;
-                                let start_pos = self.current_token.clone().unwrap().start_pos;
-                                let loc_params = self.make_params()?;
-
-                                if loc_params.len() < 3 {
-                                    return Err(ParseError::InvalidLocation { pos: self.current_token.clone().unwrap().start_pos, msg: "Not enough arguments".into() })
-                                }
-                                match loc_params[0].value {
-                                    ArgValue::Number { number } => x = number,
-                                    _ => return Err(ParseError::InvalidLocation { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid x coordinate".into() })
-                                }
-                                match loc_params[1].value {
-                                    ArgValue::Number { number } => y = number,
-                                    _ => return Err(ParseError::InvalidLocation { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid y coordinate".into() })
-                                }
-                                match loc_params[2].value {
-                                    ArgValue::Number { number } => z = number,
-                                    _ => return Err(ParseError::InvalidLocation { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid z coordinate".into() })
-                                }
-                                if loc_params.len() >= 4 {
-                                    match loc_params[3].value {
-                                        ArgValue::Number { number } => pitch = Some(number),
-                                        _ => return Err(ParseError::InvalidLocation { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid pitch".into() })
-                                    }
-                                }
-                                if loc_params.len() == 5 {
-                                    match loc_params[4].value {
-                                        ArgValue::Number { number } => yaw = Some(number),
-                                        _ => return Err(ParseError::InvalidLocation { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid yaw".into() })
-                                    }
-                                }
-                                if loc_params.len() > 5 {
-                                    return Err(ParseError::InvalidLocation { pos: self.current_token.clone().unwrap().start_pos, msg: "Too many arguments".into() })
-                                }
-                                params.push(ArgValueWithPos {
-                                    value: ArgValue::Location { x, y, z, pitch, yaw },
-                                    start_pos,
-                                    end_pos: self.current_token.clone().unwrap().end_pos
-                                });
+                                params.push(self.make_location()?);
                                 is_value = true;
                             }
                             "Vector" => {
-                                let x;
-                                let y;
-                                let z;
-                                let start_pos = self.current_token.clone().unwrap().start_pos;
-                                let vec_params = self.make_params()?;
-
-                                if vec_params.len() < 3 {
-                                    return Err(ParseError::InvalidVector { pos: self.current_token.clone().unwrap().start_pos, msg: "Not enough arguments".into() })
-                                }
-                                match vec_params[0].value {
-                                    ArgValue::Number { number } => x = number,
-                                    _ => return Err(ParseError::InvalidVector { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid x coordinate".into() })
-                                }
-                                match vec_params[1].value {
-                                    ArgValue::Number { number } => y = number,
-                                    _ => return Err(ParseError::InvalidVector { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid y coordinate".into() })
-                                }
-                                match vec_params[2].value {
-                                    ArgValue::Number { number } => z = number,
-                                    _ => return Err(ParseError::InvalidVector { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid z coordinate".into() })
-                                }
-                                if vec_params.len() > 3 {
-                                    return Err(ParseError::InvalidVector { pos: self.current_token.clone().unwrap().start_pos, msg: "Too many arguments".into() })
-                                }
-                                params.push(ArgValueWithPos {
-                                    value: ArgValue::Vector { x, y, z },
-                                    start_pos,
-                                    end_pos: self.current_token.clone().unwrap().end_pos    
-                                }); 
+                                params.push(self.make_vector()?);
                                 is_value = true;
                             }
                             "Sound" => {
-                                let sound;
-                                let volume;
-                                let pitch;
-                                let start_pos = self.current_token.clone().unwrap().start_pos;
-                                let sound_params = self.make_params()?;
-
-                                if sound_params.len() < 3 {
-                                    return Err(ParseError::InvalidSound { pos: self.current_token.clone().unwrap().start_pos, msg: "Not enough arguments".into() })
-                                }
-                                match &sound_params[0].value {
-                                    ArgValue::String { string } => sound = string.clone(),
-                                    ArgValue::Text { text } => sound = text.clone(),
-                                    _ => return Err(ParseError::InvalidSound { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid sound type".into() })
-                                }
-                                match sound_params[1].value {
-                                    ArgValue::Number { number } => volume = number,
-                                    _ => return Err(ParseError::InvalidSound { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid volume".into() })
-                                }
-                                match sound_params[2].value {
-                                    ArgValue::Number { number } => pitch = number,
-                                    _ => return Err(ParseError::InvalidSound { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid pitch".into() })
-                                }
-                                if sound_params.len() > 3 {
-                                    return Err(ParseError::InvalidSound { pos: self.current_token.clone().unwrap().start_pos, msg: "Too many arguments".into() })
-                                }
-                                params.push(ArgValueWithPos {
-                                    value: ArgValue::Sound { sound, volume, pitch },
-                                    start_pos,
-                                    end_pos: self.current_token.clone().unwrap().end_pos
-                                }); 
+                                params.push(self.make_sound()?);
                                 is_value = true;
                             }
                             "Potion" => {
-                                let potion;
-                                let amplifier;
-                                let duration;
-                                let start_pos = self.current_token.clone().unwrap().start_pos;
-                                let potion_params = self.make_params()?;
-
-                                if potion_params.len() < 3 {
-                                    return Err(ParseError::InvalidPotion { pos: self.current_token.clone().unwrap().start_pos, msg: "Not enough arguments".into() })
-                                }
-                                match &potion_params[0].value {
-                                    ArgValue::String { string } => potion = string.clone(),
-                                    ArgValue::Text { text } => potion = text.clone(),
-                                    _ => return Err(ParseError::InvalidPotion { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid potion type".into() })
-                                }
-                                match potion_params[1].value {
-                                    ArgValue::Number { number } => amplifier = number,
-                                    _ => return Err(ParseError::InvalidPotion { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid amplifier".into() })
-                                }
-                                match potion_params[2].value {
-                                    ArgValue::Number { number } => duration = number,
-                                    _ => return Err(ParseError::InvalidPotion { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid duration".into() })
-                                }
-                                if potion_params.len() > 3 {
-                                    return Err(ParseError::InvalidPotion { pos: self.current_token.clone().unwrap().start_pos, msg: "Too many arguments".into() })
-                                }
-                                params.push(ArgValueWithPos {
-                                    value: ArgValue::Potion { potion, amplifier, duration },
-                                    start_pos,
-                                    end_pos: self.current_token.clone().unwrap().end_pos
-                                }); 
+                                params.push(self.make_potion()?);
                                 is_value = true;
                             }
                             "null" => {
@@ -560,6 +551,150 @@ impl Parser {
             return Err(ParseError::InvalidToken { found: Some(TokenWithPos::new(Token::Comma, comma_pos.clone(), comma_pos)), expected })
         }
         Ok(params)
+    }
+
+    fn make_location(&mut self) -> Result<ArgValueWithPos, ParseError> {
+        let x;
+        let y;
+        let z;
+        let mut pitch = None;
+        let mut yaw = None;
+        let start_pos = self.current_token.clone().unwrap().start_pos;
+        let loc_params = self.make_params()?;
+
+        if loc_params.len() < 3 {
+            return Err(ParseError::InvalidLocation { pos: self.current_token.clone().unwrap().start_pos, msg: "Not enough arguments".into() })
+        }
+        match loc_params[0].value {
+            ArgValue::Number { number } => x = number,
+            _ => return Err(ParseError::InvalidLocation { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid x coordinate".into() })
+        }
+        match loc_params[1].value {
+            ArgValue::Number { number } => y = number,
+            _ => return Err(ParseError::InvalidLocation { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid y coordinate".into() })
+        }
+        match loc_params[2].value {
+            ArgValue::Number { number } => z = number,
+            _ => return Err(ParseError::InvalidLocation { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid z coordinate".into() })
+        }
+        if loc_params.len() >= 4 {
+            match loc_params[3].value {
+                ArgValue::Number { number } => pitch = Some(number),
+                _ => return Err(ParseError::InvalidLocation { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid pitch".into() })
+            }
+        }
+        if loc_params.len() == 5 {
+            match loc_params[4].value {
+                ArgValue::Number { number } => yaw = Some(number),
+                _ => return Err(ParseError::InvalidLocation { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid yaw".into() })
+            }
+        }
+        if loc_params.len() > 5 {
+            return Err(ParseError::InvalidLocation { pos: self.current_token.clone().unwrap().start_pos, msg: "Too many arguments".into() })
+        }
+        Ok(ArgValueWithPos {
+            value: ArgValue::Location { x, y, z, pitch, yaw },
+            start_pos,
+            end_pos: self.current_token.clone().unwrap().end_pos
+        })
+    }
+
+    fn make_vector(&mut self) -> Result<ArgValueWithPos, ParseError> {
+        let x;
+        let y;
+        let z;
+        let start_pos = self.current_token.clone().unwrap().start_pos;
+        let vec_params = self.make_params()?;
+
+        if vec_params.len() < 3 {
+            return Err(ParseError::InvalidVector { pos: self.current_token.clone().unwrap().start_pos, msg: "Not enough arguments".into() })
+        }
+        match vec_params[0].value {
+            ArgValue::Number { number } => x = number,
+            _ => return Err(ParseError::InvalidVector { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid x coordinate".into() })
+        }
+        match vec_params[1].value {
+            ArgValue::Number { number } => y = number,
+            _ => return Err(ParseError::InvalidVector { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid y coordinate".into() })
+        }
+        match vec_params[2].value {
+            ArgValue::Number { number } => z = number,
+            _ => return Err(ParseError::InvalidVector { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid z coordinate".into() })
+        }
+        if vec_params.len() > 3 {
+            return Err(ParseError::InvalidVector { pos: self.current_token.clone().unwrap().start_pos, msg: "Too many arguments".into() })
+        }
+        Ok(ArgValueWithPos {
+            value: ArgValue::Vector { x, y, z },
+            start_pos,
+            end_pos: self.current_token.clone().unwrap().end_pos    
+        })
+    }
+
+    fn make_sound(&mut self) -> Result<ArgValueWithPos, ParseError> {
+        let sound;
+        let volume;
+        let pitch;
+        let start_pos = self.current_token.clone().unwrap().start_pos;
+        let sound_params = self.make_params()?;
+
+        if sound_params.len() < 3 {
+            return Err(ParseError::InvalidSound { pos: self.current_token.clone().unwrap().start_pos, msg: "Not enough arguments".into() })
+        }
+        match &sound_params[0].value {
+            ArgValue::String { string } => sound = string.clone(),
+            ArgValue::Text { text } => sound = text.clone(),
+            _ => return Err(ParseError::InvalidSound { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid sound type".into() })
+        }
+        match sound_params[1].value {
+            ArgValue::Number { number } => volume = number,
+            _ => return Err(ParseError::InvalidSound { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid volume".into() })
+        }
+        match sound_params[2].value {
+            ArgValue::Number { number } => pitch = number,
+            _ => return Err(ParseError::InvalidSound { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid pitch".into() })
+        }
+        if sound_params.len() > 3 {
+            return Err(ParseError::InvalidSound { pos: self.current_token.clone().unwrap().start_pos, msg: "Too many arguments".into() })
+        }
+        Ok(ArgValueWithPos {
+            value: ArgValue::Sound { sound, volume, pitch },
+            start_pos,
+            end_pos: self.current_token.clone().unwrap().end_pos
+        }) 
+    }
+
+    fn make_potion(&mut self) -> Result<ArgValueWithPos, ParseError> {
+        let potion;
+        let amplifier;
+        let duration;
+        let start_pos = self.current_token.clone().unwrap().start_pos;
+        let potion_params = self.make_params()?;
+
+        if potion_params.len() < 3 {
+            return Err(ParseError::InvalidPotion { pos: self.current_token.clone().unwrap().start_pos, msg: "Not enough arguments".into() })
+        }
+        match &potion_params[0].value {
+            ArgValue::String { string } => potion = string.clone(),
+            ArgValue::Text { text } => potion = text.clone(),
+            _ => return Err(ParseError::InvalidPotion { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid potion type".into() })
+        }
+        match potion_params[1].value {
+            ArgValue::Number { number } => amplifier = number,
+            _ => return Err(ParseError::InvalidPotion { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid amplifier".into() })
+        }
+        match potion_params[2].value {
+            ArgValue::Number { number } => duration = number,
+            _ => return Err(ParseError::InvalidPotion { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid duration".into() })
+        }
+        if potion_params.len() > 3 {
+            return Err(ParseError::InvalidPotion { pos: self.current_token.clone().unwrap().start_pos, msg: "Too many arguments".into() })
+        }
+        Ok(ArgValueWithPos {
+            value: ArgValue::Potion { potion, amplifier, duration },
+            start_pos,
+            end_pos: self.current_token.clone().unwrap().end_pos
+        })
     }
 
     fn get_variable(&self, value: String) -> Option<(String, String)> {

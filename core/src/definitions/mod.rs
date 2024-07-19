@@ -1,4 +1,4 @@
-pub mod player_actions;
+pub mod actions;
 pub mod action_dump;
 
 #[derive(Clone, Debug)]

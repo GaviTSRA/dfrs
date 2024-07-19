@@ -275,6 +275,10 @@ impl Lexer {
                     result.push(self.token(Token::Semicolon));
                     self.advance();
                 }
+                '?' => {
+                    result.push(self.token(Token::QuestionMark));
+                    self.advance();
+                }
                 '0'..='9' => result.push(self.make_number()?),
                 '\'' => result.push(self.make_string()?),
                 '"' => result.push(self.make_text()?),

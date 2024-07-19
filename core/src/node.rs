@@ -1,4 +1,4 @@
-use crate::{definitions::{ArgType, DefinedTag}, token::{Position, Selector}};
+use crate::{definitions::{ArgType, DefinedTag}, token::{Position, Selector, Type}};
 
 pub trait Node {
     fn json(&self) -> String;
@@ -25,10 +25,20 @@ pub struct EventNode {
 #[derive(Clone, Debug)]
 pub struct FunctionNode {
     pub name: String,
+    pub params: Vec<FunctionParamNode>,
     pub expressions: Vec<ExpressionNode>,
     pub start_pos: Position,
     pub name_end_pos: Position,
     pub end_pos: Position
+}
+
+#[derive(Clone, Debug)]
+pub struct FunctionParamNode {
+    pub name: String,
+    pub param_type: Type,
+    pub optional: bool,
+    pub multiple: bool,
+    pub default: Option<ArgValueWithPos>
 }
 
 #[derive(Clone, Debug)]
