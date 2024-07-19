@@ -234,6 +234,14 @@ impl Parser {
                 }
             }
 
+            self.variables.push(VariableNode {
+                dfrs_name: param_name.clone(),
+                df_name: param_name.clone(),
+                var_type: VariableType::Line,
+                start_pos: Position::new(0, 0),
+                end_pos: Position::new(0, 0),
+            });
+
             params.push(FunctionParamNode {
                 name: param_name,
                 param_type,
@@ -288,6 +296,11 @@ impl Parser {
                         end_pos = res.end_pos.clone();
                         node = Expression::Action { node: res };
                     }
+                    Keyword::V => {
+                        let res = self.action(ActionType::Variable)?;
+                        end_pos = res.end_pos.clone();
+                        node = Expression::Action { node: res };
+                    }
                     Keyword::VarLine => {
                         let res = self.variable(VariableType::Line)?;
                         end_pos = res.end_pos.clone();
@@ -317,11 +330,15 @@ impl Parser {
 
         match token.token {
             Token::Colon => {
+                if action_type == ActionType::Variable {
+                    return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Dot]})
+                }
                 token = self.advance_err()?;
                 match token.token {
                     Token::Selector { value } => {
                         selector = value;
                         implicit_selector = false;
+                        self.require_token(Token::Dot)?;
                     }
                     _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Selector { value: Selector::AllPlayers }]})
                 }

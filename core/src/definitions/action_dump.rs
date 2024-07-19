@@ -147,61 +147,67 @@ pub fn get_actions(action_dump: &ActionDump, block: &str) -> Vec<Action> {
             continue
         }
 
-        let mut args = vec![];
-        for arg in &action.icon.arguments {
-            let arg_type = match &arg.arg_type as &str {
-                "NUMBER" => ArgType::NUMBER,
-                "COMPONENT" => ArgType::TEXT,
-                "TEXT" => ArgType::STRING,
-                "LOCATION" => ArgType::LOCATION,
-                "POTION" => ArgType::POTION,
-                "SOUND" => ArgType::SOUND,
-                "VECTOR" => ArgType::VECTOR,
-                "PARTICLE" => ArgType::PARTICLE,
-                "ANY_TYPE" => ArgType::ANY, // TODO test
-
-                //TODO all below
-                "LIST" => ArgType::EMPTY,
-                "VEHICLE" => ArgType::EMPTY,
-                "ITEM" => ArgType::ITEM,
-                "BLOCK" => ArgType::ITEM,
-                "BLOCK_TAG" => ArgType::STRING,
-                "PROJECTILE" => ArgType::ITEM,
-                "SPAWN_EGG" => ArgType::ITEM,
-                "VARIABLE" => ArgType::EMPTY,
-                "NONE" => ArgType::EMPTY,
-                "OR" => ArgType::EMPTY,
-                "" => continue,
-                
-                _ => panic!("Unknown arg type: {}", arg.arg_type)
-            };
-            
-            if arg.description.get(0).is_none() { // TODO remove after OR type is implemented
-                continue;
-            }
-
-            let new_arg = DefinedArg::new(arg.description.get(0).expect("No description"), arg_type, arg.optional, arg.plural);     
-            args.push(new_arg);
-        }
-
-        let mut tags = vec![];
-        for tag in &action.tags {
-            let mut options = vec![];
-            for option in &tag.options {
-                options.push(option.name.clone());
-            }
-
-            let dfrs_name = to_camel_case(&tag.name);
-            let new_tag = DefinedTag::new(&dfrs_name, &tag.name, tag.slot, options, tag.default_option.clone());
-            tags.push(new_tag);
-        }
-
-        let mut v: Vec<char> = action.name.clone().chars().collect();
-        v[0] = v[0].to_lowercase().nth(0).unwrap();
-        let name: String = v.into_iter().collect();
-        let new_action = Action::new(name, &action.name, args, tags);
+        let new_action = get_action(action);
         actions.push(new_action);
     }
 
     actions
+}
+
+pub fn get_action(action: &ADAction) -> Action {
+    let mut args = vec![];
+    for arg in &action.icon.arguments {
+        let arg_type = match &arg.arg_type as &str {
+            "NUMBER" => ArgType::NUMBER,
+            "COMPONENT" => ArgType::TEXT,
+            "TEXT" => ArgType::STRING,
+            "LOCATION" => ArgType::LOCATION,
+            "POTION" => ArgType::POTION,
+            "SOUND" => ArgType::SOUND,
+            "VECTOR" => ArgType::VECTOR,
+            "PARTICLE" => ArgType::PARTICLE,
+            "LIST" => ArgType::VARIABLE,
+            "DICT" => ArgType::VARIABLE,
+            "VARIABLE" => ArgType::VARIABLE,
+            "ANY_TYPE" => ArgType::ANY, // TODO test
+
+            //TODO all below
+            "VEHICLE" => ArgType::EMPTY,
+            "ITEM" => ArgType::ITEM,
+            "BLOCK" => ArgType::ITEM,
+            "BLOCK_TAG" => ArgType::STRING,
+            "PROJECTILE" => ArgType::ITEM,
+            "SPAWN_EGG" => ArgType::ITEM,
+            "NONE" => ArgType::EMPTY,
+            "OR" => ArgType::EMPTY,
+            "" => continue,
+            
+            _ => panic!("Unknown arg type: {}", arg.arg_type)
+        };
+        
+        if arg.description.get(0).is_none() { // TODO remove after OR type is implemented
+            continue;
+        }
+
+        let new_arg = DefinedArg::new(arg.description.get(0).expect("No description"), arg_type, arg.optional, arg.plural);     
+        args.push(new_arg);
+    }
+
+    let mut tags = vec![];
+    for tag in &action.tags {
+        let mut options = vec![];
+        for option in &tag.options {
+            options.push(option.name.clone());
+        }
+
+        let dfrs_name = to_camel_case(&tag.name);
+        let new_tag = DefinedTag::new(&dfrs_name, &tag.name, tag.slot, options, tag.default_option.clone());
+        tags.push(new_tag);
+    }
+
+    let mut v: Vec<char> = action.name.clone().chars().collect();
+    v[0] = v[0].to_lowercase().nth(0).unwrap();
+    let name: String = v.into_iter().collect();
+    let new_action = Action::new(name, &action.name, args, tags);
+    new_action
 }

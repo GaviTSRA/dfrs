@@ -1,6 +1,6 @@
 use phf::phf_map;
 
-use crate::{definitions::{action_dump::{Action, ActionDump}, actions::{EntityActions, GameActions, PlayerActions}, ArgType}, node::{ActionNode, ActionType, Arg, ArgValue, EventNode, Expression, FileNode}, token::Position};
+use crate::{definitions::{action_dump::{Action, ActionDump}, actions::{EntityActions, GameActions, PlayerActions, VariableActions}, ArgType}, node::{ActionNode, ActionType, Arg, ArgValue, EventNode, Expression, FileNode}, token::Position};
 
 pub static PLAYER_EVENTS: phf::Map<&'static str, &'static str> = phf_map! {
     "join" => "Join",
@@ -88,7 +88,8 @@ pub enum ValidateError {
 pub struct Validator {
     player_actions: PlayerActions,
     entity_actions: EntityActions,
-    game_actions: GameActions
+    game_actions: GameActions,
+    variable_actions: VariableActions
 }
 
 impl Validator {
@@ -97,7 +98,8 @@ impl Validator {
         Validator {
             player_actions: PlayerActions::new(&action_dump),
             entity_actions: EntityActions::new(&action_dump),
-            game_actions: GameActions::new(&action_dump)
+            game_actions: GameActions::new(&action_dump),
+            variable_actions: VariableActions::new(&action_dump)
         }
     }
     pub fn validate(&self, mut node: FileNode) -> Result<FileNode, ValidateError> {
@@ -158,6 +160,9 @@ impl Validator {
             }
             ActionType::Game => {
                 self.game_actions.get(action_node.clone().name)
+            }
+            ActionType::Variable => {
+                self.variable_actions.get(action_node.clone().name)
             }
         };
 

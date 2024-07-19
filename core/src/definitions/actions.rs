@@ -60,3 +60,23 @@ impl GameActions {
         return None;
     }
 }
+
+pub struct VariableActions {
+    variable_actions: Vec<Action>
+}
+
+impl VariableActions {
+    pub fn new(action_dump: &ActionDump) -> VariableActions {
+        let actions = get_actions(action_dump, "SET VARIABLE");
+        return VariableActions { variable_actions: actions };
+    }
+
+    pub fn get(&self, dfrs_name: String) -> Option<&Action> {
+        for action in &self.variable_actions {
+            if action.dfrs_name == dfrs_name {
+                return Some(action);
+            }
+        }
+        return None;
+    }
+}

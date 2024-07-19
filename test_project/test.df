@@ -1,25 +1,29 @@
-game test_var3;
-save test_var4 = `test 4`;
+save NPCS = `npcs`;
 
-@swapHands {
-    line test_var = `test var`;
-    local test_var2;
-    e.setNameVisible(nameTagVisible="Disable");
-    g.blockDropsOn();
-    p.setFreezeTicks(test_var3);
-    p.setFreezeTicks(test_var4);
+fn getNPC(id: string) {
+    local npc;
+    v.getDictValue(npc, NPCS, id);
 }
 
-fn test(testParam: string, thisIsOptional?: number, thisCanBeMultiple*: text, thisHasADefault?: vector = Vector(1, 2, 3)) {
-    p.sendMessage("Hello world!");
-}
+fn spawnNPCs() {
+    line id;
+    line npc;
+    line name;
+    line skin;
+    line loc;
 
-fn test2() {
-    line testVariable;
-    p.sendMessage(testVariable);
-}
+    //for.entry(id, npc, NPCS) {
+        v.getListValue(id, npc, 1);
+        v.getListValue(name, npc, 2);
+        v.getListValue(skin, npc, 3);
+        v.getListValue(loc, npc, 4);
 
-fn test3(param: string = 'test') {
-    line testVariable;
-    p.sendMessage(testVariable);
+        g.spawnArmorStand(loc);
+        e.playerDisguise(name, skin);
+        e.setCustomTag('npc', 1);
+        e.setCustomTag('id', id);
+        e.setAI(ai='None');
+        e.setInvulnerable();
+        e.setSilenced();
+    //}
 }

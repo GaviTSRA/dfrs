@@ -142,7 +142,8 @@ fn action_node(node: ActionNode) -> Block {
     match node.action_type {
         ActionType::Player => block = "player_action",
         ActionType::Entity => block = "entity_action",
-        ActionType::Game => block = "game_action"
+        ActionType::Game => block = "game_action",
+        ActionType::Variable => block = "set_var"
     }
 
     let mut args: Vec<Arg> = vec![];
@@ -159,7 +160,10 @@ fn action_node(node: ActionNode) -> Block {
         action: Some(node.name),
         block: block.to_string(),
         id: "block".to_string(),
-        target: Some(node.selector),
+        target: match node.action_type {
+            ActionType::Variable => None,
+            _ => Some(node.selector)
+        },
         args: Args { items: args },
         data: None
     }

@@ -109,7 +109,8 @@ pub struct ArgValueWithPos {
 pub enum ActionType {
     Player,
     Entity,
-    Game
+    Game,
+    Variable
 }
 
 #[derive(Clone, Debug, PartialEq)]
