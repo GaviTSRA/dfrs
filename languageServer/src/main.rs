@@ -1,15 +1,21 @@
 use dfrs_core::compile::compile;
+use dfrs_core::definitions::action_dump::ActionDump;
+use dfrs_core::definitions::actions::{EntityActions, GameActions, PlayerActions, VariableActions};
 use dfrs_core::lexer::{Lexer, LexerError};
 use dfrs_core::load_config;
 use dfrs_core::parser::{ParseError, Parser};
-use dfrs_core::token::Token;
-use dfrs_core::validate::{validate, ValidateError, PLAYER_EVENTS};
+use dfrs_core::token::{Keyword, Token};
+use dfrs_core::validate::{ValidateError, Validator, ENTITY_EVENTS, PLAYER_EVENTS};
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
 
 #[derive(Debug)]
 struct Backend {
     client: Client,
+    player_actions: PlayerActions,
+    entity_actions: EntityActions,
+    game_actions: GameActions,
+    variable_actions: VariableActions
 }
 
 #[tower_lsp::async_trait]
@@ -68,14 +74,28 @@ impl LanguageServer for Backend {
             Err(_) => return Ok(None)
         };
 
-        let mut last_token: Option<dfrs_core::token::TokenWithPos>= None;
+        let mut last_token: Option<dfrs_core::token::TokenWithPos> = None;
         for token in tokens {
             if token.start_pos.line == line && token.start_pos.col <= col && token.end_pos.col >= col {
                 let mut is_event = false;
+                let mut is_player_action = false;
+                let mut is_entity_action = false;
+                let mut is_game_action = false;
+                let mut is_variable_action = false;
+
                 let mut previous = String::from("");
-                match token.token {
+                match &token.token {
                     Token::At => {
                         is_event = true
+                    }
+                    Token::Keyword { value } => {
+                        match value {
+                            Keyword::P => is_player_action = true,
+                            Keyword::E => is_entity_action = true,
+                            Keyword::G => is_game_action = true,
+                            Keyword::V => is_variable_action = true,
+                            _ => {}
+                        }
                     }
                     _ => {}
                 }
@@ -102,8 +122,38 @@ impl LanguageServer for Backend {
                             events.push(CompletionItem::new_simple(event.to_string(), df_event.to_string()));
                         }
                     }
+                    for (event, df_event) in ENTITY_EVENTS.entries() {
+                        if event.starts_with(&previous) || df_event.starts_with(&previous) {
+                            events.push(CompletionItem::new_simple(event.to_string(), df_event.to_string()));
+                        }
+                    }
 
                     return Ok(Some(CompletionResponse::Array(events)))
+                }
+
+                let mut all = None;
+                if is_player_action {
+                    all = Some(self.player_actions.all());
+                }
+                if is_entity_action {
+                    all = Some(self.entity_actions.all());
+                }
+                if is_game_action {
+                    all = Some(self.game_actions.all());
+                }
+                if is_variable_action {
+                    all = Some(self.variable_actions.all());
+                }
+
+                if all.is_some() {
+                    let mut actions = vec![];
+
+                    for action in all.unwrap() {
+                        if action.dfrs_name.starts_with(&previous) || action.df_name.starts_with(&previous) {
+                            actions.push(CompletionItem::new_simple(action.dfrs_name.clone(), action.df_name.clone()));
+                        }
+                    }
+                    return Ok(Some(CompletionResponse::Array(actions)))
                 }
             }
             last_token = Some(token);
@@ -156,7 +206,14 @@ async fn main() {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
 
-    let (service, socket) = LspService::new(|client| Backend { client });
+    let ad = ActionDump::load();
+    let (service, socket) = LspService::new(|client| Backend {
+        client, 
+        player_actions: PlayerActions::new(&ad), 
+        entity_actions: EntityActions::new(&ad), 
+        game_actions: GameActions::new(&ad),
+        variable_actions: VariableActions::new(&ad) 
+    });
     Server::new(stdin, stdout, socket).serve(service).await;
 }
 
@@ -184,20 +241,19 @@ fn compile_file(data: String) -> Result<(), CompileErr> {
             match err {
                 LexerError::InvalidNumber { pos } => {
                     return Err(CompileErr::new(pos, None, "Invalid number".to_owned()))
-                    // print_err(format!("Invalid number in line {pos}"), data, pos, None);
                 }
                 LexerError::InvalidToken { token, pos } => {
-                    // print_err(format!("Invalid token '{token}' in line {pos}"), data, pos, None);
                     return Err(CompileErr::new(pos, None, format!("Invalid token '{token}'")))
                 }
                 LexerError::UnterminatedString { pos } => {
-                    // print_err(format!("Unterminated string in line {pos}"), data, pos, None);
                     return Err(CompileErr::new(pos, None, "Unterminated string".to_owned()))
                 }
                 LexerError::UnterminatedText { pos } => {
-                    // print_err(format!("Unterminated text in line {pos}"), data, pos, None);
                     return Err(CompileErr::new(pos, None, "Unterminated text".to_owned()))
                 }
+                LexerError::UnterminatedVariable { pos } => {
+                    return Err(CompileErr::new(pos, None, "Unterminated variable".to_owned()))
+                },
             }
         }
     };
@@ -224,7 +280,6 @@ fn compile_file(data: String) -> Result<(), CompileErr> {
                         }
 
                         return Err(CompileErr::new(found.start_pos, Some(found.end_pos), format!("Invalid token '{}', expected: {expected_string}", found.token)))
-                        // print_err(format!("Invalid token '{}', expected: {expected_string}", found.token), data, found.start_pos, Some(found.end_pos));
                     } else {
                         // println!("Invalid EOF, expected: {expected:?}");
                     }
@@ -241,27 +296,49 @@ fn compile_file(data: String) -> Result<(), CompileErr> {
                 ParseError::InvalidPotion { pos, msg } => {
                     return Err(CompileErr::new(pos, None, format!("Invalid potion '{msg}'")))
                 },
+                ParseError::UnknownVariable { found, start_pos, end_pos } => {
+                    return Err(CompileErr::new(start_pos, Some(end_pos), format!("Unknown variable '{}'", found)))
+                },
+                ParseError::InvalidType { found, start_pos } => {
+                    match found {
+                        Some(found) => return Err(CompileErr::new(found.start_pos, Some(found.end_pos), format!("Unknown type: {}", found.token))),
+                        None => return Err(CompileErr::new(start_pos, None, "Missing type".into()))
+                    }
+                },
             }
             return Ok(())
         }
     }
 
     let validated;
-    match validate(node) {
+    match Validator::new().validate(node) {
         Ok(res) => validated = res,
         Err(err)  => {
             match err {
                 ValidateError::UnknownEvent { node } => {
-                    let mut end_pos = node.start_pos.clone();
-                    end_pos.col += 1 + node.event.chars().count() as u32;
                     return Err(CompileErr::new(node.start_pos, Some(node.end_pos), format!("Unknown event '{}'", node.event)))
-                    // print_err(format!("Unknown event '{}'", node.event), data, node.start_pos, Some(end_pos));
                 }
                 ValidateError::UnknownAction { node } => {
-                    let mut end_pos = node.start_pos.clone();
-                    end_pos.col += 1 + node.name.chars().count() as u32;
                     return Err(CompileErr::new(node.start_pos, Some(node.end_pos), format!("Unknown action '{}'", node.name)))
                 },
+                ValidateError::MissingArgument { node, name, .. } => {
+                    return Err(CompileErr::new(node.start_pos, Some(node.end_pos), format!("Missing argument '{}'", name)));
+                }
+                ValidateError::WrongArgumentType { node, index, name, expected_type, found_type } => {
+                    return Err(CompileErr::new(node.args.get(index as usize).unwrap().start_pos.clone(), Some(node.args.get(index as usize).unwrap().end_pos.clone()), format!("Wrong argument type for '{}', expected '{:?}' but found '{:?}'", name, expected_type, found_type)));
+                }
+                ValidateError::TooManyArguments { node } => {
+                    let start_pos = node.start_pos;
+                    let mut end_pos = start_pos.clone();
+                    end_pos.col += node.name.chars().count() as u32;
+                    return Err(CompileErr::new(start_pos, Some(end_pos), format!("Too many arguments for action '{}'", node.name)));
+                }
+                ValidateError::InvalidTagOption { node: _, tag_name, provided, options, start_pos, end_pos } => {
+                    return Err(CompileErr::new(start_pos, Some(end_pos), format!("Invalid option '{}' for tag '{}', expected one of {:?}", provided, tag_name, options)));
+                }
+                ValidateError::UnknownTag { node: _, tag_name, available, start_pos, end_pos } => {
+                    return Err(CompileErr::new(start_pos, Some(end_pos), format!("Unknown tag '{}', found tags: {:?}", tag_name, available)));
+                }
             }
         }
     }

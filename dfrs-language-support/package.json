@@ -16,7 +16,7 @@
           "dfrs"
         ],
         "extensions": [
-          ".df"
+          ".dfrs"
         ],
         "configuration": "./language-configuration.json"
       }

@@ -1,5 +1,6 @@
 use super::action_dump::{get_actions, Action, ActionDump};
 
+#[derive(Debug)]
 pub struct PlayerActions {
     player_actions: Vec<Action>
 }
@@ -18,9 +19,13 @@ impl PlayerActions {
         }
         return None;
     }
+
+    pub fn all(&self) -> &Vec<Action> {
+        &self.player_actions
+    }
 }
 
-
+#[derive(Debug)]
 pub struct EntityActions {
     entity_actions: Vec<Action>
 }
@@ -39,8 +44,13 @@ impl EntityActions {
         }
         return None;
     }
+
+    pub fn all(&self) -> &Vec<Action> {
+        &self.entity_actions
+    }
 }
 
+#[derive(Debug)]
 pub struct GameActions {
     game_actions: Vec<Action>
 }
@@ -59,8 +69,13 @@ impl GameActions {
         }
         return None;
     }
+
+    pub fn all(&self) -> &Vec<Action> {
+        &self.game_actions
+    }
 }
 
+#[derive(Debug)]
 pub struct VariableActions {
     variable_actions: Vec<Action>
 }
@@ -78,5 +93,9 @@ impl VariableActions {
             }
         }
         return None;
+    }
+
+    pub fn all(&self) -> &Vec<Action> {
+        &self.variable_actions
     }
 }

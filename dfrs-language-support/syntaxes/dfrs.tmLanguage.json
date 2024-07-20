@@ -41,7 +41,7 @@
 			"patterns": [
 				{
 					"name": "support.function",
-					"match": "\\b(p|g|e)(:[A-z]*)?(.[A-z]*)\\b",
+					"match": "\\b(p|g|e|v)(:[A-z]*)?[.]([A-z]+)\\b",
 					"captures": {
 						"1": { "name": "markup.italic" },
 						"2": { "name": "markup.italic" }

@@ -126,6 +126,7 @@ fn default_vec_arg() -> Vec<ADArgument> {
     vec![]
 }
 
+#[derive(Debug)]
 pub struct Action {
     pub dfrs_name: String,
     pub df_name: String,
@@ -205,7 +206,7 @@ pub fn get_action(action: &ADAction) -> Action {
         tags.push(new_tag);
     }
 
-    let mut v: Vec<char> = action.name.clone().chars().collect();
+    let mut v: Vec<char> = action.name.clone().trim().chars().collect();
     v[0] = v[0].to_lowercase().nth(0).unwrap();
     let name: String = v.into_iter().collect();
     let new_action = Action::new(name, &action.name, args, tags);
