@@ -206,9 +206,16 @@ pub fn get_action(action: &ADAction) -> Action {
         tags.push(new_tag);
     }
 
-    let mut v: Vec<char> = action.name.clone().trim().chars().collect();
-    v[0] = v[0].to_lowercase().nth(0).unwrap();
-    let name: String = v.into_iter().collect();
+    let mut v: String = action.name.clone().trim()
+        .replace("+=", "addDirect").replace("-=", "subDirect")
+        .replace("+", "add").replace("-", "sub")
+        .replace("%", "mod").replace("/", "div").replace("=", "set");
+    if v == "x".to_owned() {
+        v = "mul".into();
+    }
+    let mut vv: Vec<char> = v.chars().collect();
+    vv[0] = vv[0].to_lowercase().nth(0).unwrap();
+    let name: String = vv.into_iter().collect();
     let new_action = Action::new(name, &action.name, args, tags);
     new_action
 }

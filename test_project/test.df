@@ -1,29 +1,8 @@
-save NPCS = `npcs`;
+save players;
 
-fn getNPC(id: string) {
-    local npc;
-    v.getDictValue(npc, NPCS, id);
-}
-
-fn spawnNPCs() {
-    line id;
-    line npc;
-    line name;
-    line skin;
-    line loc;
-
-    //for.entry(id, npc, NPCS) {
-        v.getListValue(id, npc, 1);
-        v.getListValue(name, npc, 2);
-        v.getListValue(skin, npc, 3);
-        v.getListValue(loc, npc, 4);
-
-        g.spawnArmorStand(loc);
-        e.playerDisguise(name, skin);
-        e.setCustomTag('npc', 1);
-        e.setCustomTag('id', id);
-        e.setAI(ai='None');
-        e.setInvulnerable();
-        e.setSilenced();
-    //}
+@join {
+    line test;
+    p:all.sendMessage("<green>+ %default");
+    v.div(test, 5);
+    v.appendValue(players, "%default");
 }
