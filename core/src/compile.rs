@@ -131,9 +131,9 @@ fn function_node(function_node: FunctionNode) -> Result<String, serde_json::Erro
 }
 
 fn expression_node(node: Expression) -> Option<Block> {
-    match node {
-        Expression::Action { node } => return Some(action_node(node)),
-        Expression::Variable { .. } => return None,
+    return match node {
+        Expression::Action { node } => Some(action_node(node)),
+        Expression::Variable { .. } => None,
     }
 }
 

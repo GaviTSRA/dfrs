@@ -35,7 +35,7 @@ impl LanguageServer for Backend {
                     ..Default::default()
                 }),
                 diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions { 
-                    identifier: Some("dfrs-lsp".to_owned()), 
+                    identifier: Some("dfrs-lsp".to_owned()),
                     inter_file_dependencies: false, 
                     workspace_diagnostics: false, 
                     work_done_progress_options: WorkDoneProgressOptions {
@@ -52,6 +52,10 @@ impl LanguageServer for Backend {
         self.client
             .log_message(MessageType::INFO, "server initialized!")
             .await;
+    }
+
+    async fn shutdown(&self) -> tower_lsp::jsonrpc::Result<()> {
+        Ok(())
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
@@ -195,10 +199,6 @@ impl LanguageServer for Backend {
             }
         })))
     }
-
-    async fn shutdown(&self) -> tower_lsp::jsonrpc::Result<()> {
-        Ok(())
-    }
 }
 
 #[tokio::main]
@@ -238,21 +238,21 @@ fn compile_file(data: String) -> Result<(), CompileErr> {
     let res = match result {
         Ok(res) => res,
         Err(err) => {
-            match err {
+            return match err {
                 LexerError::InvalidNumber { pos } => {
-                    return Err(CompileErr::new(pos, None, "Invalid number".to_owned()))
+                    Err(CompileErr::new(pos, None, "Invalid number".to_owned()))
                 }
                 LexerError::InvalidToken { token, pos } => {
-                    return Err(CompileErr::new(pos, None, format!("Invalid token '{token}'")))
+                    Err(CompileErr::new(pos, None, format!("Invalid token '{token}'")))
                 }
                 LexerError::UnterminatedString { pos } => {
-                    return Err(CompileErr::new(pos, None, "Unterminated string".to_owned()))
+                    Err(CompileErr::new(pos, None, "Unterminated string".to_owned()))
                 }
                 LexerError::UnterminatedText { pos } => {
-                    return Err(CompileErr::new(pos, None, "Unterminated text".to_owned()))
+                    Err(CompileErr::new(pos, None, "Unterminated text".to_owned()))
                 }
                 LexerError::UnterminatedVariable { pos } => {
-                    return Err(CompileErr::new(pos, None, "Unterminated variable".to_owned()))
+                    Err(CompileErr::new(pos, None, "Unterminated variable".to_owned()))
                 },
             }
         }
@@ -288,7 +288,7 @@ fn compile_file(data: String) -> Result<(), CompileErr> {
                     return Err(CompileErr::new(pos, None, format!("Invalid location '{msg}'")))
                 },
                 ParseError::InvalidVector { pos, msg } => {
-                    return Err(CompileErr::new(pos, None, format!("Invalid vecttor '{msg}'")))
+                    return Err(CompileErr::new(pos, None, format!("Invalid vector '{msg}'")))
                 },
                 ParseError::InvalidSound { pos, msg } => {
                     return Err(CompileErr::new(pos, None, format!("Invalid sound '{msg}'")))
@@ -300,9 +300,9 @@ fn compile_file(data: String) -> Result<(), CompileErr> {
                     return Err(CompileErr::new(start_pos, Some(end_pos), format!("Unknown variable '{}'", found)))
                 },
                 ParseError::InvalidType { found, start_pos } => {
-                    match found {
-                        Some(found) => return Err(CompileErr::new(found.start_pos, Some(found.end_pos), format!("Unknown type: {}", found.token))),
-                        None => return Err(CompileErr::new(start_pos, None, "Missing type".into()))
+                    return match found {
+                        Some(found) => Err(CompileErr::new(found.start_pos, Some(found.end_pos), format!("Unknown type: {}", found.token))),
+                        None => Err(CompileErr::new(start_pos, None, "Missing type".into()))
                     }
                 },
             }
@@ -314,30 +314,30 @@ fn compile_file(data: String) -> Result<(), CompileErr> {
     match Validator::new().validate(node) {
         Ok(res) => validated = res,
         Err(err)  => {
-            match err {
+            return match err {
                 ValidateError::UnknownEvent { node } => {
-                    return Err(CompileErr::new(node.start_pos, Some(node.end_pos), format!("Unknown event '{}'", node.event)))
+                    Err(CompileErr::new(node.start_pos, Some(node.end_pos), format!("Unknown event '{}'", node.event)))
                 }
                 ValidateError::UnknownAction { node } => {
-                    return Err(CompileErr::new(node.start_pos, Some(node.end_pos), format!("Unknown action '{}'", node.name)))
+                    Err(CompileErr::new(node.start_pos, Some(node.end_pos), format!("Unknown action '{}'", node.name)))
                 },
                 ValidateError::MissingArgument { node, name, .. } => {
-                    return Err(CompileErr::new(node.start_pos, Some(node.end_pos), format!("Missing argument '{}'", name)));
+                    Err(CompileErr::new(node.start_pos, Some(node.end_pos), format!("Missing argument '{}'", name)))
                 }
                 ValidateError::WrongArgumentType { node, index, name, expected_type, found_type } => {
-                    return Err(CompileErr::new(node.args.get(index as usize).unwrap().start_pos.clone(), Some(node.args.get(index as usize).unwrap().end_pos.clone()), format!("Wrong argument type for '{}', expected '{:?}' but found '{:?}'", name, expected_type, found_type)));
+                    Err(CompileErr::new(node.args.get(index as usize).unwrap().start_pos.clone(), Some(node.args.get(index as usize).unwrap().end_pos.clone()), format!("Wrong argument type for '{}', expected '{:?}' but found '{:?}'", name, expected_type, found_type)))
                 }
                 ValidateError::TooManyArguments { node } => {
                     let start_pos = node.start_pos;
                     let mut end_pos = start_pos.clone();
                     end_pos.col += node.name.chars().count() as u32;
-                    return Err(CompileErr::new(start_pos, Some(end_pos), format!("Too many arguments for action '{}'", node.name)));
+                    Err(CompileErr::new(start_pos, Some(end_pos), format!("Too many arguments for action '{}'", node.name)))
                 }
                 ValidateError::InvalidTagOption { node: _, tag_name, provided, options, start_pos, end_pos } => {
-                    return Err(CompileErr::new(start_pos, Some(end_pos), format!("Invalid option '{}' for tag '{}', expected one of {:?}", provided, tag_name, options)));
+                    Err(CompileErr::new(start_pos, Some(end_pos), format!("Invalid option '{}' for tag '{}', expected one of {:?}", provided, tag_name, options)))
                 }
                 ValidateError::UnknownTag { node: _, tag_name, available, start_pos, end_pos } => {
-                    return Err(CompileErr::new(start_pos, Some(end_pos), format!("Unknown tag '{}', found tags: {:?}", tag_name, available)));
+                    Err(CompileErr::new(start_pos, Some(end_pos), format!("Unknown tag '{}', found tags: {:?}", tag_name, available)))
                 }
             }
         }
