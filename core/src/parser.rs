@@ -369,7 +369,8 @@ impl Parser {
                 ArgValue::Sound { .. } => ArgType::SOUND,
                 ArgValue::Vector { .. } => ArgType::VECTOR,
                 ArgValue::Tag { ..} => ArgType::TAG,
-                ArgValue::Variable { .. } => ArgType::VARIABLE
+                ArgValue::Variable { .. } => ArgType::VARIABLE,
+                ArgValue::GameValue { .. } => ArgType::GAME_VALUE
             };
             args.push(Arg { value: param.value, index: i, arg_type, start_pos: param.start_pos, end_pos: param.end_pos});
             i += 1
@@ -442,10 +443,11 @@ impl Parser {
         let mut tag_start_pos = Position::new(0, 0);
         let mut tag_end_pos = Position::new(0, 0);
         let mut comma_pos = Position::new(0, 0);
+        let mut is_game_value = false;
 
         let expected = vec![Token::CloseParen, Token::Text { value: "<any>".into() }, Token::String { value: "<any>".into() }, Token::Number { value: 0.0 }, Token::Identifier { value: "Location".into() }];
         loop {
-            let token = self.advance_err()?;
+            let mut token = self.advance_err()?;
 
             if is_value {
                 match token.token {
@@ -498,6 +500,38 @@ impl Parser {
                     _ => {
                         return Err(ParseError::InvalidToken { found: Some(token), expected: vec![Token::String { value: "<any>".into() }, Token::Text { value: "<any>".into() }] })
                     }
+                }
+            } else if is_game_value {
+                let mut selector = Selector::Default;
+                let mut selector_end_pos = token.start_pos.clone();
+                let start_pos = token.start_pos.clone();
+                match token.token.clone() {
+                    Token::Selector { value } => {
+                        selector = value;
+                        token = self.advance_err()?;
+                        if token.token != Token::Colon {
+                            return Err(ParseError::InvalidToken { found: Some(token), expected: vec![Token::Colon]})
+                        }
+                        selector_end_pos = token.end_pos;
+                        token = self.advance_err()?;
+                    }
+                    _ => {}
+                }
+                match token.token.clone() {
+                    Token::Identifier { value } => {
+                        params.push(ArgValueWithPos {
+                            value: ArgValue::GameValue {
+                                value,
+                                selector,
+                                selector_end_pos
+                            },
+                            start_pos,
+                            end_pos: token.end_pos.clone(),
+                        });
+                        is_value = true;
+                        is_game_value = false;
+                    }
+                    _ => return Err(ParseError::InvalidToken { found: Some(token), expected: vec![Token::Identifier {value: "<any>".into()}, Token::Selector {value: Selector::Default}] })
                 }
             } else {
                 match token.token.clone() {
@@ -559,6 +593,7 @@ impl Parser {
                             }
                         }
                     }
+                    Token::Dollar => is_game_value = true,
                     Token::CloseParen => break,
                     _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected })
                 }

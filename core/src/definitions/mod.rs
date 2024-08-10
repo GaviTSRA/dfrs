@@ -1,5 +1,6 @@
 pub mod actions;
 pub mod action_dump;
+pub mod game_values;
 
 #[derive(Clone, Debug)]
 pub struct DefinedArg {
@@ -29,6 +30,7 @@ pub enum ArgType {
     ITEM,
     TAG,
     VARIABLE,
+    GAME_VALUE,
     ANY
 }
 

@@ -1,6 +1,7 @@
 use phf::phf_map;
 
 use crate::{definitions::{action_dump::{Action, ActionDump}, actions::{EntityActions, GameActions, PlayerActions, VariableActions}, ArgType}, node::{ActionNode, ActionType, Arg, ArgValue, EventNode, Expression, FileNode}, token::Position};
+use crate::definitions::game_values::{GameValue, GameValues};
 
 pub static PLAYER_EVENTS: phf::Map<&'static str, &'static str> = phf_map! {
     "join" => "Join",
@@ -78,6 +79,7 @@ pub static ENTITY_EVENTS: phf::Map<&'static str, &'static str> = phf_map! {
 pub enum ValidateError {
     UnknownEvent { node: EventNode },
     UnknownAction { node: ActionNode },
+    UnknownGameValue { start_pos: Position, end_pos: Position, game_value: String },
     MissingArgument { node: ActionNode, index: i32, name: String },
     WrongArgumentType { node: ActionNode, index: i32, name: String, expected_type: ArgType, found_type: ArgType },
     TooManyArguments { node: ActionNode },
@@ -89,7 +91,8 @@ pub struct Validator {
     player_actions: PlayerActions,
     entity_actions: EntityActions,
     game_actions: GameActions,
-    variable_actions: VariableActions
+    variable_actions: VariableActions,
+    game_values: GameValues
 }
 
 impl Validator {
@@ -99,7 +102,8 @@ impl Validator {
             player_actions: PlayerActions::new(&action_dump),
             entity_actions: EntityActions::new(&action_dump),
             game_actions: GameActions::new(&action_dump),
-            variable_actions: VariableActions::new(&action_dump)
+            variable_actions: VariableActions::new(&action_dump),
+            game_values: GameValues::new(&action_dump)
         }
     }
     pub fn validate(&self, mut node: FileNode) -> Result<FileNode, ValidateError> {
@@ -215,7 +219,26 @@ impl Validator {
                     return Err(ValidateError::MissingArgument { node: action_node, index, name: arg.name})
                 }
 
-                if provided_arg.arg_type != arg.arg_type && arg.arg_type != ArgType::ANY && provided_arg.arg_type != ArgType::VARIABLE {
+                match provided_arg.value {
+                    ArgValue::GameValue { value, selector, selector_end_pos } => {
+                        let actual_game_value = self.game_values.get(value.clone());
+                        match actual_game_value {
+                            Some(res) => provided_arg.value = ArgValue::GameValue {
+                                value: res.df_name.clone(),
+                                selector,
+                                selector_end_pos
+                            },
+                            None => return Err(ValidateError::UnknownGameValue {
+                                game_value: value,
+                                start_pos: provided_arg.start_pos,
+                                end_pos: provided_arg.end_pos
+                            })
+                        }
+                    }
+                    _ => {}
+                }
+
+                if provided_arg.arg_type != arg.arg_type && arg.arg_type != ArgType::ANY && provided_arg.arg_type != ArgType::VARIABLE && provided_arg.arg_type != ArgType::GAME_VALUE {
                     if arg.allow_multiple && matched_one {
                         action_node.args.insert(0, provided_arg);
                         break;

@@ -4,5 +4,6 @@ save players;
     line test;
     p:all.sendMessage("<green>+ %default");
     v.div(test, 5);
-    v.appendValue(players, "%default");
+    v.appendValue(players, $name);
+    v.appendValue(players, $selection:name);
 }

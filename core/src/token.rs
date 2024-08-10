@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{Display, write};
 
 use phf::phf_map;
 use serde::{Deserialize, Serialize};
@@ -57,6 +57,7 @@ pub enum Token {
     Equal,
     Semicolon,
     QuestionMark,
+    Dollar,
     OpenParen,
     CloseParen,
     OpenParenCurly,
@@ -84,6 +85,7 @@ impl Display for Token {
             Token::Equal => write!(f, "="),
             Token::Semicolon => write!(f, ";"),
             Token::QuestionMark => write!(f, "?"),
+            Token::Dollar => write!(f, "$"),
             Token::OpenParen => write!(f, "("),
             Token::CloseParen => write!(f, ")"),
             Token::OpenParenCurly => write!(f, "{{"),

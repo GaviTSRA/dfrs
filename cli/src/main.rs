@@ -192,6 +192,9 @@ fn main() {
                 ValidateError::UnknownTag { node: _, tag_name, available, start_pos, end_pos } => {
                     print_err(format!("Unknown tag '{}', found tags: {:?}", tag_name, available), data, start_pos, Some(end_pos));
                 }
+                ValidateError::UnknownGameValue { game_value, start_pos, end_pos} => {
+                    print_err(format!("Unknown game_value '{game_value}'"), data, start_pos, Some(end_pos));
+                }
             }
             std::process::exit(0);
         }

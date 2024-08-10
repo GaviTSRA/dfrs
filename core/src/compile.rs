@@ -204,6 +204,9 @@ fn arg_val_from_arg(arg: crate::node::Arg, node_name: String, block: String) -> 
         crate::node::ArgValue::Variable { value, scope } => {
             Some( Arg { item: ArgItem { data: ArgValueData::Variable { value, scope }, id: String::from("var") }, slot: arg.index } )
         }
+        crate::node::ArgValue::GameValue { value, selector, .. } => {
+            Some ( Arg { item: ArgItem { data: ArgValueData::GameValue { game_value: value, target: selector }, id: String::from("g_val") }, slot: arg.index })
+        }
     }
 }
 
@@ -247,6 +250,11 @@ struct ArgItem {
 enum ArgValueData {
     Simple { name: String },
     Id { id: String },
+    GameValue {
+        #[serde(rename="type")]
+        game_value: String,
+        target: Selector
+    },
     Variable { value: String, scope: String },
     Location { is_block: bool, loc: Location },
     Vector { x: f32, y: f32, z: f32 },
@@ -294,6 +302,12 @@ impl Serialize for ArgValueData {
             ArgValueData::Id { id } => {
                 let mut state = serializer.serialize_struct("MyEnum", 1)?;
                 state.serialize_field("id", id)?;
+                state.end()
+            }
+            ArgValueData::GameValue { target, game_value } => {
+                let mut state = serializer.serialize_struct("MyEnum", 1)?;
+                state.serialize_field("type", game_value)?;
+                state.serialize_field("target", target)?;
                 state.end()
             }
             ArgValueData::Variable { value, scope } => {

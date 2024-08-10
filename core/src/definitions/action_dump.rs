@@ -11,8 +11,7 @@ pub struct ActionDump {
     pub actions: Vec<ADAction>,
     #[serde(skip)]
     pub game_value_categories: String,
-    #[serde(skip)]
-    pub game_values: String,
+    pub game_values: Vec<ADGameValue>,
     #[serde(skip)]
     pub particle_categories: String,
     #[serde(skip)]
@@ -96,6 +95,14 @@ pub struct ADArgument {
     pub description: Vec<String>,
     #[serde(default="default_vec_vec_string")]
     pub notes: Vec<Vec<String>>
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct ADGameValue {
+    pub aliases: Vec<String>,
+    pub category: String,
+    pub icon: ADIcon
 }
 
 impl ActionDump {

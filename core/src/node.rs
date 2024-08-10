@@ -95,7 +95,8 @@ pub enum ArgValue {
     Sound { sound: String, volume: f32, pitch: f32 },
     Potion { potion: String, amplifier: f32, duration: f32 },
     Tag { tag: String, value: String, definition: Option<DefinedTag>, name_end_pos: Position, value_start_pos: Position },
-    Variable { value: String, scope: String }
+    Variable { value: String, scope: String },
+    GameValue { value: String, selector: Selector, selector_end_pos: Position }
 }
 
 #[derive(Clone, Debug)]
