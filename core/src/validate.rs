@@ -1,7 +1,7 @@
 use phf::phf_map;
 
 use crate::{definitions::{action_dump::{Action, ActionDump}, actions::{EntityActions, GameActions, PlayerActions, VariableActions}, ArgType}, node::{ActionNode, ActionType, Arg, ArgValue, EventNode, Expression, FileNode}, token::Position};
-use crate::definitions::game_values::{GameValue, GameValues};
+use crate::definitions::game_values::GameValues;
 
 pub static PLAYER_EVENTS: phf::Map<&'static str, &'static str> = phf_map! {
     "join" => "Join",
@@ -81,7 +81,7 @@ pub enum ValidateError {
     UnknownAction { node: ActionNode },
     UnknownGameValue { start_pos: Position, end_pos: Position, game_value: String },
     MissingArgument { node: ActionNode, index: i32, name: String },
-    WrongArgumentType { node: ActionNode, index: i32, name: String, expected_type: ArgType, found_type: ArgType },
+    WrongArgumentType { node: ActionNode, index: i32, name: String, expected_types: Vec<ArgType>, found_type: ArgType },
     TooManyArguments { node: ActionNode },
     InvalidTagOption { node:ActionNode, tag_name: String, provided: String, options: Vec<String>, start_pos: Position, end_pos: Position },
     UnknownTag { node: ActionNode, tag_name: String, available: Vec<String>, start_pos: Position, end_pos: Position }
@@ -238,13 +238,13 @@ impl Validator {
                     _ => {}
                 }
 
-                if provided_arg.arg_type != arg.arg_type && arg.arg_type != ArgType::ANY && provided_arg.arg_type != ArgType::VARIABLE && provided_arg.arg_type != ArgType::GAME_VALUE {
+                if !arg.arg_types.contains(&provided_arg.arg_type) && !arg.arg_types.contains(&ArgType::ANY) && provided_arg.arg_type != ArgType::VARIABLE && provided_arg.arg_type != ArgType::GAME_VALUE {
                     if arg.allow_multiple && matched_one {
                         action_node.args.insert(0, provided_arg);
                         break;
                     }    
-                    action_node.args.push(provided_arg.clone());
-                    return Err(ValidateError::WrongArgumentType { node: action_node, index, name: arg.name, expected_type: arg.arg_type, found_type: provided_arg.arg_type })
+                    action_node.args = all_provided_args;
+                    return Err(ValidateError::WrongArgumentType { node: action_node, index, name: arg.name, expected_types: arg.arg_types, found_type: provided_arg.arg_type })
                 }
 
                 provided_arg.index = index;

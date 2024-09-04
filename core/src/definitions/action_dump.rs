@@ -143,7 +143,7 @@ pub struct Action {
 
 impl Action {
     pub fn new(dfrs_name: String, df_name: &str, args: Vec<DefinedArg>, tags: Vec<DefinedTag>) -> Action {
-        return Action {dfrs_name: dfrs_name, df_name: df_name.to_owned(), args, tags};
+        return Action {dfrs_name, df_name: df_name.to_owned(), args, tags};
     }
 }
 
@@ -163,7 +163,14 @@ pub fn get_actions(action_dump: &ActionDump, block: &str) -> Vec<Action> {
 }
 
 pub fn get_action(action: &ADAction) -> Action {
-    let mut args = vec![];
+    let mut args: Vec<DefinedArg> = vec![];
+    let mut is_or = false;
+    let mut index = 0;
+    let mut index_after_or = 0;
+    let mut args_before_or= 0;
+    let mut or_index= 0;
+    let mut current_args: Vec<DefinedArg> = vec![];
+
     for arg in &action.icon.arguments {
         let arg_type = match &arg.arg_type as &str {
             "NUMBER" => ArgType::NUMBER,
@@ -187,18 +194,53 @@ pub fn get_action(action: &ADAction) -> Action {
             "PROJECTILE" => ArgType::ITEM,
             "SPAWN_EGG" => ArgType::ITEM,
             "NONE" => ArgType::EMPTY,
-            "OR" => ArgType::EMPTY,
-            "" => continue,
+            "OR" => {
+                or_index = index - 1;
+                index_after_or = 0;
+                args_before_or = current_args.len();
+                is_or = true;
+                continue;
+            },
+            "" => {
+                if is_or {
+                    return Action::new(action.name.clone() + "-NotYetSupported", &action.name, vec![], vec![]);
+                }
+                for arg in current_args {
+                    args.push(arg);
+                }
+                current_args = vec![];
+                index = 0;
+                continue;
+            },
             
             _ => panic!("Unknown arg type: {}", arg.arg_type)
         };
-        
-        if arg.description.get(0).is_none() { // TODO remove after OR type is implemented
-            continue;
-        }
+        index += 1;
 
-        let new_arg = DefinedArg::new(arg.description.get(0).expect("No description"), arg_type, arg.optional, arg.plural);     
-        args.push(new_arg);
+        if is_or {
+            if index_after_or > args_before_or - 1 {
+                let new_arg = DefinedArg::new(arg.description.get(0).expect("No description"), vec![arg_type], true, arg.plural);
+                current_args.push(new_arg);
+            } else {
+                current_args.get_mut(index_after_or).unwrap().arg_types.push(arg_type);
+            }
+            index_after_or += 1;
+        } else {
+            let new_arg = DefinedArg::new(arg.description.get(0).expect("No description"), vec![arg_type], arg.optional, arg.plural);
+            current_args.push(new_arg);
+        }
+    }
+    if is_or {
+        if or_index != current_args.len() {
+            if or_index > current_args.len() - or_index {
+                for i in (current_args.len() - or_index)..=or_index {
+                    current_args.get_mut(i).unwrap().optional = true;
+                }
+            }
+        }
+    }
+    for arg in current_args {
+        args.push(arg);
     }
 
     let mut tags = vec![];

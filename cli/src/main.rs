@@ -177,8 +177,9 @@ fn main() {
                 ValidateError::MissingArgument { node, name, .. } => {
                     print_err(format!("Missing argument '{}'", name), data, node.start_pos, Some(node.end_pos));
                 }
-                ValidateError::WrongArgumentType { node, index, name, expected_type, found_type } => {
-                    print_err(format!("Wrong argument type for '{}', expected '{:?}' but found '{:?}'", name, expected_type, found_type), data, node.args.get(index as usize).unwrap().start_pos.clone(), Some(node.args.get(index as usize).unwrap().end_pos.clone()));
+                ValidateError::WrongArgumentType { node, index, name, expected_types, found_type } => {
+                    println!("{expected_types:?} {index} {:?}", node.args);
+                    print_err(format!("Wrong argument type for '{}', expected '{:?}' but found '{:?}'", name, expected_types, found_type), data, node.args.get(index as usize).unwrap().start_pos.clone(), Some(node.args.get(index as usize).unwrap().end_pos.clone()));
                 }
                 ValidateError::TooManyArguments { node } => {
                     let start_pos = node.start_pos;

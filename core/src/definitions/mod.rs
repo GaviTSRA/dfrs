@@ -4,15 +4,15 @@ pub mod game_values;
 
 #[derive(Clone, Debug)]
 pub struct DefinedArg {
-    pub arg_type: ArgType,
+    pub arg_types: Vec<ArgType>,
     pub name: String,
     pub allow_multiple: bool,
     pub optional: bool
 }
 
 impl DefinedArg {
-    pub fn new(name: &str, arg_type: ArgType, optional: bool, allow_multiple: bool) -> DefinedArg {
-        return DefinedArg {name: name.to_owned(), arg_type, allow_multiple, optional};
+    pub fn new(name: &str, arg_types: Vec<ArgType>, optional: bool, allow_multiple: bool) -> DefinedArg {
+        return DefinedArg {name: name.to_owned(), arg_types, allow_multiple, optional};
     }
 }
 

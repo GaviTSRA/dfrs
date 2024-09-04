@@ -1,9 +1,5 @@
 save players;
 
 @join {
-    line test;
-    p:all.sendMessage("<green>+ %default");
-    v.div(test, 5);
-    v.appendValue(players, $name);
-    v.appendValue(players, $selection:name);
+
 }
