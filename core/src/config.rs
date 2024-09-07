@@ -27,7 +27,7 @@ pub enum SendApi {
     Recode
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Default)]
 pub struct Debug {
     #[serde(default = "bool::default")]
     pub tokens: bool,
@@ -37,10 +37,4 @@ pub struct Debug {
     pub compile: bool,
     #[serde(default = "bool::default")]
     pub connection: bool
-}
-
-impl Default for Debug {
-    fn default() -> Self {
-        Self { tokens: false, nodes: false, compile: false, connection: false }
-    }
 }

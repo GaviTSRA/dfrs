@@ -22,16 +22,11 @@ impl GameValues {
             game_values.push(new_value);
         }
 
-        return GameValues {game_values};
+        GameValues {game_values}
     }
 
     pub fn get(&self, dfrs_name: String) -> Option<&GameValue> {
-        for action in &self.game_values {
-            if action.dfrs_name == dfrs_name {
-                return Some(action);
-            }
-        }
-        return None;
+        self.game_values.iter().find(|&action| action.dfrs_name == dfrs_name)
     }
 
     pub fn all(&self) -> &Vec<GameValue> {

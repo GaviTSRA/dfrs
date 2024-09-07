@@ -12,7 +12,7 @@ pub struct DefinedArg {
 
 impl DefinedArg {
     pub fn new(name: &str, arg_types: Vec<ArgType>, optional: bool, allow_multiple: bool) -> DefinedArg {
-        return DefinedArg {name: name.to_owned(), arg_types, allow_multiple, optional};
+        DefinedArg {name: name.to_owned(), arg_types, allow_multiple, optional}
     }
 }
 
@@ -30,7 +30,7 @@ pub enum ArgType {
     ITEM,
     TAG,
     VARIABLE,
-    GAME_VALUE,
+    GameValue,
     ANY
 }
 
@@ -45,6 +45,6 @@ pub struct DefinedTag {
 
 impl DefinedTag {
     pub fn new(dfrs_name: &str, df_name: &str, slot: i8, options: Vec<String>, default: String) -> DefinedTag {
-        return DefinedTag {dfrs_name: dfrs_name.to_owned(), df_name: df_name.to_owned(), slot, options, default}
+        DefinedTag {dfrs_name: dfrs_name.to_owned(), df_name: df_name.to_owned(), slot, options, default}
     }
 }

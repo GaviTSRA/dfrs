@@ -30,7 +30,7 @@ impl Parser {
         } else {
             self.current_token = None
         }
-        return self.current_token.clone();
+        self.current_token.clone()
     }
 
     fn advance_err(&mut self) -> Result<TokenWithPos, ParseError> {
@@ -40,7 +40,7 @@ impl Parser {
             return Err(ParseError::InvalidToken { found: None, expected: vec![] })
         }
 
-        return Ok(token.unwrap())
+        Ok(token.unwrap())
     }
 
     fn require_token(&mut self, required_token: Token) -> Result<TokenWithPos, ParseError> {
@@ -48,11 +48,11 @@ impl Parser {
         if token.token == required_token {
             return Ok(token);
         }
-        return Err(ParseError::InvalidToken { found: Some(token), expected: vec![required_token] });
+        Err(ParseError::InvalidToken { found: Some(token), expected: vec![required_token] })
     }
 
     pub fn run(&mut self) -> Result<FileNode, ParseError> {
-        Ok(self.file()?)
+        self.file()
     }
 
     fn file(&mut self) -> Result<FileNode, ParseError> {
@@ -86,25 +86,23 @@ impl Parser {
             self.variables = self.variables.clone().into_iter().filter(|var| var.var_type == VariableType::Game || var.var_type == VariableType::Save).collect::<Vec<VariableNode>>();
         }
         
-        let end_pos;
-        if events.len() > 0 {
-            end_pos = events.get(events.len() - 1).unwrap().end_pos.clone();
+        let end_pos = if !events.is_empty() {
+            events.last().unwrap().end_pos.clone()
         } else {
-            end_pos = start_pos.clone();
-        }
+            start_pos.clone()
+        };
         Ok(FileNode { events, functions, start_pos, end_pos })
     }
 
     fn event(&mut self) -> Result<EventNode, ParseError> {
-        let event;
         let mut expressions: Vec<ExpressionNode> = vec![];
         let start_pos = self.current_token.clone().unwrap().end_pos;
 
         let name_token = self.advance_err()?;
-        match name_token.token {
-            Token::Identifier { value } => event = value,
+        let event = match name_token.token {
+            Token::Identifier { value } => value,
             _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Identifier { value: String::from("<any>")}] })
-        }
+        };
 
         self.require_token(Token::OpenParenCurly)?;
 
@@ -121,16 +119,14 @@ impl Parser {
     }
 
     fn function(&mut self) -> Result<FunctionNode, ParseError> {
-        let name;
         let mut expressions: Vec<ExpressionNode> = vec![];
         let start_pos = self.current_token.clone().unwrap().end_pos;
 
         let name_token = self.advance_err()?;
-        match name_token.token {
-            Token::Identifier { value } => name = value,
+        let name = match name_token.token {
+            Token::Identifier { value } => value,
             _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Identifier { value: String::from("<any>")}] })
-        }
-
+        };
 
         self.require_token(Token::OpenParen)?;
         let mut params: Vec<FunctionParamNode> = vec![];
@@ -321,7 +317,6 @@ impl Parser {
     }
 
     fn action(&mut self, action_type: ActionType) -> Result<ActionNode, ParseError> {
-        let name;
         let mut selector = Selector::Default;
         let mut implicit_selector = true;
         let mut token = self.advance_err()?;
@@ -348,17 +343,14 @@ impl Parser {
         }
 
         token = self.advance_err()?;
-        match token.token {
-            Token::Identifier { value } => {
-                name = value;
-            }
+        let name = match token.token {
+            Token::Identifier { value } => value,
             _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Identifier { value: String::from("<any>") }]} )
-        }
+        };
 
         let params = self.make_params()?;
         let mut args = vec![];
-        let mut i = 0;
-        for param in params {
+        for (i, param) in params.into_iter().enumerate() {
             let arg_type = match param.value {
                 ArgValue::Empty => ArgType::EMPTY,
                 ArgValue::Number { .. } => ArgType::NUMBER,
@@ -370,10 +362,9 @@ impl Parser {
                 ArgValue::Vector { .. } => ArgType::VECTOR,
                 ArgValue::Tag { ..} => ArgType::TAG,
                 ArgValue::Variable { .. } => ArgType::VARIABLE,
-                ArgValue::GameValue { .. } => ArgType::GAME_VALUE
+                ArgValue::GameValue { .. } => ArgType::GameValue
             };
-            args.push(Arg { value: param.value, index: i, arg_type, start_pos: param.start_pos, end_pos: param.end_pos});
-            i += 1
+            args.push(Arg { value: param.value, index: i as i32, arg_type, start_pos: param.start_pos, end_pos: param.end_pos});
         }
 
         let mut selector_start_pos = start_pos.clone();
@@ -505,18 +496,17 @@ impl Parser {
                 let mut selector = Selector::Default;
                 let mut selector_end_pos = token.start_pos.clone();
                 let start_pos = token.start_pos.clone();
-                match token.token.clone() {
-                    Token::Selector { value } => {
-                        selector = value;
-                        token = self.advance_err()?;
-                        if token.token != Token::Colon {
-                            return Err(ParseError::InvalidToken { found: Some(token), expected: vec![Token::Colon]})
-                        }
-                        selector_end_pos = token.end_pos;
-                        token = self.advance_err()?;
+
+                if let Token::Selector { value } = token.token.clone() {
+                    selector = value;
+                    token = self.advance_err()?;
+                    if token.token != Token::Colon {
+                        return Err(ParseError::InvalidToken { found: Some(token), expected: vec![Token::Colon]})
                     }
-                    _ => {}
+                    selector_end_pos = token.end_pos;
+                    token = self.advance_err()?;
                 }
+                
                 match token.token.clone() {
                     Token::Identifier { value } => {
                         params.push(ArgValueWithPos {
@@ -599,16 +589,13 @@ impl Parser {
                 }
             }
         }
-        if params.len() > 0 && !is_value {
+        if !params.is_empty() && !is_value {
             return Err(ParseError::InvalidToken { found: Some(TokenWithPos::new(Token::Comma, comma_pos.clone(), comma_pos)), expected })
         }
         Ok(params)
     }
 
     fn make_location(&mut self) -> Result<ArgValueWithPos, ParseError> {
-        let x;
-        let y;
-        let z;
         let mut pitch = None;
         let mut yaw = None;
         let start_pos = self.current_token.clone().unwrap().start_pos;
@@ -617,18 +604,18 @@ impl Parser {
         if loc_params.len() < 3 {
             return Err(ParseError::InvalidLocation { pos: self.current_token.clone().unwrap().start_pos, msg: "Not enough arguments".into() })
         }
-        match loc_params[0].value {
-            ArgValue::Number { number } => x = number,
+        let x = match loc_params[0].value {
+            ArgValue::Number { number } => number,
             _ => return Err(ParseError::InvalidLocation { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid x coordinate".into() })
-        }
-        match loc_params[1].value {
-            ArgValue::Number { number } => y = number,
+        };
+        let y = match loc_params[1].value {
+            ArgValue::Number { number } => number,
             _ => return Err(ParseError::InvalidLocation { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid y coordinate".into() })
-        }
-        match loc_params[2].value {
-            ArgValue::Number { number } => z = number,
+        };
+        let z = match loc_params[2].value {
+            ArgValue::Number { number } => number,
             _ => return Err(ParseError::InvalidLocation { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid z coordinate".into() })
-        }
+        };
         if loc_params.len() >= 4 {
             match loc_params[3].value {
                 ArgValue::Number { number } => pitch = Some(number),
@@ -652,27 +639,24 @@ impl Parser {
     }
 
     fn make_vector(&mut self) -> Result<ArgValueWithPos, ParseError> {
-        let x;
-        let y;
-        let z;
         let start_pos = self.current_token.clone().unwrap().start_pos;
         let vec_params = self.make_params()?;
 
         if vec_params.len() < 3 {
             return Err(ParseError::InvalidVector { pos: self.current_token.clone().unwrap().start_pos, msg: "Not enough arguments".into() })
         }
-        match vec_params[0].value {
-            ArgValue::Number { number } => x = number,
+        let x = match vec_params[0].value {
+            ArgValue::Number { number } => number,
             _ => return Err(ParseError::InvalidVector { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid x coordinate".into() })
-        }
-        match vec_params[1].value {
-            ArgValue::Number { number } => y = number,
+        };
+        let y = match vec_params[1].value {
+            ArgValue::Number { number } => number,
             _ => return Err(ParseError::InvalidVector { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid y coordinate".into() })
-        }
-        match vec_params[2].value {
-            ArgValue::Number { number } => z = number,
+        };
+        let z = match vec_params[2].value {
+            ArgValue::Number { number } => number,
             _ => return Err(ParseError::InvalidVector { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid z coordinate".into() })
-        }
+        };
         if vec_params.len() > 3 {
             return Err(ParseError::InvalidVector { pos: self.current_token.clone().unwrap().start_pos, msg: "Too many arguments".into() })
         }
@@ -684,28 +668,25 @@ impl Parser {
     }
 
     fn make_sound(&mut self) -> Result<ArgValueWithPos, ParseError> {
-        let sound;
-        let volume;
-        let pitch;
         let start_pos = self.current_token.clone().unwrap().start_pos;
         let sound_params = self.make_params()?;
 
         if sound_params.len() < 3 {
             return Err(ParseError::InvalidSound { pos: self.current_token.clone().unwrap().start_pos, msg: "Not enough arguments".into() })
         }
-        match &sound_params[0].value {
-            ArgValue::String { string } => sound = string.clone(),
-            ArgValue::Text { text } => sound = text.clone(),
+        let sound = match &sound_params[0].value {
+            ArgValue::String { string } => string.clone(),
+            ArgValue::Text { text } => text.clone(),
             _ => return Err(ParseError::InvalidSound { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid sound type".into() })
-        }
-        match sound_params[1].value {
-            ArgValue::Number { number } => volume = number,
+        };
+        let volume = match sound_params[1].value {
+            ArgValue::Number { number } => number,
             _ => return Err(ParseError::InvalidSound { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid volume".into() })
-        }
-        match sound_params[2].value {
-            ArgValue::Number { number } => pitch = number,
+        };
+        let pitch = match sound_params[2].value {
+            ArgValue::Number { number } => number,
             _ => return Err(ParseError::InvalidSound { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid pitch".into() })
-        }
+        };
         if sound_params.len() > 3 {
             return Err(ParseError::InvalidSound { pos: self.current_token.clone().unwrap().start_pos, msg: "Too many arguments".into() })
         }
@@ -717,28 +698,25 @@ impl Parser {
     }
 
     fn make_potion(&mut self) -> Result<ArgValueWithPos, ParseError> {
-        let potion;
-        let amplifier;
-        let duration;
         let start_pos = self.current_token.clone().unwrap().start_pos;
         let potion_params = self.make_params()?;
 
         if potion_params.len() < 3 {
             return Err(ParseError::InvalidPotion { pos: self.current_token.clone().unwrap().start_pos, msg: "Not enough arguments".into() })
         }
-        match &potion_params[0].value {
-            ArgValue::String { string } => potion = string.clone(),
-            ArgValue::Text { text } => potion = text.clone(),
+        let potion = match &potion_params[0].value {
+            ArgValue::String { string } => string.clone(),
+            ArgValue::Text { text } => text.clone(),
             _ => return Err(ParseError::InvalidPotion { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid potion type".into() })
-        }
-        match potion_params[1].value {
-            ArgValue::Number { number } => amplifier = number,
+        };
+        let amplifier = match potion_params[1].value {
+            ArgValue::Number { number } => number,
             _ => return Err(ParseError::InvalidPotion { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid amplifier".into() })
-        }
-        match potion_params[2].value {
-            ArgValue::Number { number } => duration = number,
+        };
+        let duration = match potion_params[2].value {
+            ArgValue::Number { number } => number,
             _ => return Err(ParseError::InvalidPotion { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid duration".into() })
-        }
+        };
         if potion_params.len() > 3 {
             return Err(ParseError::InvalidPotion { pos: self.current_token.clone().unwrap().start_pos, msg: "Too many arguments".into() })
         }

@@ -143,7 +143,7 @@ pub struct Action {
 
 impl Action {
     pub fn new(dfrs_name: String, df_name: &str, args: Vec<DefinedArg>, tags: Vec<DefinedTag>) -> Action {
-        return Action {dfrs_name, df_name: df_name.to_owned(), args, tags};
+        Action {dfrs_name, df_name: df_name.to_owned(), args, tags}
     }
 }
 
@@ -219,24 +219,20 @@ pub fn get_action(action: &ADAction) -> Action {
 
         if is_or {
             if index_after_or > args_before_or - 1 {
-                let new_arg = DefinedArg::new(arg.description.get(0).expect("No description"), vec![arg_type], true, arg.plural);
+                let new_arg = DefinedArg::new(arg.description.first().expect("No description"), vec![arg_type], true, arg.plural);
                 current_args.push(new_arg);
             } else {
                 current_args.get_mut(index_after_or).unwrap().arg_types.push(arg_type);
             }
             index_after_or += 1;
         } else {
-            let new_arg = DefinedArg::new(arg.description.get(0).expect("No description"), vec![arg_type], arg.optional, arg.plural);
+            let new_arg = DefinedArg::new(arg.description.first().expect("No description"), vec![arg_type], arg.optional, arg.plural);
             current_args.push(new_arg);
         }
     }
-    if is_or {
-        if or_index != current_args.len() {
-            if or_index > current_args.len() - or_index {
-                for i in (current_args.len() - or_index)..=or_index {
-                    current_args.get_mut(i).unwrap().optional = true;
-                }
-            }
+    if is_or && or_index != current_args.len() && or_index > current_args.len() - or_index {
+        for i in (current_args.len() - or_index)..=or_index {
+            current_args.get_mut(i).unwrap().optional = true;
         }
     }
     for arg in current_args {
@@ -257,14 +253,13 @@ pub fn get_action(action: &ADAction) -> Action {
 
     let mut v: String = action.name.clone().trim()
         .replace("+=", "addDirect").replace("-=", "subDirect")
-        .replace("+", "add").replace("-", "sub")
-        .replace("%", "mod").replace("/", "div").replace("=", "set");
-    if v == "x".to_owned() {
+        .replace('+', "add").replace('-', "sub")
+        .replace('%', "mod").replace('/', "div").replace('=', "set");
+    if v == *"x" {
         v = "mul".into();
     }
     let mut vv: Vec<char> = v.chars().collect();
-    vv[0] = vv[0].to_lowercase().nth(0).unwrap();
+    vv[0] = vv[0].to_lowercase().next().unwrap();
     let name: String = vv.into_iter().collect();
-    let new_action = Action::new(name, &action.name, args, tags);
-    new_action
+    Action::new(name, &action.name, args, tags)
 }

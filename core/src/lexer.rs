@@ -46,7 +46,7 @@ impl Lexer {
         let mut dot_count = 0;
         let start_pos = self.position.clone();
 
-        while self.current_char.is_some() && (self.current_char.unwrap().is_digit(10) || self.current_char.unwrap() == '.') {
+        while self.current_char.is_some() && (self.current_char.unwrap().is_ascii_digit() || self.current_char.unwrap() == '.') {
             if self.current_char.unwrap() == '.' { dot_count += 1 }
             if dot_count > 1 { return Err(LexerError::InvalidNumber{ pos: self.position.clone() }) }
             num_string.push_str(&self.current_char.unwrap().to_string());
@@ -172,13 +172,13 @@ impl Lexer {
         }
 
         let keyword = KEYWORDS.get(&value).cloned();
-        if keyword.is_some() {
-            return Ok(TokenWithPos { token: Token::Keyword { value: keyword.unwrap() }, start_pos, end_pos: self.position.clone()})
+        if let Some(keyword) = keyword {
+            return Ok(TokenWithPos { token: Token::Keyword { value: keyword }, start_pos, end_pos: self.position.clone()})
         }
 
         let selector = SELECTORS.get(&value).cloned();
-        if selector.is_some() {
-            return Ok(TokenWithPos { token: Token::Selector { value: selector.unwrap() }, start_pos, end_pos: self.position.clone()})
+        if let Some(selector) = selector {
+            return Ok(TokenWithPos { token: Token::Selector { value: selector }, start_pos, end_pos: self.position.clone()})
         }
 
         Ok(TokenWithPos { token: Token::Identifier { value }, start_pos, end_pos: self.position.clone() })
@@ -296,7 +296,7 @@ impl Lexer {
             }
         }
 
-        return Ok(result);
+        Ok(result)
     }
 
     fn token(&self, token: Token) -> TokenWithPos {

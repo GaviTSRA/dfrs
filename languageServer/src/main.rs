@@ -324,7 +324,7 @@ fn compile_file(data: String) -> Result<(), CompileErr> {
                 ValidateError::MissingArgument { node, name, .. } => {
                     Err(CompileErr::new(node.start_pos, Some(node.end_pos), format!("Missing argument '{}'", name)))
                 }
-                ValidateError::WrongArgumentType { node, index, name, expected_type, found_type } => {
+                ValidateError::WrongArgumentType { node, index, name, expected_types, found_type } => {
                     Err(CompileErr::new(node.args.get(index as usize).unwrap().start_pos.clone(), Some(node.args.get(index as usize).unwrap().end_pos.clone()), format!("Wrong argument type for '{}', expected '{:?}' but found '{:?}'", name, expected_type, found_type)))
                 }
                 ValidateError::TooManyArguments { node } => {

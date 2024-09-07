@@ -47,10 +47,9 @@ fn event_node(event_node: EventNode) -> Result<String, serde_json::Error> {
     codeline.blocks.push(event_block);
 
     for expr_node in event_node.expressions {
-        match expression_node(expr_node.node) {
-            Some(block) => codeline.blocks.push(block),
-            None => {}
-        };
+        if let Some(block) = expression_node(expr_node.node) { 
+            codeline.blocks.push(block)
+        }
     }
 
     let res = serde_json::to_string(&codeline)?;
@@ -66,8 +65,7 @@ fn function_node(function_node: FunctionNode) -> Result<String, serde_json::Erro
         Arg { item: ArgItem { data: ArgValueData::Tag { action: "dynamic".into(), block: "func".into(), option: "False".into(),tag: "Is Hidden".into() }, id: "bl_tag".into() }, slot: 26 }
     ];
 
-    let mut slot = 0;
-    for param in function_node.params {
+    for (slot, param) in function_node.params.into_iter().enumerate() {
         let mut default = None;
         if let Some(param_default) = param.default {
             let default_data = arg_val_from_arg(crate::node::Arg {
@@ -103,9 +101,8 @@ fn function_node(function_node: FunctionNode) -> Result<String, serde_json::Erro
                 },
                 id: "pn_el".into(),
             },
-            slot
+            slot: slot as i32
         });
-        slot += 1;
     }
 
     let function_block = Block {
@@ -119,10 +116,9 @@ fn function_node(function_node: FunctionNode) -> Result<String, serde_json::Erro
     codeline.blocks.push(function_block);
 
     for expr_node in function_node.expressions {
-        match expression_node(expr_node.node) {
-            Some(block) => codeline.blocks.push(block),
-            None => {}
-        };
+        if let Some(block) = expression_node(expr_node.node) { 
+            codeline.blocks.push(block)
+        }
     }
 
     let res = serde_json::to_string(&codeline)?;
@@ -131,20 +127,19 @@ fn function_node(function_node: FunctionNode) -> Result<String, serde_json::Erro
 }
 
 fn expression_node(node: Expression) -> Option<Block> {
-    return match node {
+    match node {
         Expression::Action { node } => Some(action_node(node)),
         Expression::Variable { .. } => None,
     }
 }
 
 fn action_node(node: ActionNode) -> Block {
-    let block;
-    match node.action_type {
-        ActionType::Player => block = "player_action",
-        ActionType::Entity => block = "entity_action",
-        ActionType::Game => block = "game_action",
-        ActionType::Variable => block = "set_var"
-    }
+    let block = match node.action_type {
+        ActionType::Player => "player_action",
+        ActionType::Entity => "entity_action",
+        ActionType::Game => "game_action",
+        ActionType::Variable => "set_var"
+    };
 
     let mut args: Vec<Arg> = vec![];
 
@@ -171,7 +166,7 @@ fn action_node(node: ActionNode) -> Block {
 
 fn arg_val_from_arg(arg: crate::node::Arg, node_name: String, block: String) -> Option<Arg> {
     match arg.value {
-        crate::node::ArgValue::Empty => return None,
+        crate::node::ArgValue::Empty => None,
         crate::node::ArgValue::Text { text } => {
             Some( Arg { item: ArgItem { data: ArgValueData::Simple { name: text }, id: String::from("comp") }, slot: arg.index } )       
         }

@@ -8,16 +8,11 @@ pub struct PlayerActions {
 impl PlayerActions {
     pub fn new(action_dump: &ActionDump) -> PlayerActions {
         let actions = get_actions(action_dump, "PLAYER ACTION");
-        return PlayerActions {player_actions: actions};
+        PlayerActions {player_actions: actions}
     }
 
     pub fn get(&self, dfrs_name: String) -> Option<&Action> {
-        for action in &self.player_actions {
-            if action.dfrs_name == dfrs_name {
-                return Some(action);
-            }
-        }
-        return None;
+        self.player_actions.iter().find(|&action| action.dfrs_name == dfrs_name)
     }
 
     pub fn all(&self) -> &Vec<Action> {
@@ -33,16 +28,11 @@ pub struct EntityActions {
 impl EntityActions {
     pub fn new(action_dump: &ActionDump) -> EntityActions {
         let actions = get_actions(action_dump, "ENTITY ACTION");
-        return EntityActions { entity_actions: actions };
+        EntityActions { entity_actions: actions }
     }
 
     pub fn get(&self, dfrs_name: String) -> Option<&Action> {
-        for action in &self.entity_actions {
-            if action.dfrs_name == dfrs_name {
-                return Some(action);
-            }
-        }
-        return None;
+        self.entity_actions.iter().find(|&action| action.dfrs_name == dfrs_name)
     }
 
     pub fn all(&self) -> &Vec<Action> {
@@ -58,16 +48,11 @@ pub struct GameActions {
 impl GameActions {
     pub fn new(action_dump: &ActionDump) -> GameActions {
         let actions = get_actions(action_dump, "GAME ACTION");
-        return GameActions { game_actions: actions };
+        GameActions { game_actions: actions }
     }
 
     pub fn get(&self, dfrs_name: String) -> Option<&Action> {
-        for action in &self.game_actions {
-            if action.dfrs_name == dfrs_name {
-                return Some(action);
-            }
-        }
-        return None;
+        self.game_actions.iter().find(|&action| action.dfrs_name == dfrs_name)
     }
 
     pub fn all(&self) -> &Vec<Action> {
@@ -83,16 +68,11 @@ pub struct VariableActions {
 impl VariableActions {
     pub fn new(action_dump: &ActionDump) -> VariableActions {
         let actions = get_actions(action_dump, "SET VARIABLE");
-        return VariableActions { variable_actions: actions };
+        VariableActions { variable_actions: actions }
     }
 
     pub fn get(&self, dfrs_name: String) -> Option<&Action> {
-        for action in &self.variable_actions {
-            if action.dfrs_name == dfrs_name {
-                return Some(action);
-            }
-        }
-        return None;
+        self.variable_actions.iter().find(|&action| action.dfrs_name == dfrs_name)
     }
 
     pub fn all(&self) -> &Vec<Action> {

@@ -1,4 +1,4 @@
-use std::fmt::{Display, write};
+use std::fmt::Display;
 
 use phf::phf_map;
 use serde::{Deserialize, Serialize};
@@ -205,7 +205,7 @@ pub static TYPES: phf::Map<&'static str, Type> = phf_map! {
 };
 
 pub fn get_type_str(input: Type) -> String {
-    return match input {
+    match input {
         Type::String => "txt",
         Type::Text => "comp",
         Type::Number => "num",
@@ -219,5 +219,5 @@ pub fn get_type_str(input: Type) -> String {
         Type::Variable => "var",
         Type::List => "list",
         Type::Dict => "dict"
-    }.into();
+    }.into()
 }

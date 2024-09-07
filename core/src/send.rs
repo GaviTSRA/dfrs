@@ -14,11 +14,9 @@ pub fn send(code: Vec<String>, config: Config) {
             send_codeclient(code, config);
         }
         crate::config::SendApi::Recode => {
-            let mut i = 0;
-            for line in code {
+            for (i, line) in code.into_iter().enumerate() {
                 //TODO Name
                 send_recode(line, format!("df.rs Test {}", i), config.debug.connection);
-                i += 1;
             }
         }
     }
@@ -85,7 +83,7 @@ fn send_codeclient(code: Vec<String>, config: Config) {
     socket.send(Message::Text("place swap".into())).unwrap();
     for line in code {
         let data = compress(line);
-        socket.send(Message::Text(format!("place {}", data).into())).unwrap();
+        socket.send(Message::Text(format!("place {}", data))).unwrap();
     }
     socket.send(Message::Text("place go".into())).unwrap();
 

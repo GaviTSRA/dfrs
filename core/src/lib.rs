@@ -13,15 +13,14 @@ pub mod definitions;
 pub mod utility;
 
 pub fn load_config() -> Config {
-    let data;
-    if !Path::new("test_project/dfrs.toml").exists() {
-        data = String::from("");
+    let data = if !Path::new("test_project/dfrs.toml").exists() {
+        String::from("")
     } else {
-        data = std::fs::read_to_string("test_project/dfrs.toml").expect("No config file");
-    }
+        std::fs::read_to_string("test_project/dfrs.toml").expect("No config file")
+    };
 
     match toml::from_str(&data) {
-        Ok(res) => return res,
+        Ok(res) => res,
         Err(err) => panic!("Failed to parse config: {}", err)
     }
 }

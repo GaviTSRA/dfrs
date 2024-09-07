@@ -124,14 +124,14 @@ impl Validator {
             actual_event = PLAYER_EVENTS.get(&event.event).cloned();
             match actual_event {
                 Some(actual) => {
-                    event.event = actual.to_owned();
+                    actual.clone_into(&mut event.event);
                     event.event_type = Some(ActionType::Player);
                 }
                 None => {
                     actual_event = ENTITY_EVENTS.get(&event.event).cloned();
                     match actual_event {
                         Some(actual) => {
-                            event.event = actual.to_owned();
+                            actual.clone_into(&mut event.event);
                             event.event_type = Some(ActionType::Entity);
                         }
                         None => {
@@ -178,7 +178,7 @@ impl Validator {
     }
 
     fn validate_action(&self, mut action_node: ActionNode, action: &Action) -> Result<ActionNode, ValidateError> {
-        action_node.name = action.df_name.clone();
+        action_node.name.clone_from(&action.df_name);
         let mut args: Vec<Arg> = vec![];
         let mut index: i32 = -1;
 
@@ -193,7 +193,7 @@ impl Validator {
                     match_more = false;
                 }
                 index += 1;
-                if all_provided_args.len() == 0 {
+                if all_provided_args.is_empty() {
                     if arg.optional {
                         if !matched_one {
                             args.push(Arg { 
@@ -205,12 +205,10 @@ impl Validator {
                             });
                         }
                         break;
-                    } else {
-                        if !matched_one {
+                    } else if !matched_one {
                             return Err(ValidateError::MissingArgument { node: action_node, index, name: arg.name})
-                        } else {
-                            break;
-                        }
+                    } else {
+                        break;
                     }
                 }
                 let mut provided_arg = all_provided_args.remove(0);
@@ -219,26 +217,23 @@ impl Validator {
                     return Err(ValidateError::MissingArgument { node: action_node, index, name: arg.name})
                 }
 
-                match provided_arg.value {
-                    ArgValue::GameValue { value, selector, selector_end_pos } => {
-                        let actual_game_value = self.game_values.get(value.clone());
-                        match actual_game_value {
-                            Some(res) => provided_arg.value = ArgValue::GameValue {
-                                value: res.df_name.clone(),
-                                selector,
-                                selector_end_pos
-                            },
-                            None => return Err(ValidateError::UnknownGameValue {
-                                game_value: value,
-                                start_pos: provided_arg.start_pos,
-                                end_pos: provided_arg.end_pos
-                            })
-                        }
+                if let ArgValue::GameValue { value, selector, selector_end_pos } = provided_arg.value {
+                    let actual_game_value = self.game_values.get(value.clone());
+                    match actual_game_value {
+                        Some(res) => provided_arg.value = ArgValue::GameValue {
+                            value: res.df_name.clone(),
+                            selector,
+                            selector_end_pos
+                        },
+                        None => return Err(ValidateError::UnknownGameValue {
+                            game_value: value,
+                            start_pos: provided_arg.start_pos,
+                            end_pos: provided_arg.end_pos
+                        })
                     }
-                    _ => {}
                 }
 
-                if !arg.arg_types.contains(&provided_arg.arg_type) && !arg.arg_types.contains(&ArgType::ANY) && provided_arg.arg_type != ArgType::VARIABLE && provided_arg.arg_type != ArgType::GAME_VALUE {
+                if !arg.arg_types.contains(&provided_arg.arg_type) && !arg.arg_types.contains(&ArgType::ANY) && provided_arg.arg_type != ArgType::VARIABLE && provided_arg.arg_type != ArgType::GameValue {
                     if arg.allow_multiple && matched_one {
                         action_node.args.insert(0, provided_arg);
                         break;
@@ -254,7 +249,7 @@ impl Validator {
         }
 
         let mut tags: Vec<Arg> = vec![];
-        if all_provided_args.len() > 0 {
+        if !all_provided_args.is_empty() {
             for val in all_provided_args.clone() {
                 if val.arg_type != ArgType::TAG {
                     return Err(ValidateError::TooManyArguments { node: action_node })
