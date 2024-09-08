@@ -36,6 +36,12 @@ pub fn compile(node: FileNode, debug: bool) -> Vec<String> {
 fn event_node(event_node: EventNode) -> Result<String, serde_json::Error> {
     let mut codeline = Codeline { blocks: vec![] };
 
+    let attribute = if event_node.cancelled {
+        Some("LS-CANCEL".into())
+    } else {
+        None
+    };
+
     let event_block = Block {
         id: "block".to_owned(), 
         block: if event_node.event_type.unwrap() == ActionType::Player { Some("event".to_owned()) } else { Some("entity_event".to_owned()) }, 
@@ -44,7 +50,8 @@ fn event_node(event_node: EventNode) -> Result<String, serde_json::Error> {
         target: None,
         data: None,
         direct: None,
-        bracket_type: None
+        bracket_type: None,
+        attribute
     };
     codeline.blocks.push(event_block);
 
@@ -111,7 +118,8 @@ fn function_node(function_node: FunctionNode) -> Result<String, serde_json::Erro
 
     let function_block = Block {
         id: "block".to_owned(), 
-        block: Some("func".to_owned()), 
+        block: Some("func".to_owned()),
+        attribute: None,
         action: None,
         args: Some(Args { items }),
         target: None,
@@ -160,6 +168,12 @@ fn conditional_node(node: ConditionalNode) -> Vec<Block> {
         args.push(arg);
     }
 
+    let attribute = if node.inverted {
+        Some("NOT".into())
+    } else {
+        None
+    };
+
     let mut blocks = vec![
         Block {
             action: Some(node.name),
@@ -171,6 +185,7 @@ fn conditional_node(node: ConditionalNode) -> Vec<Block> {
                 _ => Some(node.selector)
             },
             args: Some(Args { items: args }),
+            attribute,
             data: None,
             direct: None,
             bracket_type: None
@@ -179,7 +194,8 @@ fn conditional_node(node: ConditionalNode) -> Vec<Block> {
             id: "bracket".into(),
             direct: Some("open".into()),
             bracket_type: Some("norm".into()),
-            block: None, 
+            block: None,
+            attribute: None,
             args: None, 
             action: None,
             target: None, 
@@ -203,7 +219,8 @@ fn conditional_node(node: ConditionalNode) -> Vec<Block> {
         args: None, 
         action: None,
         target: None, 
-        data: None
+        data: None,
+        attribute: None
     });
     blocks
 }
@@ -236,6 +253,7 @@ fn action_node(node: ActionNode) -> Block {
             _ => Some(node.selector)
         },
         args: Some(Args { items: args }),
+        attribute: None,
         data: None,
         direct: None,
         bracket_type: None
@@ -302,6 +320,8 @@ struct Block {
     target: Option<Selector>,
     #[serde(skip_serializing_if = "Option::is_none")]
     data: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    attribute: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     direct: Option<String>,

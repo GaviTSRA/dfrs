@@ -259,6 +259,10 @@ impl Lexer {
                     result.push(self.token(Token::Colon));
                     self.advance();
                 }
+                '!' => {
+                    result.push(self.token(Token::ExclamationMark));
+                    self.advance();
+                }
                 '.' => {
                     result.push(self.token(Token::Dot));
                     self.advance();

@@ -97,16 +97,25 @@ impl Parser {
     fn event(&mut self) -> Result<EventNode, ParseError> {
         let mut expressions: Vec<ExpressionNode> = vec![];
         let start_pos = self.current_token.clone().unwrap().end_pos;
+        let mut cancelled = false;
 
         let name_token = self.advance_err()?;
+
         let event = match name_token.token {
             Token::Identifier { value } => value,
             _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Identifier { value: String::from("<any>")}] })
         };
 
-        self.require_token(Token::OpenParenCurly)?;
+        let mut token = self.advance_err()?;
+        match token.token {
+            Token::ExclamationMark => {
+                cancelled = true;
+                self.require_token(Token::OpenParenCurly)?;
+            }
+            Token::OpenParenCurly => {}
+            _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::OpenParenCurly, Token::ExclamationMark] })
+        }
 
-        let mut token;
         loop {
             token = self.advance_err()?;
             match token.token {
@@ -115,7 +124,7 @@ impl Parser {
             }
         }
 
-        Ok(EventNode { event_type: None, event, expressions, start_pos, name_end_pos: name_token.end_pos, end_pos: token.end_pos })
+        Ok(EventNode { event_type: None, event, expressions, start_pos, name_end_pos: name_token.end_pos, end_pos: token.end_pos, cancelled })
     }
 
     fn function(&mut self) -> Result<FunctionNode, ParseError> {
@@ -392,6 +401,15 @@ impl Parser {
         let start_pos = token.start_pos.clone();
         let mut selector_start_pos = None;
         let mut selector_end_pos = None;
+        let mut inverted = false;
+
+        match token.token {
+            Token::ExclamationMark => {
+                inverted = true;
+                token = self.advance_err()?;
+            }
+            _ => {}
+        }
 
         match token.token {
             Token::Selector { value } => {
@@ -434,6 +452,7 @@ impl Parser {
             start_pos,
             end_pos,
             expressions,
+            inverted
         })
     }
 

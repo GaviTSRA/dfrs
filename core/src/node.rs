@@ -19,7 +19,8 @@ pub struct EventNode {
     pub expressions: Vec<ExpressionNode>,
     pub start_pos: Position,
     pub name_end_pos: Position,
-    pub end_pos: Position
+    pub end_pos: Position,
+    pub cancelled: bool
 }
 
 #[derive(Clone, Debug)]
@@ -78,6 +79,7 @@ pub struct ConditionalNode {
     pub selector_end_pos: Option<Position>,
     pub end_pos: Position,
     pub expressions: Vec<ExpressionNode>,
+    pub inverted: bool
 }
 
 #[derive(Clone, Debug)]
