@@ -1,4 +1,4 @@
-use crate::{definitions::ArgType, node::{ActionNode, ActionType, Arg, ArgValue, ArgValueWithPos, EventNode, Expression, ExpressionNode, FileNode, FunctionNode, FunctionParamNode, VariableNode, VariableType}, token::{Keyword, Position, Selector, Token, TokenWithPos, SELECTORS, TYPES}};
+use crate::{definitions::ArgType, node::{ActionNode, ActionType, Arg, ArgValue, ArgValueWithPos, ConditionalNode, ConditionalType, EventNode, Expression, ExpressionNode, FileNode, FunctionNode, FunctionParamNode, VariableNode, VariableType}, token::{Keyword, Position, Selector, Token, TokenWithPos, SELECTORS, TYPES}};
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -297,6 +297,26 @@ impl Parser {
                         end_pos = res.end_pos.clone();
                         node = Expression::Action { node: res };
                     }
+                    Keyword::IfP => {
+                        let res = self.conditional(ConditionalType::Player)?;
+                        end_pos = res.end_pos.clone();
+                        node = Expression::Conditional { node: res };
+                    }
+                    Keyword::IfE => {
+                        let res = self.conditional(ConditionalType::Entity)?;
+                        end_pos = res.end_pos.clone();
+                        node = Expression::Conditional { node: res };
+                    }
+                    Keyword::IfG => {
+                        let res = self.conditional(ConditionalType::Game)?;
+                        end_pos = res.end_pos.clone();
+                        node = Expression::Conditional { node: res };
+                    }
+                    Keyword::IfV => {
+                        let res = self.conditional(ConditionalType::Variable)?;
+                        end_pos = res.end_pos.clone();
+                        node = Expression::Conditional { node: res };
+                    }
                     Keyword::VarLine => {
                         let res = self.variable(VariableType::Line)?;
                         end_pos = res.end_pos.clone();
@@ -381,6 +401,70 @@ impl Parser {
         self.require_token(Token::Semicolon)?;
 
         Ok(ActionNode { action_type, selector, name, args, start_pos, selector_start_pos, selector_end_pos, end_pos: token.end_pos })
+    }
+
+    fn conditional(&mut self, conditional_type: ConditionalType) -> Result<ConditionalNode, ParseError> {
+        let mut token = self.advance_err()?;
+        let mut selector = Selector::Default;
+        let start_pos = token.start_pos.clone();
+
+        match token.token {
+            Token::Selector { value } => {
+                selector = value;
+                self.require_token(Token::Colon)?;
+                token = self.advance_err()?;
+            }
+            _ => {}
+        }
+        let name = match token.token {
+            Token::Identifier { value } => value,
+            _ => return Err(ParseError::InvalidToken { found: Some(token), expected: vec![Token::Identifier { value: "any".into() }] })
+        };
+
+        let params = self.make_params()?;
+        let mut args = vec![];
+        for (i, param) in params.into_iter().enumerate() {
+            let arg_type = match param.value {
+                ArgValue::Empty => ArgType::EMPTY,
+                ArgValue::Number { .. } => ArgType::NUMBER,
+                ArgValue::String { .. } => ArgType::STRING,
+                ArgValue::Text { .. } => ArgType::TEXT,
+                ArgValue::Location { .. } => ArgType::LOCATION,
+                ArgValue::Potion { .. } => ArgType::POTION,
+                ArgValue::Sound { .. } => ArgType::SOUND,
+                ArgValue::Vector { .. } => ArgType::VECTOR,
+                ArgValue::Tag { ..} => ArgType::TAG,
+                ArgValue::Variable { .. } => ArgType::VARIABLE,
+                ArgValue::GameValue { .. } => ArgType::GameValue
+            };
+            args.push(Arg { value: param.value, index: i as i32, arg_type, start_pos: param.start_pos, end_pos: param.end_pos});
+        }
+
+        self.require_token(Token::OpenParenCurly)?;
+        let mut expressions = vec![];
+        loop {
+            token = self.advance_err()?;
+            match token.token {
+                Token::CloseParenCurly => break,
+                _ => {
+                    let expression = self.expression()?;
+                    expressions.push(expression);
+                }
+            }
+        }
+        let end_pos = token.end_pos;
+        
+        Ok(ConditionalNode {
+            conditional_type,
+            selector,
+            name,
+            args,
+            selector_start_pos: start_pos.clone(),
+            selector_end_pos: end_pos.clone(),
+            start_pos,
+            end_pos,
+            expressions,
+        })
     }
 
     fn variable(&mut self, var_type: VariableType) -> Result<VariableNode, ParseError> {

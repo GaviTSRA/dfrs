@@ -51,6 +51,7 @@ pub struct ExpressionNode {
 #[derive(Clone, Debug)]
 pub enum Expression {
     Action { node: ActionNode },
+    Conditional { node: ConditionalNode },
     Variable { node: VariableNode }
 }
 
@@ -64,6 +65,19 @@ pub struct ActionNode {
     pub selector_start_pos: Position,
     pub selector_end_pos: Position,
     pub end_pos: Position
+}
+
+#[derive(Clone, Debug)]
+pub struct ConditionalNode {
+    pub conditional_type: ConditionalType,
+    pub selector: Selector,
+    pub name: String,
+    pub args: Vec<Arg>,
+    pub start_pos: Position,
+    pub selector_start_pos: Position,
+    pub selector_end_pos: Position,
+    pub end_pos: Position,
+    pub expressions: Vec<ExpressionNode>,
 }
 
 #[derive(Clone, Debug)]
@@ -108,6 +122,14 @@ pub struct ArgValueWithPos {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ActionType {
+    Player,
+    Entity,
+    Game,
+    Variable
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ConditionalType {
     Player,
     Entity,
     Game,

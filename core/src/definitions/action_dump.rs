@@ -188,6 +188,7 @@ pub fn get_action(action: &ADAction) -> Action {
 
             //TODO all below
             "VEHICLE" => ArgType::EMPTY,
+            "ENTITY_TYPE" => ArgType::EMPTY,
             "ITEM" => ArgType::ITEM,
             "BLOCK" => ArgType::ITEM,
             "BLOCK_TAG" => ArgType::STRING,
@@ -254,7 +255,7 @@ pub fn get_action(action: &ADAction) -> Action {
     let mut v: String = action.name.clone().trim()
         .replace("+=", "addDirect").replace("-=", "subDirect")
         .replace('+', "add").replace('-', "sub")
-        .replace('%', "mod").replace('/', "div").replace('=', "set");
+        .replace('%', "mod").replace('/', "div").replace('=', "equal");
     if v == *"x" {
         v = "mul".into();
     }

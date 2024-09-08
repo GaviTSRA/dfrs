@@ -86,7 +86,10 @@ fn main() {
                         match &expression.node {
                             dfrs_core::node::Expression::Action { node } => {
                                 println!("{:?} {:?} {:?} {:?}", node.action_type, node.selector, node.name, node.args)
-                            }
+                            } 
+                            dfrs_core::node::Expression::Conditional { node } => {
+                                println!("{:?} {:?} {:?} {:?}", node.conditional_type, node.selector, node.name, node.args)
+                            },
                             dfrs_core::node::Expression::Variable { node } => {
                                 println!("{:?} {:?} {:?}", node.var_type, node.dfrs_name, node.df_name)
                             },
@@ -104,6 +107,9 @@ fn main() {
                         match &expression.node {
                             dfrs_core::node::Expression::Action { node } => {
                                 println!("{:?} {:?} {:?} {:?}", node.action_type, node.selector, node.name, node.args)
+                            }
+                            dfrs_core::node::Expression::Conditional { node } => {
+                                println!("{:?} {:?} {:?} {:?}", node.conditional_type, node.selector, node.name, node.args)
                             }
                             dfrs_core::node::Expression::Variable { node } => {
                                 println!("{:?} {:?} {:?}", node.var_type, node.dfrs_name, node.df_name)

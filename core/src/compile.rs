@@ -1,6 +1,6 @@
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 
-use crate::{node::{ActionNode, ActionType, EventNode, Expression, FileNode, FunctionNode}, token::{get_type_str, Selector}};
+use crate::{node::{ActionNode, ActionType, ConditionalNode, ConditionalType, EventNode, Expression, FileNode, FunctionNode}, token::{get_type_str, Selector}};
 
 pub fn compile(node: FileNode, debug: bool) -> Vec<String> {
     let mut res: Vec<String> = vec![];
@@ -38,17 +38,21 @@ fn event_node(event_node: EventNode) -> Result<String, serde_json::Error> {
 
     let event_block = Block {
         id: "block".to_owned(), 
-        block: if event_node.event_type.unwrap() == ActionType::Player { "event".to_owned() } else { "entity_event".to_owned() }, 
+        block: if event_node.event_type.unwrap() == ActionType::Player { Some("event".to_owned()) } else { Some("entity_event".to_owned()) }, 
         action: Some(event_node.event),
-        args: Args { items: vec![] },
+        args: Some(Args { items: vec![] }),
         target: None,
-        data: None
+        data: None,
+        direct: None,
+        bracket_type: None
     };
     codeline.blocks.push(event_block);
 
     for expr_node in event_node.expressions {
-        if let Some(block) = expression_node(expr_node.node) { 
-            codeline.blocks.push(block)
+        if let Some(blocks) = expression_node(expr_node.node) {
+            for block in blocks {
+                codeline.blocks.push(block);
+            }
         }
     }
 
@@ -107,17 +111,21 @@ fn function_node(function_node: FunctionNode) -> Result<String, serde_json::Erro
 
     let function_block = Block {
         id: "block".to_owned(), 
-        block: "func".to_owned(), 
+        block: Some("func".to_owned()), 
         action: None,
-        args: Args { items },
+        args: Some(Args { items }),
         target: None,
-        data: Some(function_node.name)
+        data: Some(function_node.name),
+        direct: None,
+        bracket_type: None
     };
     codeline.blocks.push(function_block);
 
     for expr_node in function_node.expressions {
-        if let Some(block) = expression_node(expr_node.node) { 
-            codeline.blocks.push(block)
+        if let Some(blocks) = expression_node(expr_node.node) { 
+            for block in blocks {
+                codeline.blocks.push(block)
+            }
         }
     }
 
@@ -126,11 +134,78 @@ fn function_node(function_node: FunctionNode) -> Result<String, serde_json::Erro
     Ok(res)
 }
 
-fn expression_node(node: Expression) -> Option<Block> {
+fn expression_node(node: Expression) -> Option<Vec<Block>> {
     match node {
-        Expression::Action { node } => Some(action_node(node)),
+        Expression::Action { node } => Some(vec![action_node(node)]),
+        Expression::Conditional { node } => Some(conditional_node(node)),
         Expression::Variable { .. } => None,
     }
+}
+
+fn conditional_node(node: ConditionalNode) -> Vec<Block> {
+    let block = match node.conditional_type {
+        ConditionalType::Player => "if_player",
+        ConditionalType::Entity => "if_entity",
+        ConditionalType::Game => "if_game",
+        ConditionalType::Variable => "if_var"
+    };
+
+    let mut args: Vec<Arg> = vec![];
+
+    for arg in node.args {
+        let arg = match arg_val_from_arg(arg, node.name.clone(), block.to_owned()) {
+            Some(res) => res,
+            None => continue
+        };
+        args.push(arg);
+    }
+
+    let mut blocks = vec![
+        Block {
+            action: Some(node.name),
+            block: Some(block.to_string()),
+            id: "block".to_string(),
+            target: match node.conditional_type {
+                ConditionalType::Game => None,
+                ConditionalType::Variable => None,
+                _ => Some(node.selector)
+            },
+            args: Some(Args { items: args }),
+            data: None,
+            direct: None,
+            bracket_type: None
+        },
+        Block {
+            id: "bracket".into(),
+            direct: Some("open".into()),
+            bracket_type: Some("norm".into()),
+            block: None, 
+            args: None, 
+            action: None,
+            target: None, 
+            data: None
+        },
+    ];
+
+    for expression in node.expressions {
+        if let Some(expression_blocks) = expression_node(expression.node) {
+            for block in expression_blocks {
+                blocks.push(block);
+            }
+        }
+    }
+
+    blocks.push(Block {
+        id:"bracket".into(),
+        direct: Some("close".into()),
+        bracket_type: Some("norm".into()), 
+        block: None, 
+        args: None, 
+        action: None,
+        target: None, 
+        data: None
+    });
+    blocks
 }
 
 fn action_node(node: ActionNode) -> Block {
@@ -153,14 +228,17 @@ fn action_node(node: ActionNode) -> Block {
 
     Block {
         action: Some(node.name),
-        block: block.to_string(),
+        block: Some(block.to_string()),
         id: "block".to_string(),
         target: match node.action_type {
+            ActionType::Game => None,
             ActionType::Variable => None,
             _ => Some(node.selector)
         },
-        args: Args { items: args },
-        data: None
+        args: Some(Args { items: args }),
+        data: None,
+        direct: None,
+        bracket_type: None
     }
 }
 
@@ -213,15 +291,22 @@ struct Codeline {
 #[derive(Deserialize, Serialize, Debug)]
 struct Block {
     id: String,
-    block: String,
-    // #[serde(skip_serializing_if = "Option::is_none")]
-    args: Args,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    block: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    args: Option<Args>,
     #[serde(skip_serializing_if = "Option::is_none")]
     action: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     target: Option<Selector>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    data: Option<String>
+    data: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    direct: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", rename="type")]
+    bracket_type: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
