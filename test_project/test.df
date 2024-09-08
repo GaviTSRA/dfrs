@@ -1,5 +1,7 @@
 save players;
 
 @join {
+    ifp isNear(12) {
 
+    }
 }

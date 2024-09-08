@@ -24,6 +24,7 @@ fn print_err(message: String, data: String, start_pos: Position, end_pos: Option
         Some(end_pos) => {
             if end_pos.line != start_pos.line {
                 // TODO
+                return;
             }
             arrows = "^".repeat(cmp::max(end_pos.col - start_pos.col, 1) as usize).bright_blue();
         }
@@ -177,26 +178,24 @@ fn main() {
                 ValidateError::UnknownEvent { node } => {
                     print_err(format!("Unknown event '{}'", node.event), data, node.start_pos, Some(node.name_end_pos));
                 }
-                ValidateError::UnknownAction { node } => {
-                    print_err(format!("Unknown action '{}'", node.name), data, node.start_pos, Some(node.end_pos));
+                ValidateError::UnknownAction { name, start_pos, end_pos } => {
+                    println!("{start_pos}");
+                    println!("{end_pos}");
+                    print_err(format!("Unknown action '{}'", name), data, start_pos, Some(end_pos));
                 }
-                ValidateError::MissingArgument { node, name, .. } => {
-                    print_err(format!("Missing argument '{}'", name), data, node.start_pos, Some(node.end_pos));
+                ValidateError::MissingArgument { name, start_pos, end_pos } => {
+                    print_err(format!("Missing argument '{}'", name), data, start_pos, Some(end_pos));
                 }
-                ValidateError::WrongArgumentType { node, index, name, expected_types, found_type } => {
-                    println!("{expected_types:?} {index} {:?}", node.args);
-                    print_err(format!("Wrong argument type for '{}', expected '{:?}' but found '{:?}'", name, expected_types, found_type), data, node.args.get(index as usize).unwrap().start_pos.clone(), Some(node.args.get(index as usize).unwrap().end_pos.clone()));
+                ValidateError::WrongArgumentType { args, index, name, expected_types, found_type } => {
+                    print_err(format!("Wrong argument type for '{}', expected '{:?}' but found '{:?}'", name, expected_types, found_type), data, args.get(index as usize).unwrap().start_pos.clone(), Some(args.get(index as usize).unwrap().end_pos.clone()));
                 }
-                ValidateError::TooManyArguments { node } => {
-                    let start_pos = node.start_pos;
-                    let mut end_pos = start_pos.clone();
-                    end_pos.col += node.name.chars().count() as u32;
-                    print_err(format!("Too many arguments for action '{}'", node.name), data, start_pos, Some(end_pos));
+                ValidateError::TooManyArguments { start_pos, end_pos, name } => {
+                    print_err(format!("Too many arguments for action '{}'", name), data, start_pos, Some(end_pos));
                 }
-                ValidateError::InvalidTagOption { node: _, tag_name, provided, options, start_pos, end_pos } => {
+                ValidateError::InvalidTagOption { tag_name, provided, options, start_pos, end_pos } => {
                     print_err(format!("Invalid option '{}' for tag '{}', expected one of {:?}", provided, tag_name, options), data, start_pos, Some(end_pos));
                 }
-                ValidateError::UnknownTag { node: _, tag_name, available, start_pos, end_pos } => {
+                ValidateError::UnknownTag { tag_name, available, start_pos, end_pos } => {
                     print_err(format!("Unknown tag '{}', found tags: {:?}", tag_name, available), data, start_pos, Some(end_pos));
                 }
                 ValidateError::UnknownGameValue { game_value, start_pos, end_pos} => {

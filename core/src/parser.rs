@@ -368,24 +368,7 @@ impl Parser {
             _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Identifier { value: String::from("<any>") }]} )
         };
 
-        let params = self.make_params()?;
-        let mut args = vec![];
-        for (i, param) in params.into_iter().enumerate() {
-            let arg_type = match param.value {
-                ArgValue::Empty => ArgType::EMPTY,
-                ArgValue::Number { .. } => ArgType::NUMBER,
-                ArgValue::String { .. } => ArgType::STRING,
-                ArgValue::Text { .. } => ArgType::TEXT,
-                ArgValue::Location { .. } => ArgType::LOCATION,
-                ArgValue::Potion { .. } => ArgType::POTION,
-                ArgValue::Sound { .. } => ArgType::SOUND,
-                ArgValue::Vector { .. } => ArgType::VECTOR,
-                ArgValue::Tag { ..} => ArgType::TAG,
-                ArgValue::Variable { .. } => ArgType::VARIABLE,
-                ArgValue::GameValue { .. } => ArgType::GameValue
-            };
-            args.push(Arg { value: param.value, index: i as i32, arg_type, start_pos: param.start_pos, end_pos: param.end_pos});
-        }
+        let args = self.make_args()?;
 
         let mut selector_start_pos = start_pos.clone();
         selector_start_pos.col += 2;
@@ -407,10 +390,14 @@ impl Parser {
         let mut token = self.advance_err()?;
         let mut selector = Selector::Default;
         let start_pos = token.start_pos.clone();
+        let mut selector_start_pos = None;
+        let mut selector_end_pos = None;
 
         match token.token {
             Token::Selector { value } => {
                 selector = value;
+                selector_start_pos = Some(token.start_pos);
+                selector_end_pos = Some(token.end_pos);
                 self.require_token(Token::Colon)?;
                 token = self.advance_err()?;
             }
@@ -421,24 +408,8 @@ impl Parser {
             _ => return Err(ParseError::InvalidToken { found: Some(token), expected: vec![Token::Identifier { value: "any".into() }] })
         };
 
-        let params = self.make_params()?;
-        let mut args = vec![];
-        for (i, param) in params.into_iter().enumerate() {
-            let arg_type = match param.value {
-                ArgValue::Empty => ArgType::EMPTY,
-                ArgValue::Number { .. } => ArgType::NUMBER,
-                ArgValue::String { .. } => ArgType::STRING,
-                ArgValue::Text { .. } => ArgType::TEXT,
-                ArgValue::Location { .. } => ArgType::LOCATION,
-                ArgValue::Potion { .. } => ArgType::POTION,
-                ArgValue::Sound { .. } => ArgType::SOUND,
-                ArgValue::Vector { .. } => ArgType::VECTOR,
-                ArgValue::Tag { ..} => ArgType::TAG,
-                ArgValue::Variable { .. } => ArgType::VARIABLE,
-                ArgValue::GameValue { .. } => ArgType::GameValue
-            };
-            args.push(Arg { value: param.value, index: i as i32, arg_type, start_pos: param.start_pos, end_pos: param.end_pos});
-        }
+        let args = self.make_args()?;
+        let end_pos = token.end_pos;
 
         self.require_token(Token::OpenParenCurly)?;
         let mut expressions = vec![];
@@ -452,15 +423,14 @@ impl Parser {
                 }
             }
         }
-        let end_pos = token.end_pos;
         
         Ok(ConditionalNode {
             conditional_type,
             selector,
             name,
             args,
-            selector_start_pos: start_pos.clone(),
-            selector_end_pos: end_pos.clone(),
+            selector_start_pos,
+            selector_end_pos,
             start_pos,
             end_pos,
             expressions,
@@ -677,6 +647,28 @@ impl Parser {
             return Err(ParseError::InvalidToken { found: Some(TokenWithPos::new(Token::Comma, comma_pos.clone(), comma_pos)), expected })
         }
         Ok(params)
+    }
+
+    fn make_args(&mut self) -> Result<Vec<Arg>, ParseError> {
+        let params = self.make_params()?;
+        let mut args = vec![];
+        for (i, param) in params.into_iter().enumerate() {
+            let arg_type = match param.value {
+                ArgValue::Empty => ArgType::EMPTY,
+                ArgValue::Number { .. } => ArgType::NUMBER,
+                ArgValue::String { .. } => ArgType::STRING,
+                ArgValue::Text { .. } => ArgType::TEXT,
+                ArgValue::Location { .. } => ArgType::LOCATION,
+                ArgValue::Potion { .. } => ArgType::POTION,
+                ArgValue::Sound { .. } => ArgType::SOUND,
+                ArgValue::Vector { .. } => ArgType::VECTOR,
+                ArgValue::Tag { ..} => ArgType::TAG,
+                ArgValue::Variable { .. } => ArgType::VARIABLE,
+                ArgValue::GameValue { .. } => ArgType::GameValue
+            };
+            args.push(Arg { value: param.value, index: i as i32, arg_type, start_pos: param.start_pos, end_pos: param.end_pos});
+        }
+        Ok(args)
     }
 
     fn make_location(&mut self) -> Result<ArgValueWithPos, ParseError> {
