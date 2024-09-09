@@ -1,11 +1,11 @@
 save players;
 
 @join! {
-    ifp !isNear(Location(0, 0, 0), 10) {
-        p.sendMessage("Test");
+    p.sendMessage($name,
+                  $selection:name);
+    ifp isNear(Location(0,0,0)) {
+        p.sendMessage("Near");
+    } else {
+        p.sendMessage("Not near");
     }
-}
-
-@swapHands {
-
 }

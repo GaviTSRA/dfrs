@@ -222,6 +222,52 @@ fn conditional_node(node: ConditionalNode) -> Vec<Block> {
         data: None,
         attribute: None
     });
+
+    if !node.else_expressions.is_empty() {
+        blocks.push(Block {
+            id: "block".into(),
+            direct: None,
+            bracket_type: None,
+            block: Some("else".into()),
+            attribute: None,
+            args: None,
+            action: None,
+            target: None,
+            data: None
+        });
+        blocks.push(Block {
+            id: "bracket".into(),
+            direct: Some("open".into()),
+            bracket_type: Some("norm".into()),
+            block: None,
+            attribute: None,
+            args: None,
+            action: None,
+            target: None,
+            data: None
+        });
+
+        for expression in node.else_expressions {
+            if let Some(expression_blocks) = expression_node(expression.node) {
+                for block in expression_blocks {
+                    blocks.push(block);
+                }
+            }
+        }
+
+        blocks.push(Block {
+            id:"bracket".into(),
+            direct: Some("close".into()),
+            bracket_type: Some("norm".into()),
+            block: None,
+            args: None,
+            action: None,
+            target: None,
+            data: None,
+            attribute: None
+        });
+    }
+
     blocks
 }
 

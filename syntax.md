@@ -43,6 +43,7 @@ TODO
 
 ---
 # Expressions
+TODO TAGS
 Every event, function or process contains a list of expressions.
 ## Actions
 Actions can either target players, entities, the game or variables.
@@ -58,6 +59,10 @@ Game and entity actions can target different selectors:
 p:default.sendMessage("Hi");
 p:selection.sendMessage("Hi 1");
 e:all.remove();
+```
+Tags can also be used:
+```
+p.sendMessage("Hi", alignmentMode="Centered");
 ```
 ## Conditionals
 Conditional statements function the same, but they have a slightly different syntax.
@@ -79,7 +84,15 @@ ifp selection:isNear(Location(0,0,0), 10) {
     <expressions...>
 }
 ```
-
+The else keyword can be used on conditionals:
+```
+ifp selection:isNear(Location(0,0,0), 10) {
+    <expressions...>
+} else {
+    <expressions...>
+}
+```
+---
 # Values
 ## Text
 ```

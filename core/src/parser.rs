@@ -23,6 +23,15 @@ impl Parser {
         Parser { tokens, token_index: -1, current_token: None, variables: vec![] }
     }
 
+    fn peak(&self) -> Option<TokenWithPos> {
+        let index = self.token_index + 1;
+        if index < self.tokens.len() as i32 {
+            Some(self.tokens[index as usize].clone())
+        } else {
+            None
+        }
+    }
+
     fn advance(&mut self) -> Option<TokenWithPos> {
         self.token_index += 1;
         if self.token_index < self.tokens.len() as i32 {
@@ -441,6 +450,35 @@ impl Parser {
                 }
             }
         }
+
+        let mut else_expressions = vec![];
+        match self.peak() {
+            Some(token) => {
+                match token.token {
+                    Token::Keyword { value } => {
+                        match value {
+                            Keyword::Else => {
+                                self.advance_err()?;
+                                self.require_token(Token::OpenParenCurly)?;
+                                loop {
+                                    let token = self.advance_err()?;
+                                    match token.token {
+                                        Token::CloseParenCurly => break,
+                                        _ => {
+                                            let expression = self.expression()?;
+                                            else_expressions.push(expression);
+                                        }
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            None => {}
+        }
         
         Ok(ConditionalNode {
             conditional_type,
@@ -452,6 +490,7 @@ impl Parser {
             start_pos,
             end_pos,
             expressions,
+            else_expressions,
             inverted
         })
     }

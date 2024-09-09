@@ -232,6 +232,18 @@ impl Validator {
             }
         }
 
+        for expression in conditional_node.else_expressions.iter_mut() {
+            match expression.node.clone() {
+                Expression::Action { node } => {
+                    expression.node = Expression::Action { node: self.validate_action_node(node)? };
+                }
+                Expression::Conditional { node } => {
+                    expression.node = Expression::Conditional { node: self.validate_conditional_node(node)? }
+                }
+                Expression::Variable { .. } => {}
+            }
+        }
+
         Ok(conditional_node)
     }
 

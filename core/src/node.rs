@@ -79,6 +79,7 @@ pub struct ConditionalNode {
     pub selector_end_pos: Option<Position>,
     pub end_pos: Position,
     pub expressions: Vec<ExpressionNode>,
+    pub else_expressions: Vec<ExpressionNode>,
     pub inverted: bool
 }
 
