@@ -54,7 +54,8 @@ pub enum Expression {
     Action { node: ActionNode },
     Conditional { node: ConditionalNode },
     Variable { node: VariableNode },
-    Call { node: CallNode }
+    Call { node: CallNode },
+    Repeat { node: RepeatNode }
 }
 
 #[derive(Clone, Debug)]
@@ -93,6 +94,15 @@ pub struct CallNode {
 }
 
 #[derive(Clone, Debug)]
+pub struct RepeatNode {
+    pub name: String,
+    pub args: Vec<Arg>,
+    pub start_pos: Position,
+    pub end_pos: Position,
+    pub expressions: Vec<ExpressionNode>
+}
+
+#[derive(Clone, Debug)]
 pub struct Arg {
     pub value: ArgValue,
     pub index: i32,
@@ -122,7 +132,8 @@ pub enum ArgValue {
     Potion { potion: String, amplifier: f32, duration: f32 },
     Tag { tag: String, value: String, definition: Option<DefinedTag>, name_end_pos: Position, value_start_pos: Position },
     Variable { value: String, scope: String },
-    GameValue { value: String, selector: Selector, selector_end_pos: Position }
+    GameValue { value: String, selector: Selector, selector_end_pos: Position },
+    Condition { name: String, args: Vec<Arg>, selector: Selector, conditional_type: ConditionalType, inverted: bool }
 }
 
 #[derive(Clone, Debug)]

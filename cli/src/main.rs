@@ -11,6 +11,7 @@ use dfrs_core::validate::{Validator, ValidateError};
 use colored::Colorize;
 
 fn print_err(message: String, data: String, start_pos: Position, end_pos: Option<Position>) {
+    println!("{message} {start_pos:?} - {end_pos:?} \n{data}");
     let lines = data.split("\n").collect::<Vec<&str>>();
     let line = lines.get((start_pos.line - 1) as usize).unwrap();
     let ln = start_pos.line;
@@ -94,6 +95,9 @@ fn main() {
                             dfrs_core::node::Expression::Call { node } => {
                                 println!("{:?} {:?}", node.name, node.args)
                             }
+                            dfrs_core::node::Expression::Repeat { node } => {
+                                println!("{:?} {:?}", node.name, node.args)
+                            },
                             dfrs_core::node::Expression::Variable { node } => {
                                 println!("{:?} {:?} {:?}", node.var_type, node.dfrs_name, node.df_name)
                             },
@@ -118,6 +122,9 @@ fn main() {
                             dfrs_core::node::Expression::Call { node } => {
                                 println!("{:?} {:?}", node.name, node.args)
                             }
+                            dfrs_core::node::Expression::Repeat { node } => {
+                                println!("{:?} {:?}", node.name, node.args)
+                            },
                             dfrs_core::node::Expression::Variable { node } => {
                                 println!("{:?} {:?} {:?}", node.var_type, node.dfrs_name, node.df_name)
                             },

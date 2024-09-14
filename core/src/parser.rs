@@ -1,4 +1,4 @@
-use crate::{definitions::ArgType, node::{ActionNode, ActionType, Arg, ArgValue, ArgValueWithPos, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, ExpressionNode, FileNode, FunctionNode, FunctionParamNode, VariableNode, VariableType}, token::{Keyword, Position, Selector, Token, TokenWithPos, SELECTORS, TYPES}};
+use crate::{definitions::ArgType, node::{ActionNode, ActionType, Arg, ArgValue, ArgValueWithPos, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, ExpressionNode, FileNode, FunctionNode, FunctionParamNode, RepeatNode, VariableNode, VariableType}, token::{Keyword, Position, Selector, Token, TokenWithPos, SELECTORS, TYPES}};
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -356,6 +356,11 @@ impl Parser {
                         end_pos = res.end_pos.clone();
                         node = Expression::Call { node: res }
                     }
+                    Keyword::Repeat => {
+                        let res = self.repeat()?;
+                        end_pos = res.end_pos.clone();
+                        node = Expression::Repeat { node: res }
+                    }
                     _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Keyword { value: Keyword::E }, Token::Keyword { value: Keyword::P }] })
                 }
             }
@@ -530,6 +535,40 @@ impl Parser {
             args,
             start_pos,
             end_pos,
+        })
+    }
+
+    fn repeat(&mut self) -> Result<RepeatNode, ParseError> {
+        let mut token = self.advance_err()?;
+        let start_pos = token.start_pos.clone();
+
+        let name = match token.token {
+            Token::Identifier { value } => value,
+            _ => return Err(ParseError::InvalidToken { found: Some(token), expected: vec![Token::Identifier { value: "any".into() }] })
+        };
+
+        let args = self.make_args()?;
+        let end_pos = token.end_pos;
+
+        self.require_token(Token::OpenParenCurly)?;
+        let mut expressions = vec![];
+        loop {
+            token = self.advance_err()?;
+            match token.token {
+                Token::CloseParenCurly => break,
+                _ => {
+                    let expression = self.expression()?;
+                    expressions.push(expression);
+                }
+            }
+        }
+        
+        Ok(RepeatNode {
+            name,
+            args,
+            start_pos,
+            end_pos,
+            expressions,
         })
     }
 
@@ -734,6 +773,17 @@ impl Parser {
                         }
                     }
                     Token::Dollar => is_game_value = true,
+                    Token::Keyword { value } => {
+                        let arg = match value {
+                            Keyword::IfP => self.conditional_arg(ConditionalType::Player)?,
+                            Keyword::IfE => self.conditional_arg(ConditionalType::Entity)?,
+                            Keyword::IfG => self.conditional_arg(ConditionalType::Game)?,
+                            Keyword::IfV => self.conditional_arg(ConditionalType::Variable)?,
+                            _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected })
+                        };
+                        params.push(arg);
+                        is_value = true;
+                    }
                     Token::CloseParen => break,
                     _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected })
                 }
@@ -760,7 +810,8 @@ impl Parser {
                 ArgValue::Vector { .. } => ArgType::VECTOR,
                 ArgValue::Tag { ..} => ArgType::TAG,
                 ArgValue::Variable { .. } => ArgType::VARIABLE,
-                ArgValue::GameValue { .. } => ArgType::GameValue
+                ArgValue::GameValue { .. } => ArgType::GameValue,
+                ArgValue::Condition { .. } => ArgType::CONDITION
             };
             args.push(Arg { value: param.value, index: i as i32, arg_type, start_pos: param.start_pos, end_pos: param.end_pos});
         }
@@ -898,6 +949,50 @@ impl Parser {
             end_pos: self.current_token.clone().unwrap().end_pos
         })
     }
+
+    fn conditional_arg(&mut self, conditional_type: ConditionalType) -> Result<ArgValueWithPos, ParseError> {
+        let mut token = self.advance_err()?;
+        let mut selector = Selector::Default;
+        let start_pos = token.start_pos.clone();
+        let mut inverted = false;
+
+        match token.token {
+            Token::ExclamationMark => {
+                inverted = true;
+                token = self.advance_err()?;
+            }
+            _ => {}
+        }
+
+        match token.token {
+            Token::Selector { value } => {
+                selector = value;
+                self.require_token(Token::Colon)?;
+                token = self.advance_err()?;
+            }
+            _ => {}
+        }
+        let name = match token.token {
+            Token::Identifier { value } => value,
+            _ => return Err(ParseError::InvalidToken { found: Some(token), expected: vec![Token::Identifier { value: "any".into() }] })
+        };
+
+        let args = self.make_args()?;
+        let end_pos = token.end_pos;
+
+        Ok(ArgValueWithPos {
+            value: ArgValue::Condition {
+                name,
+                args,
+                selector,
+                inverted,
+                conditional_type
+            },
+            start_pos,
+            end_pos,
+        })
+    }
+
 
     fn get_variable(&self, value: String) -> Option<(String, String)> {
         for node in &self.variables {

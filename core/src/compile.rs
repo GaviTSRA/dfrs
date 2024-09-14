@@ -1,6 +1,6 @@
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 
-use crate::{node::{ActionNode, ActionType, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, FileNode, FunctionNode}, token::{get_type_str, Selector}};
+use crate::{node::{ActionNode, ActionType, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, FileNode, FunctionNode, RepeatNode}, token::{get_type_str, Selector}};
 
 pub fn compile(node: FileNode, debug: bool) -> Vec<String> {
     let mut res: Vec<String> = vec![];
@@ -44,6 +44,7 @@ fn event_node(event_node: EventNode) -> Result<String, serde_json::Error> {
 
     let event_block = Block {
         id: "block".to_owned(), 
+        subAction: None,
         block: if event_node.event_type.unwrap() == ActionType::Player { Some("event".to_owned()) } else { Some("entity_event".to_owned()) }, 
         action: Some(event_node.event),
         args: Some(Args { items: vec![] }),
@@ -124,6 +125,7 @@ fn function_node(function_node: FunctionNode) -> Result<String, serde_json::Erro
         args: Some(Args { items }),
         target: None,
         data: Some(function_node.name),
+        subAction: None,
         direct: None,
         bracket_type: None
     };
@@ -147,6 +149,7 @@ fn expression_node(node: Expression) -> Option<Vec<Block>> {
         Expression::Action { node } => Some(vec![action_node(node)]),
         Expression::Conditional { node } => Some(conditional_node(node)),
         Expression::Call { node } => Some(vec![call_node(node)]),
+        Expression::Repeat { node } => Some(repeat_node(node)),
         Expression::Variable { .. } => None,
     }
 }
@@ -189,7 +192,8 @@ fn conditional_node(node: ConditionalNode) -> Vec<Block> {
             attribute,
             data: None,
             direct: None,
-            bracket_type: None
+            bracket_type: None,
+            subAction: None,
         },
         Block {
             id: "bracket".into(),
@@ -199,6 +203,7 @@ fn conditional_node(node: ConditionalNode) -> Vec<Block> {
             attribute: None,
             args: None, 
             action: None,
+            subAction: None,
             target: None, 
             data: None
         },
@@ -221,6 +226,7 @@ fn conditional_node(node: ConditionalNode) -> Vec<Block> {
         action: None,
         target: None, 
         data: None,
+        subAction: None,
         attribute: None
     });
 
@@ -232,6 +238,7 @@ fn conditional_node(node: ConditionalNode) -> Vec<Block> {
             block: Some("else".into()),
             attribute: None,
             args: None,
+            subAction: None,
             action: None,
             target: None,
             data: None
@@ -245,6 +252,7 @@ fn conditional_node(node: ConditionalNode) -> Vec<Block> {
             args: None,
             action: None,
             target: None,
+            subAction: None,
             data: None
         });
 
@@ -264,6 +272,7 @@ fn conditional_node(node: ConditionalNode) -> Vec<Block> {
             args: None,
             action: None,
             target: None,
+            subAction: None,
             data: None,
             attribute: None
         });
@@ -292,8 +301,97 @@ fn call_node(node: CallNode) -> Block {
         data: Some(node.name),
         attribute: None,
         direct: None,
+        subAction: None,
         bracket_type: None,
     }
+}
+
+fn repeat_node(node: RepeatNode) -> Vec<Block> {
+    let mut args: Vec<Arg> = vec![];
+    let mut attribute = None;
+    let mut sub_action = None;
+    let mut target = None;
+
+    if !node.clone().args.is_empty() {
+        let arg =  node.args.get(0).clone().unwrap();
+        match arg.value.clone() {
+            crate::node::ArgValue::Condition { name, args: new_args, selector, inverted, .. } => {
+                for arg in new_args {
+                    let arg = match arg_val_from_arg(arg, node.name.clone(), "repeat".to_owned()) {
+                        Some(res) => res,
+                        None => continue
+                    };
+                    args.push(arg);
+                }
+                attribute = if inverted {
+                    Some("NOT".into())
+                } else {
+                    None
+                };
+                sub_action = Some(name);
+                target = Some(selector);
+            }
+            _ => {
+                for arg in node.args {
+                    let arg = match arg_val_from_arg(arg, node.name.clone(), "repeat".to_owned()) {
+                        Some(res) => res,
+                        None => continue
+                    };
+                    args.push(arg);
+                }
+            }
+        }
+    }
+
+    let mut blocks = vec![
+        Block {
+            action: Some(node.name),
+            block: Some("repeat".into()),
+            id: "block".to_string(),
+            target,
+            args: Some(Args { items: args }),
+            attribute,
+            data: None,
+            direct: None,
+            subAction: sub_action,
+            bracket_type: None
+        },
+        Block {
+            id: "bracket".into(),
+            direct: Some("open".into()),
+            bracket_type: Some("repeat".into()),
+            block: None,
+            attribute: None,
+            args: None, 
+            action: None,
+            subAction: None,
+            target: None, 
+            data: None
+        }
+    ];
+
+    for expression in node.expressions {
+        if let Some(expression_blocks) = expression_node(expression.node) {
+            for block in expression_blocks {
+                blocks.push(block);
+            }
+        }
+    }
+
+    blocks.push(Block {
+        id:"bracket".into(),
+        direct: Some("close".into()),
+        bracket_type: Some("repeat".into()), 
+        block: None, 
+        args: None, 
+        action: None,
+        target: None, 
+        data: None,
+        subAction: None,
+        attribute: None
+    });
+
+    blocks
 }
 
 fn action_node(node: ActionNode) -> Block {
@@ -329,12 +427,13 @@ fn action_node(node: ActionNode) -> Block {
         attribute: None,
         data: None,
         direct: None,
+        subAction: None,
         bracket_type: None
     }
 }
 
 fn arg_val_from_arg(arg: crate::node::Arg, node_name: String, block: String) -> Option<Arg> {
-    match arg.value {
+    let arg = match arg.value {
         crate::node::ArgValue::Empty => None,
         crate::node::ArgValue::Text { text } => {
             Some( Arg { item: ArgItem { data: ArgValueData::Simple { name: text }, id: String::from("comp") }, slot: arg.index } )       
@@ -371,7 +470,11 @@ fn arg_val_from_arg(arg: crate::node::Arg, node_name: String, block: String) -> 
         crate::node::ArgValue::GameValue { value, selector, .. } => {
             Some ( Arg { item: ArgItem { data: ArgValueData::GameValue { game_value: value, target: selector }, id: String::from("g_val") }, slot: arg.index })
         }
-    }
+        crate::node::ArgValue::Condition { .. } => {
+            unreachable!();
+        }
+    };
+    arg
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -395,6 +498,8 @@ struct Block {
     data: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     attribute: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    subAction: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     direct: Option<String>,

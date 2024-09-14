@@ -1,6 +1,6 @@
-save players;
-
-@join! {
-    c.wait(1);
-    call("testFn", 1, 'test', $name);
+@join {
+    repeat while(ifp !selection:nameEquals('GaviTSRA')) {
+        p.sendMessage("test");
+        c.wait(1);
+    }
 }

@@ -1,6 +1,6 @@
 use phf::phf_map;
 
-use crate::{definitions::{action_dump::{Action, ActionDump}, actions::{EntityActions, GameActions, PlayerActions, VariableActions, ControlActions}, conditionals::{EntityConditionals, GameConditionals, PlayerConditionals, VariableConditionals}, ArgType, DefinedArg}, node::{ActionNode, ActionType, Arg, ArgValue, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, FileNode}, token::Position};
+use crate::{definitions::{action_dump::{Action, ActionDump}, actions::{ControlActions, EntityActions, GameActions, PlayerActions, VariableActions}, conditionals::{EntityConditionals, GameConditionals, PlayerConditionals, VariableConditionals}, repeats::Repeats, ArgType, DefinedArg}, node::{ActionNode, ActionType, Arg, ArgValue, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, FileNode, RepeatNode}, token::Position};
 use crate::definitions::game_values::GameValues;
 
 //TODO load from ad
@@ -100,6 +100,8 @@ pub struct Validator {
     game_conditionals: GameConditionals,
     variable_conditionals: VariableConditionals,
 
+    repeats: Repeats,
+
     game_values: GameValues
 }
 
@@ -118,6 +120,8 @@ impl Validator {
             game_conditionals: GameConditionals::new(&action_dump),
             variable_conditionals: VariableConditionals::new(&action_dump),
 
+            repeats: Repeats::new(&action_dump),
+
             game_values: GameValues::new(&action_dump)
         }
     }
@@ -133,6 +137,9 @@ impl Validator {
                     }
                     Expression::Call { node } => {
                         expression.node = Expression::Call { node: self.validate_call(node)? }
+                    }
+                    Expression::Repeat { node } => {
+                        expression.node = Expression::Repeat { node: self.validate_repeat_node(node)? }
                     }
                     Expression::Variable { .. } => {}
                 }
@@ -172,6 +179,9 @@ impl Validator {
                     }
                     Expression::Call { node } => {
                         expression.node = Expression::Call { node: self.validate_call(node)? }
+                    }
+                    Expression::Repeat { node } => {
+                        expression.node = Expression::Repeat { node: self.validate_repeat_node(node)? }
                     }
                     Expression::Variable { .. } => {}
                 }
@@ -245,6 +255,9 @@ impl Validator {
                 Expression::Call { node } => {
                     expression.node = Expression::Call { node: self.validate_call(node)? }
                 }
+                Expression::Repeat { node } => {
+                    expression.node = Expression::Repeat { node: self.validate_repeat_node(node)? }
+                }
                 Expression::Variable { .. } => {}
             }
         }
@@ -259,6 +272,9 @@ impl Validator {
                 }
                 Expression::Call { node } => {
                     expression.node = Expression::Call { node: self.validate_call(node)? }
+                }
+                Expression::Repeat { node } => {
+                    expression.node = Expression::Repeat { node: self.validate_repeat_node(node)? }
                 }
                 Expression::Variable { .. } => {}
             }
@@ -288,10 +304,82 @@ impl Validator {
             df_name: "internal".into(),
             dfrs_name: "internal".into(),
             args,
-            tags: vec![]
+            tags: vec![],
+            has_conditional_arg: false
         };
         call_node.args = self.validate_args(call_node.args, &action, call_node.start_pos.clone(), call_node.end_pos.clone())?;
         Ok(call_node)
+    }
+
+    fn validate_repeat_node(&self, mut repeat_node: RepeatNode) -> Result<RepeatNode, ValidateError> {
+        let mut action = self.repeats.get(repeat_node.clone().name);
+        let mut old_args = vec![];
+        let mut old_name = "".into();
+        let mut was_condition = false;
+
+        if !repeat_node.args.is_empty() && repeat_node.args.get(0).unwrap().arg_type == ArgType::CONDITION {
+            match repeat_node.args.get(0).unwrap().clone().value {
+                ArgValue::Condition { name, args, conditional_type, .. } => {
+                    old_args = repeat_node.args;
+                    
+                    match action {
+                        Some(res) => old_name = res.df_name.clone(),
+                        None => return Err(ValidateError::UnknownAction { name: repeat_node.name, start_pos: repeat_node.start_pos, end_pos: repeat_node.end_pos })
+                    };
+
+                    repeat_node.args = args;
+                    was_condition = true;
+                    action = match conditional_type {
+                        ConditionalType::Player => self.player_conditionals.get(name),
+                        ConditionalType::Entity => self.entity_conditionals.get(name),
+                        ConditionalType::Game => self.game_conditionals.get(name),
+                        ConditionalType::Variable => self.variable_conditionals.get(name),
+                    }
+                }
+                _ => unreachable!()
+            }
+        }
+
+        match action {
+            Some(res) => repeat_node = self.validate_repeat(repeat_node, res)?,
+            None => return Err(ValidateError::UnknownAction { name: repeat_node.name, start_pos: repeat_node.start_pos, end_pos: repeat_node.end_pos })
+        };
+        if was_condition {
+            match old_args.get(0).unwrap().clone().value {
+                ArgValue::Condition { name, args, selector, conditional_type, inverted } => {
+                    old_args.get_mut(0).unwrap().value = ArgValue::Condition { name: repeat_node.name, args: repeat_node.args.clone(), selector, conditional_type, inverted };
+                    repeat_node.args = old_args;
+                    repeat_node.name = old_name;
+                }
+                _ => unreachable!()
+            }
+        }
+
+        for expression in repeat_node.expressions.iter_mut() {
+            match expression.node.clone() {
+                Expression::Action { node } => {
+                    expression.node = Expression::Action { node: self.validate_action_node(node)? };
+                }
+                Expression::Conditional { node } => {
+                    expression.node = Expression::Conditional { node: self.validate_conditional_node(node)? }
+                }
+                Expression::Call { node } => {
+                    expression.node = Expression::Call { node: self.validate_call(node)? }
+                }
+                Expression::Repeat { node }  => {
+                    expression.node = Expression::Repeat { node: self.validate_repeat_node(node)? }
+                }
+                Expression::Variable { .. } => {}
+            }
+        }
+
+        Ok(repeat_node)
+    }
+
+    fn validate_repeat(&self, mut repeat_node: RepeatNode, action: &Action) -> Result<RepeatNode, ValidateError> {
+        repeat_node.name.clone_from(&action.df_name);
+        repeat_node.args = self.validate_args(repeat_node.args, action, repeat_node.start_pos.clone(), repeat_node.end_pos.clone())?;
+        Ok(repeat_node)
     }
 
     fn validate_args(&self, input_args: Vec<Arg>, action: &Action, start_pos: Position, end_pos: Position) -> Result<Vec<Arg>, ValidateError> {

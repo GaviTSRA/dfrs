@@ -42,7 +42,8 @@ pub struct ADAction {
     pub codeblock_name: String,
     pub tags: Vec<ADTag>,
     pub aliases: Vec<String>,
-    pub icon: ADIcon
+    pub icon: ADIcon,
+    pub sub_action_blocks: Option<Vec<String>>
 }
 
 #[derive(Deserialize)]
@@ -137,13 +138,14 @@ fn default_vec_arg() -> Vec<ADArgument> {
 pub struct Action {
     pub dfrs_name: String,
     pub df_name: String,
+    pub has_conditional_arg: bool,
     pub args: Vec<DefinedArg>,
     pub tags: Vec<DefinedTag>
 }
 
 impl Action {
-    pub fn new(dfrs_name: String, df_name: &str, args: Vec<DefinedArg>, tags: Vec<DefinedTag>) -> Action {
-        Action {dfrs_name, df_name: df_name.to_owned(), args, tags}
+    pub fn new(dfrs_name: String, df_name: &str, args: Vec<DefinedArg>, tags: Vec<DefinedTag>, has_conditional_arg: bool) -> Action {
+        Action {dfrs_name, df_name: df_name.to_owned(), args, tags, has_conditional_arg}
     }
 }
 
@@ -204,7 +206,7 @@ pub fn get_action(action: &ADAction) -> Action {
             },
             "" => {
                 if is_or {
-                    return Action::new(action.name.clone() + "-NotYetSupported", &action.name, vec![], vec![]);
+                    return Action::new(action.name.clone() + "-NotYetSupported", &action.name, vec![], vec![], action.sub_action_blocks.is_some() && !action.sub_action_blocks.clone().unwrap().is_empty());
                 }
                 for arg in current_args {
                     args.push(arg);
@@ -262,5 +264,5 @@ pub fn get_action(action: &ADAction) -> Action {
     let mut vv: Vec<char> = v.chars().collect();
     vv[0] = vv[0].to_lowercase().next().unwrap();
     let name: String = vv.into_iter().collect();
-    Action::new(name, &action.name, args, tags)
+    Action::new(name, &action.name, args, tags, action.sub_action_blocks.is_some() && !action.sub_action_blocks.clone().unwrap().is_empty())
 }
