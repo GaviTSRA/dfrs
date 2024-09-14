@@ -91,6 +91,9 @@ fn main() {
                             dfrs_core::node::Expression::Conditional { node } => {
                                 println!("{:?} {:?} {:?} {:?}", node.conditional_type, node.selector, node.name, node.args)
                             },
+                            dfrs_core::node::Expression::Call { node } => {
+                                println!("{:?} {:?}", node.name, node.args)
+                            }
                             dfrs_core::node::Expression::Variable { node } => {
                                 println!("{:?} {:?} {:?}", node.var_type, node.dfrs_name, node.df_name)
                             },
@@ -111,6 +114,9 @@ fn main() {
                             }
                             dfrs_core::node::Expression::Conditional { node } => {
                                 println!("{:?} {:?} {:?} {:?}", node.conditional_type, node.selector, node.name, node.args)
+                            }
+                            dfrs_core::node::Expression::Call { node } => {
+                                println!("{:?} {:?}", node.name, node.args)
                             }
                             dfrs_core::node::Expression::Variable { node } => {
                                 println!("{:?} {:?} {:?}", node.var_type, node.dfrs_name, node.df_name)
@@ -143,6 +149,9 @@ fn main() {
                     } else {
                         println!("Invalid EOF, expected: {expected:?}");
                     }
+                }
+                ParseError::InvalidCall { pos, msg } => {
+                    print_err(format!("Invalid function call: {}", msg), data, pos, None)
                 }
                 ParseError::InvalidLocation { pos, msg } => {
                     print_err(format!("Invalid Location: {}", msg), data, pos, None)

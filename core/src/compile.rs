@@ -1,6 +1,6 @@
 use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 
-use crate::{node::{ActionNode, ActionType, ConditionalNode, ConditionalType, EventNode, Expression, FileNode, FunctionNode}, token::{get_type_str, Selector}};
+use crate::{node::{ActionNode, ActionType, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, FileNode, FunctionNode}, token::{get_type_str, Selector}};
 
 pub fn compile(node: FileNode, debug: bool) -> Vec<String> {
     let mut res: Vec<String> = vec![];
@@ -146,6 +146,7 @@ fn expression_node(node: Expression) -> Option<Vec<Block>> {
     match node {
         Expression::Action { node } => Some(vec![action_node(node)]),
         Expression::Conditional { node } => Some(conditional_node(node)),
+        Expression::Call { node } => Some(vec![call_node(node)]),
         Expression::Variable { .. } => None,
     }
 }
@@ -269,6 +270,30 @@ fn conditional_node(node: ConditionalNode) -> Vec<Block> {
     }
 
     blocks
+}
+
+fn call_node(node: CallNode) -> Block {
+    let mut args: Vec<Arg> = vec![];
+
+    for arg in node.args {
+        let arg = match arg_val_from_arg(arg, node.name.clone(), "".to_owned()) {
+            Some(res) => res,
+            None => continue
+        };
+        args.push(arg);
+    }
+
+    Block {
+        id: "block".into(),
+        block: Some("call_func".into()),
+        args: Some(Args { items: args }),
+        action: None,
+        target: None,
+        data: Some(node.name),
+        attribute: None,
+        direct: None,
+        bracket_type: None,
+    }
 }
 
 fn action_node(node: ActionNode) -> Block {

@@ -118,7 +118,8 @@ pub enum Keyword {
     VarLocal,
     VarGame,
     VarSave,
-    Function
+    Function,
+    Call
 }
 
 impl Display for Keyword {
@@ -137,7 +138,8 @@ impl Display for Keyword {
             Keyword::VarLocal => write!(f, "local"),
             Keyword::VarGame => write!(f, "game"),
             Keyword::VarSave => write!(f, "save"),
-            Keyword::Function => write!(f, "function")
+            Keyword::Function => write!(f, "function"),
+            Keyword::Call => write!(f, "call"),
         }
     }
 }
@@ -156,7 +158,8 @@ pub static KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
     "local" => Keyword::VarLocal,
     "game" => Keyword::VarGame,
     "save" => Keyword::VarSave,
-    "fn" => Keyword::Function
+    "fn" => Keyword::Function,
+    "call" => Keyword::Call
 };
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]

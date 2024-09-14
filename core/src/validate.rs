@@ -1,6 +1,6 @@
 use phf::phf_map;
 
-use crate::{definitions::{action_dump::{Action, ActionDump}, actions::{EntityActions, GameActions, PlayerActions, VariableActions}, conditionals::{EntityConditionals, GameConditionals, PlayerConditionals, VariableConditionals}, ArgType}, node::{ActionNode, ActionType, Arg, ArgValue, ConditionalNode, ConditionalType, EventNode, Expression, FileNode}, token::Position};
+use crate::{definitions::{action_dump::{Action, ActionDump}, actions::{EntityActions, GameActions, PlayerActions, VariableActions}, conditionals::{EntityConditionals, GameConditionals, PlayerConditionals, VariableConditionals}, ArgType, DefinedArg}, node::{ActionNode, ActionType, Arg, ArgValue, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, FileNode}, token::Position};
 use crate::definitions::game_values::GameValues;
 
 pub static PLAYER_EVENTS: phf::Map<&'static str, &'static str> = phf_map! {
@@ -126,6 +126,9 @@ impl Validator {
                     Expression::Conditional { node } => {
                         expression.node = Expression::Conditional { node: self.validate_conditional_node(node)? }
                     }
+                    Expression::Call { node } => {
+                        expression.node = Expression::Call { node: self.validate_call(node)? }
+                    }
                     Expression::Variable { .. } => {}
                 }
             }
@@ -161,6 +164,9 @@ impl Validator {
                     }
                     Expression::Conditional { node } => {
                         expression.node = Expression::Conditional { node: self.validate_conditional_node(node)? }
+                    }
+                    Expression::Call { node } => {
+                        expression.node = Expression::Call { node: self.validate_call(node)? }
                     }
                     Expression::Variable { .. } => {}
                 }
@@ -228,6 +234,9 @@ impl Validator {
                 Expression::Conditional { node } => {
                     expression.node = Expression::Conditional { node: self.validate_conditional_node(node)? }
                 }
+                Expression::Call { node } => {
+                    expression.node = Expression::Call { node: self.validate_call(node)? }
+                }
                 Expression::Variable { .. } => {}
             }
         }
@@ -239,6 +248,9 @@ impl Validator {
                 }
                 Expression::Conditional { node } => {
                     expression.node = Expression::Conditional { node: self.validate_conditional_node(node)? }
+                }
+                Expression::Call { node } => {
+                    expression.node = Expression::Call { node: self.validate_call(node)? }
                 }
                 Expression::Variable { .. } => {}
             }
@@ -253,9 +265,30 @@ impl Validator {
         Ok(conditional_node)
     }
 
+    fn validate_call(&self, mut call_node: CallNode) -> Result<CallNode, ValidateError> {
+        // TODO proper validation
+        let mut args = vec![];
+        for arg in &call_node.args {
+            args.push(DefinedArg {
+                arg_types: vec![ArgType::ANY],
+                name: "".into(),
+                allow_multiple: false,
+                optional: false,
+            })
+        }
+        let action = Action {
+            df_name: "internal".into(),
+            dfrs_name: "internal".into(),
+            args,
+            tags: vec![]
+        };
+        call_node.args = self.validate_args(call_node.args, &action, call_node.start_pos.clone(), call_node.end_pos.clone())?;
+        Ok(call_node)
+    }
+
     fn validate_args(&self, input_args: Vec<Arg>, action: &Action, start_pos: Position, end_pos: Position) -> Result<Vec<Arg>, ValidateError> {
         let mut node_args = input_args;
-        let mut all_provided_args: Vec<Arg> = node_args.clone();
+        let all_provided_args: Vec<Arg> = node_args.clone();
         let mut args: Vec<Arg> = vec![];
         let mut index: i32 = -1;
 

@@ -53,7 +53,8 @@ pub struct ExpressionNode {
 pub enum Expression {
     Action { node: ActionNode },
     Conditional { node: ConditionalNode },
-    Variable { node: VariableNode }
+    Variable { node: VariableNode },
+    Call { node: CallNode }
 }
 
 #[derive(Clone, Debug)]
@@ -81,6 +82,14 @@ pub struct ConditionalNode {
     pub expressions: Vec<ExpressionNode>,
     pub else_expressions: Vec<ExpressionNode>,
     pub inverted: bool
+}
+
+#[derive(Clone, Debug)]
+pub struct CallNode {
+    pub name: String,
+    pub args: Vec<Arg>,
+    pub start_pos: Position,
+    pub end_pos: Position
 }
 
 #[derive(Clone, Debug)]

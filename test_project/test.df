@@ -1,11 +1,5 @@
 save players;
 
 @join! {
-    p.sendMessage($name,
-                  $selection:name);
-    ifp isNear(Location(0,0,0)) {
-        p.sendMessage("Near");
-    } else {
-        p.sendMessage("Not near");
-    }
+    call("testFn", 1, 'test', $name);
 }

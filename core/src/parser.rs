@@ -1,9 +1,10 @@
-use crate::{definitions::ArgType, node::{ActionNode, ActionType, Arg, ArgValue, ArgValueWithPos, ConditionalNode, ConditionalType, EventNode, Expression, ExpressionNode, FileNode, FunctionNode, FunctionParamNode, VariableNode, VariableType}, token::{Keyword, Position, Selector, Token, TokenWithPos, SELECTORS, TYPES}};
+use crate::{definitions::ArgType, node::{ActionNode, ActionType, Arg, ArgValue, ArgValueWithPos, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, ExpressionNode, FileNode, FunctionNode, FunctionParamNode, VariableNode, VariableType}, token::{Keyword, Position, Selector, Token, TokenWithPos, SELECTORS, TYPES}};
 
 #[derive(Debug)]
 pub enum ParseError {
     InvalidToken { found: Option<TokenWithPos>, expected: Vec<Token> },
     UnknownVariable { found: String, start_pos: Position, end_pos: Position },
+    InvalidCall { pos: Position, msg: String },
     InvalidLocation { pos: Position, msg: String },
     InvalidVector { pos: Position, msg: String },
     InvalidSound { pos: Position, msg: String },
@@ -345,6 +346,11 @@ impl Parser {
                         end_pos = res.end_pos.clone();
                         node = Expression::Variable { node: res }
                     },
+                    Keyword::Call => {
+                        let res = self.call()?;
+                        end_pos = res.end_pos.clone();
+                        node = Expression::Call { node: res }
+                    }
                     _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Keyword { value: Keyword::E }, Token::Keyword { value: Keyword::P }] })
                 }
             }
@@ -492,6 +498,33 @@ impl Parser {
             expressions,
             else_expressions,
             inverted
+        })
+    }
+
+    fn call(&mut self) -> Result<CallNode, ParseError> {
+        let start_pos = self.current_token.clone().unwrap().start_pos;
+        let mut args = self.make_args()?;
+
+        if args.is_empty() {
+            return Err(ParseError::InvalidCall { pos: start_pos, msg: "Missing function name".into() })
+        }
+        let name_arg = args.remove(0);
+        let name = match name_arg.value {
+            ArgValue::Text { text } => text,
+            _ => return Err(ParseError::InvalidCall { pos: start_pos, msg: "Invalid function name param type".into() })
+        };
+        for arg in args.iter_mut() {
+            arg.index -= 1;
+        }
+        self.require_token(Token::Semicolon)?;
+
+        let end_pos = self.current_token.clone().unwrap().end_pos;
+
+        Ok(CallNode {
+            name,
+            args,
+            start_pos,
+            end_pos,
         })
     }
 
