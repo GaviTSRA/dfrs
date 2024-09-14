@@ -43,16 +43,16 @@ TODO
 
 ---
 # Expressions
-TODO TAGS
 Every event, function or process contains a list of expressions.
 ## Actions
-Actions can either target players, entities, the game or variables.
-The general syntax is the character for one of the categories above, followed by the actions name and arguments:
+Actions have multiple types, determined by their block: player, entity, game, variable and control.
+The general syntax is the character for one of the categories, followed by the actions name and arguments:
 ```
 p.sendMessage("Test");
 e.teleport(Location(0,0,0));
 g.cancelEvent();
 v.add(var, 1, 2);
+c.wait(1);
 ```
 Game and entity actions can target different selectors:
 ```
@@ -91,6 +91,11 @@ ifp selection:isNear(Location(0,0,0), 10) {
 } else {
     <expressions...>
 }
+```
+## Function calls
+Functions can also be called:
+```
+call("functionName", arg1, arg2, ...);
 ```
 ---
 # Values

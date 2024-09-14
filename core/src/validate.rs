@@ -1,8 +1,9 @@
 use phf::phf_map;
 
-use crate::{definitions::{action_dump::{Action, ActionDump}, actions::{EntityActions, GameActions, PlayerActions, VariableActions}, conditionals::{EntityConditionals, GameConditionals, PlayerConditionals, VariableConditionals}, ArgType, DefinedArg}, node::{ActionNode, ActionType, Arg, ArgValue, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, FileNode}, token::Position};
+use crate::{definitions::{action_dump::{Action, ActionDump}, actions::{EntityActions, GameActions, PlayerActions, VariableActions, ControlActions}, conditionals::{EntityConditionals, GameConditionals, PlayerConditionals, VariableConditionals}, ArgType, DefinedArg}, node::{ActionNode, ActionType, Arg, ArgValue, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, FileNode}, token::Position};
 use crate::definitions::game_values::GameValues;
 
+//TODO load from ad
 pub static PLAYER_EVENTS: phf::Map<&'static str, &'static str> = phf_map! {
     "join" => "Join",
     "leave" => "Leave",
@@ -92,10 +93,13 @@ pub struct Validator {
     entity_actions: EntityActions,
     game_actions: GameActions,
     variable_actions: VariableActions,
+    control_actions: ControlActions,
+
     player_conditionals: PlayerConditionals,
     entity_conditionals: EntityConditionals,
     game_conditionals: GameConditionals,
     variable_conditionals: VariableConditionals,
+
     game_values: GameValues
 }
 
@@ -107,6 +111,7 @@ impl Validator {
             entity_actions: EntityActions::new(&action_dump),
             game_actions: GameActions::new(&action_dump),
             variable_actions: VariableActions::new(&action_dump),
+            control_actions: ControlActions::new(&action_dump),
 
             player_conditionals: PlayerConditionals::new(&action_dump),
             entity_conditionals: EntityConditionals::new(&action_dump),
@@ -189,6 +194,9 @@ impl Validator {
             }
             ActionType::Variable => {
                 self.variable_actions.get(action_node.clone().name)
+            }
+            ActionType::Control => {
+                self.control_actions.get(action_node.clone().name)
             }
         };
 

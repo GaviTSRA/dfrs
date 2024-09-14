@@ -316,6 +316,11 @@ impl Parser {
                         end_pos = res.end_pos.clone();
                         node = Expression::Action { node: res };
                     }
+                    Keyword::C => {
+                        let res = self.action(ActionType::Control)?;
+                        end_pos = res.end_pos.clone();
+                        node = Expression::Action { node: res };
+                    }
                     Keyword::IfP => {
                         let res = self.conditional(ConditionalType::Player)?;
                         end_pos = res.end_pos.clone();

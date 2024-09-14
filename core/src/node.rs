@@ -137,7 +137,8 @@ pub enum ActionType {
     Player,
     Entity,
     Game,
-    Variable
+    Variable,
+    Control,
 }
 
 #[derive(Clone, Debug, PartialEq)]
