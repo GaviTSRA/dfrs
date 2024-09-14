@@ -11,7 +11,6 @@ use dfrs_core::validate::{Validator, ValidateError};
 use colored::Colorize;
 
 fn print_err(message: String, data: String, start_pos: Position, end_pos: Option<Position>) {
-    println!("{message} {start_pos:?} - {end_pos:?} \n{data}");
     let lines = data.split("\n").collect::<Vec<&str>>();
     let line = lines.get((start_pos.line - 1) as usize).unwrap();
     let ln = start_pos.line;
@@ -195,8 +194,6 @@ fn main() {
                     print_err(format!("Unknown event '{}'", node.event), data, node.start_pos, Some(node.name_end_pos));
                 }
                 ValidateError::UnknownAction { name, start_pos, end_pos } => {
-                    println!("{start_pos}");
-                    println!("{end_pos}");
                     print_err(format!("Unknown action '{}'", name), data, start_pos, Some(end_pos));
                 }
                 ValidateError::MissingArgument { name, start_pos, end_pos } => {

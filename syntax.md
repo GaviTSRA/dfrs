@@ -45,7 +45,7 @@ TODO
 # Expressions
 Every event, function or process contains a list of expressions.
 ## Actions
-Actions have multiple types, determined by their block: player, entity, game, variable and control.
+Actions have multiple types, determined by their block: player, entity, game, variable, control and select.
 The general syntax is the character for one of the categories, followed by the actions name and arguments:
 ```
 p.sendMessage("Test");
@@ -90,6 +90,19 @@ ifp selection:isNear(Location(0,0,0), 10) {
     <expressions...>
 } else {
     <expressions...>
+}
+```
+## Repeats
+Repeats can be used similar to conditionals:
+```
+repeat forever() {
+    <expressions...>
+}
+```
+Repeat while can also be used:
+```
+repeat while(ifp isNear(Location(0, 0, 0), 1)) {
+   <expressions...> 
 }
 ```
 ## Function calls

@@ -100,3 +100,23 @@ impl ControlActions {
         &self.control_actions
     }
 }
+
+#[derive(Debug)]
+pub struct SelectActions {
+    select_actions: Vec<Action>
+}
+
+impl SelectActions {
+    pub fn new(action_dump: &ActionDump) -> SelectActions {
+        let actions = get_actions(action_dump, "SELECT OBJECT");
+        SelectActions {select_actions: actions}
+    }
+
+    pub fn get(&self, dfrs_name: String) -> Option<&Action> {
+        self.select_actions.iter().find(|&action| action.dfrs_name == dfrs_name)
+    }
+
+    pub fn all(&self) -> &Vec<Action> {
+        &self.select_actions
+    }
+}

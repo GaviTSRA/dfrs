@@ -44,7 +44,7 @@ fn event_node(event_node: EventNode) -> Result<String, serde_json::Error> {
 
     let event_block = Block {
         id: "block".to_owned(), 
-        subAction: None,
+        sub_action: None,
         block: if event_node.event_type.unwrap() == ActionType::Player { Some("event".to_owned()) } else { Some("entity_event".to_owned()) }, 
         action: Some(event_node.event),
         args: Some(Args { items: vec![] }),
@@ -125,7 +125,7 @@ fn function_node(function_node: FunctionNode) -> Result<String, serde_json::Erro
         args: Some(Args { items }),
         target: None,
         data: Some(function_node.name),
-        subAction: None,
+        sub_action: None,
         direct: None,
         bracket_type: None
     };
@@ -193,7 +193,7 @@ fn conditional_node(node: ConditionalNode) -> Vec<Block> {
             data: None,
             direct: None,
             bracket_type: None,
-            subAction: None,
+            sub_action: None,
         },
         Block {
             id: "bracket".into(),
@@ -203,7 +203,7 @@ fn conditional_node(node: ConditionalNode) -> Vec<Block> {
             attribute: None,
             args: None, 
             action: None,
-            subAction: None,
+            sub_action: None,
             target: None, 
             data: None
         },
@@ -226,7 +226,7 @@ fn conditional_node(node: ConditionalNode) -> Vec<Block> {
         action: None,
         target: None, 
         data: None,
-        subAction: None,
+        sub_action: None,
         attribute: None
     });
 
@@ -238,7 +238,7 @@ fn conditional_node(node: ConditionalNode) -> Vec<Block> {
             block: Some("else".into()),
             attribute: None,
             args: None,
-            subAction: None,
+            sub_action: None,
             action: None,
             target: None,
             data: None
@@ -252,7 +252,7 @@ fn conditional_node(node: ConditionalNode) -> Vec<Block> {
             args: None,
             action: None,
             target: None,
-            subAction: None,
+            sub_action: None,
             data: None
         });
 
@@ -272,7 +272,7 @@ fn conditional_node(node: ConditionalNode) -> Vec<Block> {
             args: None,
             action: None,
             target: None,
-            subAction: None,
+            sub_action: None,
             data: None,
             attribute: None
         });
@@ -301,7 +301,7 @@ fn call_node(node: CallNode) -> Block {
         data: Some(node.name),
         attribute: None,
         direct: None,
-        subAction: None,
+        sub_action: None,
         bracket_type: None,
     }
 }
@@ -353,7 +353,7 @@ fn repeat_node(node: RepeatNode) -> Vec<Block> {
             attribute,
             data: None,
             direct: None,
-            subAction: sub_action,
+            sub_action: sub_action,
             bracket_type: None
         },
         Block {
@@ -364,7 +364,7 @@ fn repeat_node(node: RepeatNode) -> Vec<Block> {
             attribute: None,
             args: None, 
             action: None,
-            subAction: None,
+            sub_action: None,
             target: None, 
             data: None
         }
@@ -387,7 +387,7 @@ fn repeat_node(node: RepeatNode) -> Vec<Block> {
         action: None,
         target: None, 
         data: None,
-        subAction: None,
+        sub_action: None,
         attribute: None
     });
 
@@ -400,17 +400,45 @@ fn action_node(node: ActionNode) -> Block {
         ActionType::Entity => "entity_action",
         ActionType::Game => "game_action",
         ActionType::Variable => "set_var",
-        ActionType::Control => "control"
+        ActionType::Control => "control",
+        ActionType::Select => "select_obj"
     };
 
     let mut args: Vec<Arg> = vec![];
 
-    for arg in node.args {
-        let arg = match arg_val_from_arg(arg, node.name.clone(), block.to_owned()) {
-            Some(res) => res,
-            None => continue
-        };
-        args.push(arg);
+    let mut attribute = None;
+    let mut sub_action = None;
+    let mut target = None;
+
+    if !node.clone().args.is_empty() {
+        let arg =  node.args.get(0).clone().unwrap();
+        match arg.value.clone() {
+            crate::node::ArgValue::Condition { name, args: new_args, selector, inverted, .. } => {
+                for arg in new_args {
+                    let arg = match arg_val_from_arg(arg, node.name.clone(), "repeat".to_owned()) {
+                        Some(res) => res,
+                        None => continue
+                    };
+                    args.push(arg);
+                }
+                attribute = if inverted {
+                    Some("NOT".into())
+                } else {
+                    None
+                };
+                sub_action = Some(name);
+                target = Some(selector);
+            }
+            _ => {
+                for arg in node.args {
+                    let arg = match arg_val_from_arg(arg, node.name.clone(), block.to_owned()) {
+                        Some(res) => res,
+                        None => continue
+                    };
+                    args.push(arg);
+                }
+            }
+        }
     }
 
     Block {
@@ -421,13 +449,18 @@ fn action_node(node: ActionNode) -> Block {
             ActionType::Game => None,
             ActionType::Variable => None,
             ActionType::Control => None,
-            _ => Some(node.selector)
+            ActionType::Select => None,
+            _ => if target.is_some() {
+                target
+            } else {
+                Some(node.selector)
+            }
         },
         args: Some(Args { items: args }),
-        attribute: None,
+        attribute,
         data: None,
         direct: None,
-        subAction: None,
+        sub_action,
         bracket_type: None
     }
 }
@@ -498,8 +531,8 @@ struct Block {
     data: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     attribute: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    subAction: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", rename="subAction")]
+    sub_action: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     direct: Option<String>,

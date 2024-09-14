@@ -150,6 +150,7 @@ pub enum ActionType {
     Game,
     Variable,
     Control,
+    Select,
 }
 
 #[derive(Clone, Debug, PartialEq)]

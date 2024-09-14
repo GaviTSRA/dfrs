@@ -1,6 +1,5 @@
 @join {
-    repeat while(ifp !selection:nameEquals('GaviTSRA')) {
-        p.sendMessage("test");
-        c.wait(1);
+    repeat while(ifp isNear(Location(0, 0, 0), 1)) {
+
     }
 }

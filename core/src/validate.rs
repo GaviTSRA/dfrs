@@ -1,6 +1,6 @@
 use phf::phf_map;
 
-use crate::{definitions::{action_dump::{Action, ActionDump}, actions::{ControlActions, EntityActions, GameActions, PlayerActions, VariableActions}, conditionals::{EntityConditionals, GameConditionals, PlayerConditionals, VariableConditionals}, repeats::Repeats, ArgType, DefinedArg}, node::{ActionNode, ActionType, Arg, ArgValue, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, FileNode, RepeatNode}, token::Position};
+use crate::{definitions::{action_dump::{Action, ActionDump}, actions::{ControlActions, EntityActions, GameActions, PlayerActions, SelectActions, VariableActions}, conditionals::{EntityConditionals, GameConditionals, PlayerConditionals, VariableConditionals}, repeats::Repeats, ArgType, DefinedArg}, node::{ActionNode, ActionType, Arg, ArgValue, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, FileNode, RepeatNode}, token::Position};
 use crate::definitions::game_values::GameValues;
 
 //TODO load from ad
@@ -94,6 +94,7 @@ pub struct Validator {
     game_actions: GameActions,
     variable_actions: VariableActions,
     control_actions: ControlActions,
+    select_actions: SelectActions,
 
     player_conditionals: PlayerConditionals,
     entity_conditionals: EntityConditionals,
@@ -114,6 +115,7 @@ impl Validator {
             game_actions: GameActions::new(&action_dump),
             variable_actions: VariableActions::new(&action_dump),
             control_actions: ControlActions::new(&action_dump),
+            select_actions: SelectActions::new(&action_dump),
 
             player_conditionals: PlayerConditionals::new(&action_dump),
             entity_conditionals: EntityConditionals::new(&action_dump),
@@ -192,7 +194,7 @@ impl Validator {
     }
 
     fn validate_action_node(&self, mut action_node: ActionNode) -> Result<ActionNode, ValidateError> {
-        let action = match action_node.action_type {
+        let mut action = match action_node.action_type {
             ActionType::Player => {
                 self.player_actions.get(action_node.clone().name)
             }
@@ -208,12 +210,54 @@ impl Validator {
             ActionType::Control => {
                 self.control_actions.get(action_node.clone().name)
             }
+            ActionType::Select => {
+                self.select_actions.get(action_node.clone().name)
+            }
         };
+
+        let mut old_args = vec![];
+        let mut old_name = "".into();
+        let mut was_condition = false;
+
+        if !action_node.args.is_empty() && action_node.args.get(0).unwrap().arg_type == ArgType::CONDITION {
+            match action_node.args.get(0).unwrap().clone().value {
+                ArgValue::Condition { name, args, conditional_type, .. } => {
+                    old_args = action_node.args;
+                    
+                    match action {
+                        Some(res) => old_name = res.df_name.clone(),
+                        None => return Err(ValidateError::UnknownAction { name: action_node.name, start_pos: action_node.start_pos, end_pos: action_node.end_pos })
+                    };
+
+                    action_node.args = args;
+                    was_condition = true;
+                    action = match conditional_type {
+                        ConditionalType::Player => self.player_conditionals.get(name),
+                        ConditionalType::Entity => self.entity_conditionals.get(name),
+                        ConditionalType::Game => self.game_conditionals.get(name),
+                        ConditionalType::Variable => self.variable_conditionals.get(name),
+                    }
+                }
+                _ => unreachable!()
+            }
+        }
 
         match action {
             Some(res) => action_node = self.validate_action(action_node, res)?,
             None => return Err(ValidateError::UnknownAction { name: action_node.name, start_pos: action_node.start_pos, end_pos: action_node.end_pos })
         };
+
+        if was_condition {
+            match old_args.get(0).unwrap().clone().value {
+                ArgValue::Condition { selector, conditional_type, inverted, .. } => {
+                    old_args.get_mut(0).unwrap().value = ArgValue::Condition { name: action_node.name, args: action_node.args.clone(), selector, conditional_type, inverted };
+                    action_node.args = old_args;
+                    action_node.name = old_name;
+                }
+                _ => unreachable!()
+            }
+        }
+
         Ok(action_node)
     }
 
@@ -346,7 +390,7 @@ impl Validator {
         };
         if was_condition {
             match old_args.get(0).unwrap().clone().value {
-                ArgValue::Condition { name, args, selector, conditional_type, inverted } => {
+                ArgValue::Condition { selector, conditional_type, inverted, .. } => {
                     old_args.get_mut(0).unwrap().value = ArgValue::Condition { name: repeat_node.name, args: repeat_node.args.clone(), selector, conditional_type, inverted };
                     repeat_node.args = old_args;
                     repeat_node.name = old_name;
