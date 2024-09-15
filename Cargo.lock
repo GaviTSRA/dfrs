@@ -288,18 +288,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dfrs_lsp"
-version = "0.1.0"
-dependencies = [
- "dashmap",
- "dfrs_core",
- "ropey",
- "serde_json",
- "tokio",
- "tower-lsp",
-]
-
-[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
