@@ -1,7 +1,3 @@
-fn setCooldown(player: string, item: item, time: number) {
-    local coopMembers;
-    call("getCoopMembers");
-    s.playerName(coopMembers);
-    p:selection.setItemCooldown(item, time);
-    s.reset();
+@join {
+
 }

@@ -7,13 +7,17 @@ use dfrs_core::lexer::{Lexer, LexerError};
 use dfrs_core::load_config;
 use dfrs_core::parser::{ParseError, Parser};
 use dfrs_core::token::{Keyword, Token};
-use dfrs_core::validate::{ValidateError, Validator, ENTITY_EVENTS, PLAYER_EVENTS};
+use dfrs_core::validate::{ValidateError, Validator};
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
+use dfrs_core::definitions::events::{EntityEvents, PlayerEvents};
 
 #[derive(Debug)]
 struct Backend {
     client: Client,
+
+    player_events: PlayerEvents,
+    entity_events: EntityEvents,
 
     player_actions: PlayerActions,
     entity_actions: EntityActions,
@@ -130,14 +134,14 @@ impl LanguageServer for Backend {
                 if is_event {
                     let mut events = vec![];
 
-                    for (event, df_event) in PLAYER_EVENTS.entries() {
-                        if event.starts_with(&previous) || df_event.starts_with(&previous) {
-                            events.push(CompletionItem::new_simple(event.to_string(), df_event.to_string()));
+                    for event in self.player_events.all() {
+                        if event.dfrs_name.starts_with(&previous) || event.df_name.starts_with(&previous) {
+                            events.push(CompletionItem::new_simple(event.dfrs_name.clone(), event.df_name.clone()));
                         }
                     }
-                    for (event, df_event) in ENTITY_EVENTS.entries() {
-                        if event.starts_with(&previous) || df_event.starts_with(&previous) {
-                            events.push(CompletionItem::new_simple(event.to_string(), df_event.to_string()));
+                    for event in self.entity_events.all() {
+                        if event.dfrs_name.starts_with(&previous) || event.df_name.starts_with(&previous) {
+                            events.push(CompletionItem::new_simple(event.dfrs_name.clone(), event.df_name.clone()));
                         }
                     }
 
@@ -223,9 +227,12 @@ pub async fn run_lsp() {
 
     let ad = ActionDump::load();
     let (service, socket) = LspService::new(|client| Backend {
-        client, 
+        client,
 
-        player_actions: PlayerActions::new(&ad), 
+        player_events: PlayerEvents::new(&ad),
+        entity_events: EntityEvents::new(&ad),
+
+        player_actions: PlayerActions::new(&ad),
         entity_actions: EntityActions::new(&ad), 
         game_actions: GameActions::new(&ad),
         variable_actions: VariableActions::new(&ad),

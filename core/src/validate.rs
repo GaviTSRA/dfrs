@@ -1,82 +1,6 @@
-use phf::phf_map;
-
 use crate::{definitions::{action_dump::{Action, ActionDump}, actions::{ControlActions, EntityActions, GameActions, PlayerActions, SelectActions, VariableActions}, conditionals::{EntityConditionals, GameConditionals, PlayerConditionals, VariableConditionals}, repeats::Repeats, ArgType, DefinedArg}, node::{ActionNode, ActionType, Arg, ArgValue, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, FileNode, RepeatNode}, token::Position};
+use crate::definitions::events::{EntityEvents, PlayerEvents};
 use crate::definitions::game_values::GameValues;
-
-//TODO load from ad
-pub static PLAYER_EVENTS: phf::Map<&'static str, &'static str> = phf_map! {
-    "join" => "Join",
-    "leave" => "Leave",
-    "command" => "Command",
-    "packLoad" => "PackLoad",
-    "packDecline" => "PackDecline",
-
-    "rightClick" => "RightClick",
-    "leftClick" => "LeftClick",
-    "clickEntity" => "ClickEntity",
-    "clickPlayer" => "ClickPlayer",
-    "loadCrossbow" => "LoadCrossbow",
-    "placeBlock" => "PlaceBlock",
-    "breakBlock" => "BreakBlock",
-    "swapHands" => "SwapHands",
-    "changeSlot" => "ChangeSlot",
-    "tameMob" => "TameEntity",
-
-    "walk" => "Walk",
-    "jump" => "Jump",
-    "sneak" => "Sneak",
-    "unsneak" => "Unsneak",
-    "startSprint" => "StartSprint",
-    "stopSprint" => "StopSprint",
-    "startFlight" => "StartFly",
-    "stopFlight" => "StopFly",
-    "riptide" => "Riptide",
-    "dismount" => "Dismount",
-    "horseJump" => "HorseJump",
-    "vehicleJump" => "VehicleJump",
-
-    "clickMenuSlot" => "ClickMenuSlot",
-    "clickInventorySlot" => "ClickInvSlot",
-    "pickUpItem" => "PickUpItem",
-    "dropItem" => "DropItem",
-    "consumeItem" => "Consume",
-    "breakItem" => "BreakItem",
-    "closeInventory" => "CloseInv",
-    "fish" => "Fish",
-
-    "playerTakeDamage" => "PlayerTakeDmg",
-    "playerDamagePlayer" => "PlayerDmgPlayer",
-    "playerDamageEntity" => "DamageEntity",
-    "entityDamagePlayer" => "EntityDmgPlayer",
-    "heal" => "PlayerHeal",
-    "shootBow" => "ShootBow",
-    "shootProjectile" => "ShootProjectile",
-    "projectileHit" => "ProjHit",
-    "projectileDamagePlayer" => "ProjDmgPlayer",
-    "cloudImbuePlayer" => "CloudImbuePlayer",
-
-    "playerDeath" => "Death",
-    "killPlayer" => "KillPlayer",
-    "playerResurrect" => "PlayerResurrect",
-    "killMob" => "KillMob",
-    "respawn" => "Respawn",
-    "exhaustion" => "Exhaustion"
-};
-
-pub static ENTITY_EVENTS: phf::Map<&'static str, &'static str> = phf_map! {
-    "entityDamageEntity" => "EntityDmgEntity",
-    "entityKillEntity" => "EntityKillEntity",
-    "entityTakeDamage" => "EntityDmg",
-    "projectileDamageEntity" => "ProjDmgEntity",
-    "projectileKillEntity" => "ProjKillEntity",
-    "entityDeath" => "EntityDeath",
-    "explode" => "EntityExplode",
-    "vehicleTakeDamage" => "VehicleDamage",
-    "blockFall" => "BlockFall",
-    "blockLand" => "FallingBlockLand",
-    "entityResurrect" => "EntityResurrect",
-    "regrowWool" => "RegrowWool"
-};
 
 pub enum ValidateError {
     UnknownEvent { node: EventNode },
@@ -90,6 +14,9 @@ pub enum ValidateError {
 }
 
 pub struct Validator {
+    player_events: PlayerEvents,
+    entity_events: EntityEvents,
+
     player_actions: PlayerActions,
     entity_actions: EntityActions,
     game_actions: GameActions,
@@ -111,6 +38,9 @@ impl Validator {
     pub fn new() -> Validator {
         let action_dump = ActionDump::load();
         Validator {
+            player_events: PlayerEvents::new(&action_dump),
+            entity_events: EntityEvents::new(&action_dump),
+
             player_actions: PlayerActions::new(&action_dump),
             entity_actions: EntityActions::new(&action_dump),
             game_actions: GameActions::new(&action_dump),
@@ -152,17 +82,17 @@ impl Validator {
         for event in node.events.iter_mut() {
             let mut actual_event;
             
-            actual_event = PLAYER_EVENTS.get(&event.event).cloned();
+            actual_event = self.player_events.get(event.event.clone());
             match actual_event {
                 Some(actual) => {
-                    actual.clone_into(&mut event.event);
+                    actual.df_name.clone_into(&mut event.event);
                     event.event_type = Some(ActionType::Player);
                 }
                 None => {
-                    actual_event = ENTITY_EVENTS.get(&event.event).cloned();
+                    actual_event = self.entity_events.get(event.event.clone());
                     match actual_event {
                         Some(actual) => {
-                            actual.clone_into(&mut event.event);
+                            actual.df_name.clone_into(&mut event.event);
                             event.event_type = Some(ActionType::Entity);
                         }
                         None => {

@@ -20,7 +20,6 @@ Available configs:
     - api: Which API to use when sending templates. Either "recode" or "codeclient"
 
 ## Current limitations
-- No proper release is available
 - Documentation is lacking
 - The extension is not ready for use
 - Variables are not type checked
@@ -29,7 +28,6 @@ Available configs:
 - Actions with multiple possible arguments are not correctly type checked
 - Function calls are not validated
 - Potion names, sound names and particles names are not validated
-- Events are not loaded from action dump
 - Error handling is lacking
 - Some argument types are not implemented
 - Multiline errors are not properly printed

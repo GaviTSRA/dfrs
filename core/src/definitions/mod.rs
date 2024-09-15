@@ -3,6 +3,7 @@ pub mod action_dump;
 pub mod game_values;
 pub mod conditionals;
 pub mod repeats;
+pub mod events;
 
 #[derive(Clone, Debug)]
 pub struct DefinedArg {
