@@ -10,8 +10,11 @@ use dfrs_core::lexer::{Lexer, LexerError};
 use dfrs_core::load_config;
 use dfrs_core::parser::{ParseError, Parser};
 use dfrs_core::validate::{Validator, ValidateError};
+use lsp::run_lsp;
 
 use colored::Colorize;
+
+mod lsp;
 
 fn print_err(message: String, data: String, start_pos: Position, end_pos: Option<Position>) {
     let lines = data.split("\n").collect::<Vec<&str>>();
@@ -250,7 +253,8 @@ enum Commands {
     },
     Init {
         path: PathBuf,
-    }
+    },
+    LSP {}
 }
 
 fn main() {
@@ -272,6 +276,9 @@ fn main() {
             config_path.push("dfrs.toml");
             new_config.save(&config_path);
             println!("{} {}", "Created new config".green(), config_path.to_string_lossy());
+        }
+        Some(Commands::LSP {}) => {
+            run_lsp();
         }
         None => {}
     }

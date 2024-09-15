@@ -7,15 +7,22 @@ function activate(context) {
     // If the extension is launched in debug mode then the debug server options are used
     // Otherwise the run options are used
     const serverOptions = {
-        run: { command: "C:\\Users\\gavin\\Desktop\\Code\\rust\\dfrs\\dfrs-language-support\\server.exe", transport: node_1.TransportKind.stdio },
+        run: {
+            command: "dfrs lsp",
+            options: {
+                shell: true
+            }
+        },
         debug: {
-            command: "C:\\Users\\gavin\\Desktop\\Code\\rust\\dfrs\\dfrs-language-support\\server.exe",
-            transport: node_1.TransportKind.stdio,
+            command: "dfrs lsp",
+            options: {
+                shell: true
+            }
         }
     };
     // Options to control the language client
     const clientOptions = {
-        documentSelector: [{ scheme: 'file', language: 'dfrs' }],
+        documentSelector: [{ scheme: 'file', language: '' }],
         // synchronize: {
         // 	// Notify the server about file changes to '.clientrc files contained in the workspace
         // 	fileEvents: workspace.createFileSystemWatcher('**/.clientrc')

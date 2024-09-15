@@ -15,12 +15,16 @@ export function activate(context: ExtensionContext) {
 	// Otherwise the run options are used
 	const serverOptions: ServerOptions = {
 		run: { 
-			command: "C:\\Users\\gavin\\Desktop\\Code\\rust\\dfrs\\dfrs-language-support\\server.exe", 
-			transport: TransportKind.stdio 
+			command: "dfrs lsp", 
+			options: {
+				shell: true
+			}
 		},
 		debug: {
-			command: "C:\\Users\\gavin\\Desktop\\Code\\rust\\dfrs\\dfrs-language-support\\server.exe --nolazy --inspect=6009",
-			transport: TransportKind.stdio
+			command: "dfrs lsp",
+			options: {
+				shell: true
+			}
 		}
 	};
 
