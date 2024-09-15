@@ -176,8 +176,3 @@ The way variables are named on DF can be overridden:
 line var = `%default data`;
 p.sendMessage(var);
 ```
-
-# Current limitations
-- Variables are currently not type checked
-- There is currently no way to represent items
-- Codeblocks are missing
