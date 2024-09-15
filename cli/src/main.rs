@@ -1,5 +1,7 @@
 use std::cmp;
+use std::path::PathBuf;
 
+use clap::{Parser as _, Subcommand};
 use dfrs_core::send::send;
 use dfrs_core::token::Position;
 use dfrs_core::compile::compile;
@@ -35,10 +37,10 @@ fn print_err(message: String, data: String, start_pos: Position, end_pos: Option
     println!("{} {} {}{}", " ".repeat(ln_length), "|".bright_black(), " ".repeat((start_pos.col - 1) as usize), arrows);
 }
 
-fn main() {
+fn compile_cmd(file: &PathBuf) {
     let config = load_config();
 
-    let data = std::fs::read_to_string("test_project/test.df").expect("could not open file");
+    let data = std::fs::read_to_string(file).expect("could not open file");
 
     let mut lexer = Lexer::new(data.clone());
     let result = lexer.run();
@@ -220,5 +222,32 @@ fn main() {
     }
 
     let compiled = compile(validated, config.debug.compile);
+    println!("{}  {}", "Compiled".green(), file.file_name().unwrap().to_string_lossy());
     send(compiled, config);
+}
+
+#[derive(clap::Parser)]
+#[command(version, about, long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    Compile {
+        file: PathBuf,
+    }
+}
+
+fn main() {
+    let cli = Cli::parse();
+
+    match &cli.command {
+        Some(Commands::Compile { file }) => {
+            println!("{} {}", "Compiling".bright_black(), file.file_name().unwrap().to_string_lossy());
+            compile_cmd(file);
+        }
+        None => {}
+    }
 }

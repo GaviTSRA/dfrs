@@ -2,12 +2,15 @@ use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 
 use crate::{node::{ActionNode, ActionType, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, FileNode, FunctionNode, RepeatNode}, token::{get_type_str, Selector}};
 
-pub fn compile(node: FileNode, debug: bool) -> Vec<String> {
-    let mut res: Vec<String> = vec![];
+pub fn compile(node: FileNode, debug: bool) -> Vec<CompiledLine> {
+    let mut res: Vec<CompiledLine> = vec![];
     for function in node.functions.clone() {
-        match function_node(function) {
+        match function_node(function.clone()) {
             Ok(result) => {
-                res.push(result.clone());
+                res.push(CompiledLine {
+                    name: format!("Function {}", function.name),
+                    code: result.clone()
+                });
                 if debug {
                     println!("{:?}", result);
                 }
@@ -18,9 +21,12 @@ pub fn compile(node: FileNode, debug: bool) -> Vec<String> {
         }
     }
     for event in node.events.clone() {
-        match event_node(event) {
+        match event_node(event.clone()) {
             Ok(result) => {
-                res.push(result.clone());
+                res.push(CompiledLine {
+                    name: format!("Event {}", event.event),
+                    code: result.clone()
+                });
                 if debug {
                     println!("{:?}", result);
                 }
@@ -754,4 +760,9 @@ impl Serialize for Location {
         }
         state.end()
     }
+}
+
+pub struct CompiledLine {
+    pub name: String,
+    pub code: String
 }

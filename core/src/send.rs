@@ -5,18 +5,18 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 
 use crate::config::Config;
+use crate::compile::CompiledLine;
 use tungstenite::{connect, Message};
 use url::Url;
 
-pub fn send(code: Vec<String>, config: Config) {
+pub fn send(code: Vec<CompiledLine>, config: Config) {
     match config.sending.api {
         crate::config::SendApi::CodeClient => {
             send_codeclient(code, config);
         }
         crate::config::SendApi::Recode => {
-            for (i, line) in code.into_iter().enumerate() {
-                //TODO Name
-                send_recode(line, format!("df.rs Test {}", i), config.debug.connection);
+            for line in code {
+                send_recode(line.code, line.name, config.debug.connection);
             }
         }
     }
@@ -60,7 +60,7 @@ fn send_recode(code: String, name: String, debug: bool) {
     }
 }
 
-fn send_codeclient(code: Vec<String>, config: Config) {
+fn send_codeclient(code: Vec<CompiledLine>, config: Config) {
     //TODO error handling
     let (mut socket, response) = connect(Url::parse("ws://localhost:31375").unwrap()).expect("Can't connect");
     
@@ -82,7 +82,7 @@ fn send_codeclient(code: Vec<String>, config: Config) {
     
     socket.send(Message::Text("place swap".into())).unwrap();
     for line in code {
-        let data = compress(line);
+        let data = compress(line.code);
         socket.send(Message::Text(format!("place {}", data))).unwrap();
     }
     socket.send(Message::Text("place go".into())).unwrap();
