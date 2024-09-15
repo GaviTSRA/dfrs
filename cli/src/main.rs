@@ -2,6 +2,7 @@ use std::cmp;
 use std::path::PathBuf;
 
 use clap::{Parser as _, Subcommand};
+use dfrs_core::config::Config;
 use dfrs_core::send::send;
 use dfrs_core::token::Position;
 use dfrs_core::compile::compile;
@@ -38,7 +39,16 @@ fn print_err(message: String, data: String, start_pos: Position, end_pos: Option
 }
 
 fn compile_cmd(file: &PathBuf) {
-    let config = load_config();
+    let mut config_file = file.clone();
+    config_file.set_file_name("dfrs.toml");
+    let config = match load_config(&config_file) {
+        Ok(res) => res,
+        Err(_) => {
+            println!("{} No config file found", "Error:".bright_red());
+            println!("{} dfrs init <path> {}", "Use".bright_black(), "to create a new config file".bright_black());
+            return;
+        }
+    };
 
     let data = std::fs::read_to_string(file).expect("could not open file");
 
@@ -237,6 +247,9 @@ struct Cli {
 enum Commands {
     Compile {
         file: PathBuf,
+    },
+    Init {
+        path: PathBuf,
     }
 }
 
@@ -247,6 +260,18 @@ fn main() {
         Some(Commands::Compile { file }) => {
             println!("{} {}", "Compiling".bright_black(), file.file_name().unwrap().to_string_lossy());
             compile_cmd(file);
+        }
+        Some(Commands::Init { path }) => {
+            if !path.is_dir() {
+                println!("{} Path is not a directory", "Error:".bright_red());
+                return;
+            }
+            println!("{} {}", "Initializing new project in".bright_black(), path.to_string_lossy());
+            let new_config = Config::default();
+            let mut config_path = path.clone();
+            config_path.push("dfrs.toml");
+            new_config.save(&config_path);
+            println!("{} {}", "Created new config".green(), config_path.to_string_lossy());
         }
         None => {}
     }

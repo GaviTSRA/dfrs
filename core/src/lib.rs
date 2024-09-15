@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::PathBuf;
 use config::Config;
 
 pub mod config;
@@ -12,15 +12,17 @@ pub mod send;
 pub mod definitions;
 pub mod utility;
 
-pub fn load_config() -> Config {
-    let data = if !Path::new("test_project/dfrs.toml").exists() {
-        String::from("")
+pub struct ConfigFileNotFoundError {}
+
+pub fn load_config(file: &PathBuf) -> Result<Config, ConfigFileNotFoundError> {
+    let data = if !file.exists() {
+        return Err(ConfigFileNotFoundError {})
     } else {
-        std::fs::read_to_string("test_project/dfrs.toml").expect("No config file")
+        std::fs::read_to_string(file).expect("No config file")
     };
 
     match toml::from_str(&data) {
-        Ok(res) => res,
+        Ok(res) => Ok(res),
         Err(err) => panic!("Failed to parse config: {}", err)
     }
 }

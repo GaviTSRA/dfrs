@@ -1,7 +1,9 @@
+use std::path::PathBuf;
+
 use serde::{Deserialize, Serialize};
 
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Default)]
 pub struct Config {
     #[serde(default)]
     pub sending: Sending,
@@ -37,4 +39,11 @@ pub struct Debug {
     pub compile: bool,
     #[serde(default = "bool::default")]
     pub connection: bool
+}
+
+impl Config {
+    pub fn save(&self, path: &PathBuf) {
+        let data = toml::to_string(self).expect("Failed to create new config");
+        std::fs::write(path, data).expect("Failed to save new config");
+    }
 }
