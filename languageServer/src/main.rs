@@ -1,6 +1,6 @@
 use dfrs_core::compile::compile;
 use dfrs_core::definitions::action_dump::ActionDump;
-use dfrs_core::definitions::actions::{EntityActions, GameActions, PlayerActions, VariableActions};
+use dfrs_core::definitions::actions::{EntityActions, GameActions, PlayerActions, VariableActions, ControlActions, SelectActions};
 use dfrs_core::lexer::{Lexer, LexerError};
 use dfrs_core::load_config;
 use dfrs_core::parser::{ParseError, Parser};
@@ -12,10 +12,13 @@ use tower_lsp::{Client, LanguageServer, LspService, Server};
 #[derive(Debug)]
 struct Backend {
     client: Client,
+
     player_actions: PlayerActions,
     entity_actions: EntityActions,
     game_actions: GameActions,
-    variable_actions: VariableActions
+    variable_actions: VariableActions,
+    control_actions: ControlActions,
+    select_actions: SelectActions
 }
 
 #[tower_lsp::async_trait]
@@ -86,6 +89,8 @@ impl LanguageServer for Backend {
                 let mut is_entity_action = false;
                 let mut is_game_action = false;
                 let mut is_variable_action = false;
+                let mut is_control_action = false;
+                let mut is_select_action = false;
 
                 let mut previous = String::from("");
                 match &token.token {
@@ -98,6 +103,8 @@ impl LanguageServer for Backend {
                             Keyword::E => is_entity_action = true,
                             Keyword::G => is_game_action = true,
                             Keyword::V => is_variable_action = true,
+                            Keyword::C => is_control_action = true,
+                            Keyword::S => is_select_action = true,
                             _ => {}
                         }
                     }
@@ -147,6 +154,12 @@ impl LanguageServer for Backend {
                 }
                 if is_variable_action {
                     all = Some(self.variable_actions.all());
+                }
+                if is_control_action {
+                    all = Some(self.control_actions.all());
+                }
+                if is_select_action {
+                    all = Some(self.select_actions.all());
                 }
 
                 if all.is_some() {
@@ -209,10 +222,13 @@ async fn main() {
     let ad = ActionDump::load();
     let (service, socket) = LspService::new(|client| Backend {
         client, 
+
         player_actions: PlayerActions::new(&ad), 
         entity_actions: EntityActions::new(&ad), 
         game_actions: GameActions::new(&ad),
-        variable_actions: VariableActions::new(&ad) 
+        variable_actions: VariableActions::new(&ad),
+        control_actions: ControlActions::new(&ad),
+        select_actions: SelectActions::new(&ad)
     });
     Server::new(stdin, stdout, socket).serve(service).await;
 }
@@ -305,6 +321,9 @@ fn compile_file(data: String) -> Result<(), CompileErr> {
                         None => Err(CompileErr::new(start_pos, None, "Missing type".into()))
                     }
                 },
+                ParseError::InvalidCall { pos, msg } => {
+                    return Err(CompileErr::new(pos, None, format!("Invalid function call '{msg}'")))
+                },
             }
             return Ok(())
         }
@@ -318,26 +337,27 @@ fn compile_file(data: String) -> Result<(), CompileErr> {
                 ValidateError::UnknownEvent { node } => {
                     Err(CompileErr::new(node.start_pos, Some(node.end_pos), format!("Unknown event '{}'", node.event)))
                 }
-                ValidateError::UnknownAction { node } => {
-                    Err(CompileErr::new(node.start_pos, Some(node.end_pos), format!("Unknown action '{}'", node.name)))
+                ValidateError::UnknownAction { name, start_pos, end_pos } => {
+                    Err(CompileErr::new(start_pos, Some(end_pos), format!("Unknown action '{}'", name)))
                 },
-                ValidateError::MissingArgument { node, name, .. } => {
-                    Err(CompileErr::new(node.start_pos, Some(node.end_pos), format!("Missing argument '{}'", name)))
+                ValidateError::MissingArgument { start_pos, end_pos, name } => {
+                    Err(CompileErr::new(start_pos, Some(end_pos), format!("Missing argument '{}'", name)))
                 }
-                ValidateError::WrongArgumentType { node, index, name, expected_types, found_type } => {
-                    Err(CompileErr::new(node.args.get(index as usize).unwrap().start_pos.clone(), Some(node.args.get(index as usize).unwrap().end_pos.clone()), format!("Wrong argument type for '{}', expected '{:?}' but found '{:?}'", name, expected_type, found_type)))
+                ValidateError::WrongArgumentType { args, index, name, expected_types, found_type } => {
+                    Err(CompileErr::new(args.get(index as usize).unwrap().start_pos.clone(), Some(args.get(index as usize).unwrap().end_pos.clone()), format!("Wrong argument type for '{}', expected '{:?}' but found '{:?}'", name, expected_types, found_type)))
                 }
-                ValidateError::TooManyArguments { node } => {
-                    let start_pos = node.start_pos;
-                    let mut end_pos = start_pos.clone();
-                    end_pos.col += node.name.chars().count() as u32;
-                    Err(CompileErr::new(start_pos, Some(end_pos), format!("Too many arguments for action '{}'", node.name)))
+                ValidateError::TooManyArguments { start_pos, mut end_pos, name } => {
+                    end_pos.col += name.chars().count() as u32;
+                    Err(CompileErr::new(start_pos.clone(), Some(start_pos), format!("Too many arguments for action '{}'", name)))
                 }
-                ValidateError::InvalidTagOption { node: _, tag_name, provided, options, start_pos, end_pos } => {
+                ValidateError::InvalidTagOption { tag_name, provided, options, start_pos, end_pos } => {
                     Err(CompileErr::new(start_pos, Some(end_pos), format!("Invalid option '{}' for tag '{}', expected one of {:?}", provided, tag_name, options)))
                 }
-                ValidateError::UnknownTag { node: _, tag_name, available, start_pos, end_pos } => {
+                ValidateError::UnknownTag { tag_name, available, start_pos, end_pos } => {
                     Err(CompileErr::new(start_pos, Some(end_pos), format!("Unknown tag '{}', found tags: {:?}", tag_name, available)))
+                }
+                ValidateError::UnknownGameValue { game_value, start_pos, end_pos} => {
+                    Err(CompileErr::new(start_pos, Some(end_pos), format!("Unknown game value '{}'", game_value)))
                 }
             }
         }

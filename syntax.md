@@ -53,6 +53,7 @@ e.teleport(Location(0,0,0));
 g.cancelEvent();
 v.add(var, 1, 2);
 c.wait(1);
+s.eventTarget();
 ```
 Game and entity actions can target different selectors:
 ```

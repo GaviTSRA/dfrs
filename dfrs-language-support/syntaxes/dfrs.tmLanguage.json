@@ -9,7 +9,16 @@
 			"include": "#events"
 		},
 		{
+			"include": "#functions"
+		},
+		{
+			"include": "#repeats"
+		},
+		{
 			"include": "#actions"
+		},
+		{
+			"include": "#conditionals"
 		},
 		{
 			"include": "#values"
@@ -22,6 +31,9 @@
 		},
 		{
 			"include": "#keywords"
+		},
+		{
+			"include": "#variables"
 		}
 	],
 	"repository": {
@@ -37,11 +49,47 @@
 			"name": "keyword",
 			"match": "@[A-z]*"
 		},
+		"functions": {
+			"patterns": [
+				{
+					"match": "(fn) ([A-z]*)",
+					"captures": {
+						"1": { "name": "keyword" },
+						"2": { "name": "support.function" }
+					}
+				}
+			]
+		},
+		"repeats": {
+			"patterns": [
+				{
+					"name": "support.function",
+					"match": "(repeat) ([A-z]+)",
+					"captures": {
+						"1": { "name": "keyword" },
+						"2": { "name": "support.function" }
+					}
+				}
+			]
+		},
+		"conditionals": {
+			"patterns": [
+				{
+					"name": "support.function",
+					"match": "(ifp|ife|ifg|ifv) [!]?([A-z]*:)?([A-z]+)",
+					"captures": {
+						"1": { "name": "keyword" },
+						"2": { "name": "markup.italic" },
+						"3": { "name": "support.function" }
+					}
+				}
+			]
+		},
 		"actions": {
 			"patterns": [
 				{
 					"name": "support.function",
-					"match": "\\b(p|g|e|v)(:[A-z]*)?[.]([A-z]+)\\b",
+					"match": "\\b(p|g|e|v|c|s)(:[A-z]*)?[.]([A-z]+)\\b",
 					"captures": {
 						"1": { "name": "markup.italic" },
 						"2": { "name": "markup.italic" }
@@ -52,7 +100,7 @@
 		"keywords": {
 			"patterns": [{
 				"name": "keyword.control.dfrs",
-				"match": "\\b(if|while|for|return)\\b"
+				"match": "\\b(line|local|game|save|else)\\b"
 			}]
 		},
 		"values": {
@@ -74,6 +122,17 @@
 			"name": "string.quoted.double.dfrs",
 			"begin": "\"",
 			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.dfrs",
+					"match": "\\\\."
+				}
+			]
+		},
+		"variables": {
+			"name": "string.quoted.double.dfrs",
+			"begin": "`",
+			"end": "`",
 			"patterns": [
 				{
 					"name": "constant.character.escape.dfrs",
