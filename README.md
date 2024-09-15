@@ -5,9 +5,13 @@ For more information, see [the syntax doc](syntax.md).
 ## Usage
 > [!WARNING]  
 > dfrs is currently in beta and may not function correctly.  
-> Make sure to backup any important code before replacing it with dfrs-generated code.
+> Make sure to back up any important code before replacing it with dfrs-generated code.
 
-To use dfrs you need to build the source code of the cli and put the executable in your path. Afterwards you can use the dfrs command to compile .dfrs files. You also need either recode or codeclient to receive the compiled templates. Which API is used can be configured in the dfrs.toml configuration file. This file can be created using `dfrs init <path>`. Files can be compiled using `dfrs compile <path>`.
+To use dfrs, download the latest release from [the releases](https://github.com/GaviTSRA/dfrs/releases). Make sure the executable is in your path.   
+Now, create a new project using `dfrs init <path>`   
+Start writing your code in a `.dfrs` file.   
+To send the code to minecraft, you will need to have CodeClient or Recode installed. Select the API you want to use in your `dfrs.toml` [configuration file](#Configuration).   
+To compile the code and send it, run `dfrs compile <file>`.
 
 ## Configuration
 A projects configuration is stored in its dfrs.toml.  
@@ -18,10 +22,11 @@ Available configs:
 ## Current limitations
 - No proper release is available
 - Documentation is lacking
+- The extension is not ready for use
 - Variables are not type checked
 - There is no way to represent items
 - Processes cannot be created or called
-- Actions with multiple possible arguemnts are not correctly type checked
+- Actions with multiple possible arguments are not correctly type checked
 - Function calls are not validated
 - Potion names, sound names and particles names are not validated
 - Events are not loaded from action dump
