@@ -3,7 +3,7 @@ dfrs is a text-based programming language for the DiamondFire Minecraft server. 
 For more information, see [the syntax doc](syntax.md).
 
 ## Usage
-> **Warning**  
+> [!WARNING]  
 > dfrs is currently in beta and may not function correctly.  
 > Make sure to backup any important code before replacing it with dfrs-generated code.
 
