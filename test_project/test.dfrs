@@ -1,3 +1,3 @@
 @join {
-
+    p.sendMessage(-1);
 }

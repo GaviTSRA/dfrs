@@ -46,11 +46,20 @@ impl Lexer {
         let mut dot_count = 0;
         let start_pos = self.position.clone();
 
-        while self.current_char.is_some() && (self.current_char.unwrap().is_ascii_digit() || self.current_char.unwrap() == '.') {
+        while self.current_char.is_some() && (self.current_char.unwrap().is_ascii_digit() || self.current_char.unwrap() == '.' || self.current_char.unwrap() == '-') {
             if self.current_char.unwrap() == '.' { dot_count += 1 }
+            if self.current_char.unwrap() == '-' {
+                if !num_string.is_empty() {
+                    return Err(LexerError::InvalidNumber {pos: start_pos});
+                }
+            }
             if dot_count > 1 { return Err(LexerError::InvalidNumber{ pos: self.position.clone() }) }
             num_string.push_str(&self.current_char.unwrap().to_string());
             self.advance();
+        }
+
+        if num_string.is_empty() {
+            return Err(LexerError::InvalidNumber { pos: start_pos })
         }
 
         Ok(TokenWithPos { token: Token::Number { value: num_string.parse::<f32>().unwrap() }, start_pos, end_pos: self.position.clone()})
@@ -234,8 +243,14 @@ impl Lexer {
                     self.advance();
                 }
                 '-' => {
-                    result.push(self.token(Token::Minus));
-                    self.advance();
+                    let token = match self.make_number() {
+                        Ok(res) => res,
+                        Err(_) => {
+                            self.advance();
+                            self.token(Token::Minus)
+                        }
+                    };
+                    result.push(token);
                 }
                 '*' => {
                     result.push(self.token(Token::Multiply));
