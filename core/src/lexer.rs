@@ -26,7 +26,7 @@ impl Lexer {
         self.char_pos += 1;
         self.position.advance();
 
-        if self.char_pos >= self.input.len() as i32 { 
+        if self.char_pos >= self.input.chars().count() as i32 { 
             self.current_char = None 
         } else {
             self.current_char = Some(self.input.chars().nth(self.char_pos as usize).unwrap())

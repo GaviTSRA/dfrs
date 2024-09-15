@@ -59,7 +59,8 @@ pub static PLAYER_EVENTS: phf::Map<&'static str, &'static str> = phf_map! {
     "killPlayer" => "KillPlayer",
     "playerResurrect" => "PlayerResurrect",
     "killMob" => "KillMob",
-    "respawn" => "Respawn"
+    "respawn" => "Respawn",
+    "exhaustion" => "Exhaustion"
 };
 
 pub static ENTITY_EVENTS: phf::Map<&'static str, &'static str> = phf_map! {
