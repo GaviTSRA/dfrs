@@ -11,12 +11,14 @@
 	<div class="top">
 		<img src={logo}>
 		<h1>
-			<span class="title">df.rs</span>
+			<span class="title">dfrs</span>
 		</h1>
-		<p class="subtitle">A DiamondFire Scripting Language</p>
+		<p class="subtitle">A Programming Language for DiamondFire</p>
 		<div>
-			<button class="btn-start">Getting started</button>
-			<button class="btn-doc">Documentation</button>
+			<button class="btn-start">
+				<svg xmlns="http://www.w3.org/2000/svg" height="32" width="24" viewBox="0 0 384 512"><!--!Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.--><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80L0 432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg>
+				Getting started
+			</button>
 		</div>
 	</div>
 	<div>
@@ -31,26 +33,16 @@
 
 <style>
 	.btn-start {
-		background-color: rgb(0, 241, 0);
+		display: flex;
+		align-items: center;
+		gap: 1rem;
 	}
 
 	.btn-start:hover {
-		background-color: rgb(73, 255, 73)
+		background-color: lightblue
 	}
 
 	.btn-start:active {
-		background-color: white;
-	}
-
-	.btn-doc {
-		background-color: rgb(92, 92, 255);
-	}
-
-	.btn-doc:hover {
-		background-color: rgb(150, 150, 255);
-	}
-
-	.btn-doc:active {
 		background-color: white;
 	}
 

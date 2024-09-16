@@ -32,7 +32,7 @@
 	</nav> -->
 
 	<div class="corner right">
-		<a href="https://github.com/GaviTSRA/dfrs">
+		<a href="https://github.com/GaviTSRA/io">
 			<img src={github} alt="GitHub" />
 		</a>
 	</div>
