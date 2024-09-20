@@ -1,4 +1,4 @@
-use std::cmp;
+use std::{cmp, fs};
 use std::path::PathBuf;
 
 use clap::{Parser as _, Subcommand};
@@ -42,6 +42,7 @@ fn print_err(message: String, data: String, start_pos: Position, end_pos: Option
 }
 
 fn compile_cmd(file: &PathBuf) {
+    println!("{} {}", "Compiling".bright_black(), file.file_name().unwrap().to_string_lossy());
     let mut config_file = file.clone();
     config_file.set_file_name("dfrs.toml");
     let config = match load_config(&config_file) {
@@ -249,7 +250,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     Compile {
-        file: PathBuf,
+        path: PathBuf,
     },
     Init {
         path: PathBuf,
@@ -261,11 +262,31 @@ fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
-        Some(Commands::Compile { file }) => {
-            println!("{} {}", "Compiling".bright_black(), file.file_name().unwrap().to_string_lossy());
-            compile_cmd(file);
+        Some(Commands::Compile { path }) => {
+            if !path.exists() {
+                println!("{} File not found", "Error:".bright_red());
+                return;
+            }
+            if path.is_dir() {
+                let paths = fs::read_dir(path).unwrap();
+
+                println!("{} {}", "Compiling project".bright_black(), path.file_name().unwrap().to_string_lossy());
+                for path in paths {
+                    let file = path.unwrap().path();
+                    if file.is_file() && file.extension().unwrap() == "dfrs" {
+                        compile_cmd(&file);
+                    }
+                }
+            } else {
+                println!("f");
+                compile_cmd(path);
+            }
         }
         Some(Commands::Init { path }) => {
+            if !path.exists() {
+                println!("{} File not found", "Error:".bright_red());
+                return;
+            }
             if !path.is_dir() {
                 println!("{} Path is not a directory", "Error:".bright_red());
                 return;
