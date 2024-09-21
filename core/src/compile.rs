@@ -1,5 +1,6 @@
-use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
-
+use std::fmt;
+use serde::{de, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
+use serde::de::{MapAccess, Visitor};
 use crate::{node::{ActionNode, ActionType, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, FileNode, FunctionNode, RepeatNode}, token::{get_type_str, Selector}};
 
 pub fn compile(node: FileNode, debug: bool) -> Vec<CompiledLine> {
@@ -503,8 +504,8 @@ fn arg_val_from_arg(arg: crate::node::Arg, node_name: String, block: String) -> 
             tag
            }, id: String::from("bl_tag")}, slot: definition.unwrap().slot as i32})
         }
-        crate::node::ArgValue::Variable { value, scope } => {
-            Some( Arg { item: ArgItem { data: ArgValueData::Variable { value, scope }, id: String::from("var") }, slot: arg.index } )
+        crate::node::ArgValue::Variable { name, scope } => {
+            Some( Arg { item: ArgItem { data: ArgValueData::Variable { name, scope }, id: String::from("var") }, slot: arg.index } )
         }
         crate::node::ArgValue::GameValue { value, selector, .. } => {
             Some ( Arg { item: ArgItem { data: ArgValueData::GameValue { game_value: value, target: selector }, id: String::from("g_val") }, slot: arg.index })
@@ -517,86 +518,83 @@ fn arg_val_from_arg(arg: crate::node::Arg, node_name: String, block: String) -> 
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-struct Codeline {
-    blocks: Vec<Block>
+pub struct Codeline {
+    pub blocks: Vec<Block>
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-struct Block {
-    id: String,
+pub struct Block {
+    pub id: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    block: Option<String>,
+    pub block: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    args: Option<Args>,
+    pub args: Option<Args>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    action: Option<String>,
+    pub action: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    target: Option<Selector>,
+    pub target: Option<Selector>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    data: Option<String>,
+    pub data: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    attribute: Option<String>,
+    pub attribute: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", rename="subAction")]
-    sub_action: Option<String>,
+    pub sub_action: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    direct: Option<String>,
+    pub direct: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", rename="type")]
-    bracket_type: Option<String>,
+    pub bracket_type: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-struct Args {
-    items: Vec<Arg>
+pub struct Args {
+    pub items: Vec<Arg>
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-struct Arg {
-    item: ArgItem,
-    slot: i32
+pub struct Arg {
+    pub item: ArgItem,
+    pub slot: i32
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-struct ArgItem {
-    data: ArgValueData, 
-    id: String
+pub struct ArgItem {
+    pub data: ArgValueData,
+    pub id: String
 }
 
-#[derive(Deserialize, Debug)]
-enum ArgValueData {
+#[derive(Debug)]
+pub enum ArgValueData {
     Simple { name: String },
     Id { id: String },
     GameValue {
-        #[serde(rename="type")]
         game_value: String,
         target: Selector
     },
-    Variable { value: String, scope: String },
+    Variable { name: String, scope: String },
     Location { is_block: bool, loc: Location },
     Vector { x: f32, y: f32, z: f32 },
     Sound { sound: String, volume: f32, pitch: f32 },
     Potion { potion: String, amplifier: f32, duration: f32 },
     Tag { action: String, block: String, option: String, tag: String },
-    FunctionParam { 
-        #[serde(skip_serializing_if="Option::is_none")]
+    FunctionParam {
         default_value: Option<FunctionDefaultItem>,
         name: String,
         optional: bool,
         plural: bool,
-        #[serde(rename="type")]    
-        param_type: String 
+        param_type: String
     }
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-struct FunctionDefaultItem {
-    data: FunctionDefaultItemData, 
-    id: String
+pub struct FunctionDefaultItem {
+    pub data: FunctionDefaultItemData,
+    pub id: String
 }
 
 #[derive(Deserialize, Debug)]
-enum FunctionDefaultItemData {
+pub enum FunctionDefaultItemData {
     Simple { name: String },
     Id { id: String },
     Location { is_block: bool, loc: Location },
@@ -627,9 +625,9 @@ impl Serialize for ArgValueData {
                 state.serialize_field("target", target)?;
                 state.end()
             }
-            ArgValueData::Variable { value, scope } => {
+            ArgValueData::Variable { name, scope } => {
                 let mut state = serializer.serialize_struct("MyEnum", 2)?;
-                state.serialize_field("name", value)?;
+                state.serialize_field("name", name)?;
                 state.serialize_field("scope", scope)?;
                 state.end()
             }
@@ -683,6 +681,268 @@ impl Serialize for ArgValueData {
     }
 }
 
+impl<'de> Deserialize<'de> for ArgValueData {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(field_identifier, rename_all = "camelCase")]
+        enum Field {
+            Name,
+            Id,
+            Type,
+            Target,
+            Scope,
+            IsBlock,
+            Loc,
+            X,
+            Y,
+            Z,
+            Sound,
+            Vol,
+            Pitch,
+            Pot,
+            Amp,
+            Dur,
+            Action,
+            Block,
+            Option,
+            Tag,
+            DefaultValue,
+            Optional,
+            Plural,
+        }
+
+        struct ArgValueDataVisitor;
+
+        impl<'de> Visitor<'de> for ArgValueDataVisitor {
+            type Value = ArgValueData;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("struct ArgValueData")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<Self::Value, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut name = None;
+                let mut id = None;
+                let mut game_value = None;
+                let mut target = None;
+                let mut scope = None;
+                let mut is_block = None;
+                let mut loc = None;
+                let mut x = None;
+                let mut y = None;
+                let mut z = None;
+                let mut sound = None;
+                let mut volume = None;
+                let mut pitch = None;
+                let mut potion = None;
+                let mut amplifier = None;
+                let mut duration = None;
+                let mut action = None;
+                let mut block = None;
+                let mut option = None;
+                let mut tag = None;
+                let mut default_value = None;
+                let mut optional = None;
+                let mut plural = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Name => {
+                            if name.is_some() {
+                                return Err(de::Error::duplicate_field("name"));
+                            }
+                            name = Some(map.next_value()?);
+                        }
+                        Field::Id => {
+                            if id.is_some() {
+                                return Err(de::Error::duplicate_field("id"));
+                            }
+                            id = Some(map.next_value()?);
+                        }
+                        Field::Type => {
+                            if game_value.is_some() {
+                                return Err(de::Error::duplicate_field("type"));
+                            }
+                            game_value = Some(map.next_value()?);
+                        }
+                        Field::Target => {
+                            if target.is_some() {
+                                return Err(de::Error::duplicate_field("target"));
+                            }
+                            target = Some(map.next_value()?);
+                        }
+                        Field::Scope => {
+                            if scope.is_some() {
+                                return Err(de::Error::duplicate_field("scope"));
+                            }
+                            scope = Some(map.next_value()?);
+                        }
+                        Field::IsBlock => {
+                            if is_block.is_some() {
+                                return Err(de::Error::duplicate_field("isBlock"));
+                            }
+                            is_block = Some(map.next_value()?);
+                        }
+                        Field::Loc => {
+                            if loc.is_some() {
+                                return Err(de::Error::duplicate_field("loc"));
+                            }
+                            loc = Some(map.next_value()?);
+                        }
+                        Field::X => {
+                            if x.is_some() {
+                                return Err(de::Error::duplicate_field("x"));
+                            }
+                            x = Some(map.next_value()?);
+                        }
+                        Field::Y => {
+                            if y.is_some() {
+                                return Err(de::Error::duplicate_field("y"));
+                            }
+                            y = Some(map.next_value()?);
+                        }
+                        Field::Z => {
+                            if z.is_some() {
+                                return Err(de::Error::duplicate_field("z"));
+                            }
+                            z = Some(map.next_value()?);
+                        }
+                        Field::Sound => {
+                            if sound.is_some() {
+                                return Err(de::Error::duplicate_field("sound"));
+                            }
+                            sound = Some(map.next_value()?);
+                        }
+                        Field::Vol => {
+                            if volume.is_some() {
+                                return Err(de::Error::duplicate_field("vol"));
+                            }
+                            volume = Some(map.next_value()?);
+                        }
+                        Field::Pitch => {
+                            if pitch.is_some() {
+                                return Err(de::Error::duplicate_field("pitch"));
+                            }
+                            pitch = Some(map.next_value()?);
+                        }
+                        Field::Pot => {
+                            if potion.is_some() {
+                                return Err(de::Error::duplicate_field("pot"));
+                            }
+                            potion = Some(map.next_value()?);
+                        }
+                        Field::Amp => {
+                            if amplifier.is_some() {
+                                return Err(de::Error::duplicate_field("amp"));
+                            }
+                            amplifier = Some(map.next_value()?);
+                        }
+                        Field::Dur => {
+                            if duration.is_some() {
+                                return Err(de::Error::duplicate_field("dur"));
+                            }
+                            duration = Some(map.next_value()?);
+                        }
+                        Field::Action => {
+                            if action.is_some() {
+                                return Err(de::Error::duplicate_field("action"));
+                            }
+                            action = Some(map.next_value()?);
+                        }
+                        Field::Block => {
+                            if block.is_some() {
+                                return Err(de::Error::duplicate_field("block"));
+                            }
+                            block = Some(map.next_value()?);
+                        }
+                        Field::Option => {
+                            if option.is_some() {
+                                return Err(de::Error::duplicate_field("option"));
+                            }
+                            option = Some(map.next_value()?);
+                        }
+                        Field::Tag => {
+                            if tag.is_some() {
+                                return Err(de::Error::duplicate_field("tag"));
+                            }
+                            tag = Some(map.next_value()?);
+                        }
+                        Field::DefaultValue => {
+                            if default_value.is_some() {
+                                return Err(de::Error::duplicate_field("default_value"));
+                            }
+                            default_value = Some(map.next_value()?);
+                        }
+                        Field::Optional => {
+                            if optional.is_some() {
+                                return Err(de::Error::duplicate_field("optional"));
+                            }
+                            optional = Some(map.next_value()?);
+                        }
+                        Field::Plural => {
+                            if plural.is_some() {
+                                return Err(de::Error::duplicate_field("plural"));
+                            }
+                            plural = Some(map.next_value()?);
+                        }
+                    }
+                }
+
+                if let (Some(name), Some(scope)) = (name.clone(), scope) {
+                    Ok(ArgValueData::Variable { name, scope })
+                } else if let (Some(name), Some(optional), Some(plural), Some(param_type)) = (name.clone(), optional, plural, game_value.clone()) {
+                    Ok(ArgValueData::FunctionParam {
+                        default_value,
+                        name,
+                        optional,
+                        plural,
+                        param_type,
+                    })
+                } else if let Some(name) = name {
+                    Ok(ArgValueData::Simple { name })
+                } else if let Some(id) = id {
+                    Ok(ArgValueData::Id { id })
+                } else if let (Some(game_value), Some(target)) = (game_value, target) {
+                    Ok(ArgValueData::GameValue { game_value, target })
+                } else if let (Some(is_block), Some(loc)) = (is_block, loc) {
+                    Ok(ArgValueData::Location { is_block, loc })
+                } else if let (Some(x), Some(y), Some(z)) = (x, y, z) {
+                    Ok(ArgValueData::Vector { x, y, z })
+                } else if let (Some(sound), Some(volume), Some(pitch)) = (sound, volume, pitch) {
+                    Ok(ArgValueData::Sound { sound, volume, pitch })
+                } else if let (Some(potion), Some(amplifier), Some(duration)) =
+                    (potion, amplifier, duration)
+                {
+                    Ok(ArgValueData::Potion {
+                        potion,
+                        amplifier,
+                        duration,
+                    })
+                } else if let (Some(action), Some(block), Some(option), Some(tag)) =
+                    (action, block, option, tag)
+                {
+                    Ok(ArgValueData::Tag {
+                        action,
+                        block,
+                        option,
+                        tag,
+                    })
+                } else {
+                    Err(de::Error::missing_field("required field"))
+                }
+            }
+        }
+
+        deserializer.deserialize_struct("ArgValueData", &[], ArgValueDataVisitor)
+    }
+}
+
 impl Serialize for FunctionDefaultItemData {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -731,12 +991,12 @@ impl Serialize for FunctionDefaultItemData {
 }
 
 #[derive(Deserialize, Debug)]
-struct Location {
-    x: f32,
-    y: f32,
-    z: f32,
-    pitch: Option<f32>,
-    yaw: Option<f32>,
+pub struct Location {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub pitch: Option<f32>,
+    pub yaw: Option<f32>,
 }
 
 impl Serialize for Location {

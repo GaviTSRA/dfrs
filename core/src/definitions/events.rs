@@ -1,4 +1,5 @@
 use crate::definitions::action_dump::ActionDump;
+use crate::utility::to_dfrs_name;
 
 #[derive(Debug)]
 pub struct Event {
@@ -16,10 +17,7 @@ impl PlayerEvents {
         let mut events = vec![];
         for entry in &action_dump.actions {
             if entry.codeblock_name == "PLAYER EVENT" {
-                let v = entry.name.clone().trim().to_owned();
-                let mut vv: Vec<char> = v.chars().collect();
-                vv[0] = vv[0].to_lowercase().next().unwrap();
-                let name: String = vv.into_iter().collect();
+                let name = to_dfrs_name(&entry.name.clone());
                 events.push(Event {
                     df_name: entry.name.clone(),
                     dfrs_name: name
@@ -48,10 +46,7 @@ impl EntityEvents {
         let mut events = vec![];
         for entry in &action_dump.actions {
             if entry.codeblock_name == "ENTITY EVENT" {
-                let v = entry.name.clone().trim().to_owned();
-                let mut vv: Vec<char> = v.chars().collect();
-                vv[0] = vv[0].to_lowercase().next().unwrap();
-                let name: String = vv.into_iter().collect();
+                let name: String = to_dfrs_name(&entry.name.clone());
                 events.push(Event {
                     df_name: entry.name.clone(),
                     dfrs_name: name

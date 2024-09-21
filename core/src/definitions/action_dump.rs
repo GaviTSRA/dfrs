@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::utility::to_camel_case;
+use crate::utility::{to_camel_case, to_dfrs_name};
 
 use super::{ArgType, DefinedArg, DefinedTag};
 
@@ -254,15 +254,13 @@ pub fn get_action(action: &ADAction) -> Action {
         tags.push(new_tag);
     }
 
-    let mut v: String = action.name.clone().trim()
+    let mut replaced: String = action.name.clone().trim()
         .replace("+=", "addDirect").replace("-=", "subDirect")
         .replace('+', "add").replace('-', "sub")
         .replace('%', "mod").replace('/', "div").replace('=', "equal");
-    if v == *"x" {
-        v = "mul".into();
+    if replaced == *"x" {
+        replaced = "mul".into();
     }
-    let mut vv: Vec<char> = v.chars().collect();
-    vv[0] = vv[0].to_lowercase().next().unwrap();
-    let name: String = vv.into_iter().collect();
+    let name = to_dfrs_name(&replaced);
     Action::new(name, &action.name, args, tags, action.sub_action_blocks.is_some() && !action.sub_action_blocks.clone().unwrap().is_empty())
 }

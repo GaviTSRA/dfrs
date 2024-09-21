@@ -13,6 +13,7 @@ use dfrs_core::validate::{Validator, ValidateError};
 use lsp::run_lsp;
 
 use colored::Colorize;
+use dfrs_core::decompile::Decompiler;
 
 mod lsp;
 
@@ -255,6 +256,9 @@ enum Commands {
     Init {
         path: PathBuf,
     },
+    Decompile {
+        code: String
+    },
     LSP {}
 }
 
@@ -297,6 +301,10 @@ fn main() {
             config_path.push("dfrs.toml");
             new_config.save(&config_path);
             println!("{} {}", "Created new config".green(), config_path.to_string_lossy());
+        }
+        Some(Commands::Decompile { code }) => {
+            let mut decompiler = Decompiler::new();
+            decompiler.decompile(code);
         }
         Some(Commands::LSP {}) => {
             run_lsp();

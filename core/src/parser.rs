@@ -652,7 +652,7 @@ impl Parser {
                     _ => {
                         if let Some((var, scope)) = self.get_variable(tag_name.clone()) {
                             params.push(ArgValueWithPos {
-                                value: ArgValue::Variable { value: var, scope },
+                                value: ArgValue::Variable { name: var, scope },
                                 start_pos: self.current_token.clone().unwrap().start_pos,
                                 end_pos: self.current_token.clone().unwrap().end_pos,
                             });

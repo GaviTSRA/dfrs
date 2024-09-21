@@ -11,6 +11,7 @@ pub mod compile;
 pub mod send;
 pub mod definitions;
 pub mod utility;
+pub mod decompile;
 
 pub struct ConfigFileNotFoundError {}
 
