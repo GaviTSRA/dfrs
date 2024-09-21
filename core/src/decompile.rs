@@ -103,6 +103,9 @@ impl Decompiler {
             }
         }
 
+        vars.sort();
+        vars.dedup();
+
         for block in line.blocks {
             match block.id.as_str() {
                 "block" => {
