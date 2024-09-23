@@ -314,6 +314,9 @@ fn compile_file(data: String, path: PathBuf) -> Result<(), CompileErr> {
                         // println!("Invalid EOF, expected: {expected:?}");
                     }
                 }
+                ParseError::InvalidComplexNumber { pos, msg } => {
+                    return Err(CompileErr::new(pos, None, format!("Invalid number '{msg}'")))
+                },
                 ParseError::InvalidLocation { pos, msg } => {
                     return Err(CompileErr::new(pos, None, format!("Invalid location '{msg}'")))
                 },

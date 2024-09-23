@@ -481,6 +481,9 @@ fn arg_val_from_arg(arg: crate::node::Arg, node_name: String, block: String) -> 
         crate::node::ArgValue::Number { number } => {
             Some( Arg { item: ArgItem { data: ArgValueData::Simple { name: number.to_string() }, id: String::from("num") }, slot: arg.index} )
         }
+        crate::node::ArgValue::ComplexNumber { number } => {
+            Some( Arg { item: ArgItem { data: ArgValueData::Simple { name: number.to_string() }, id: String::from("num") }, slot: arg.index} )
+        }
         crate::node::ArgValue::String { string } => {
             Some( Arg { item: ArgItem { data: ArgValueData::Simple { name: string }, id: String::from("txt") }, slot: arg.index } )
         }

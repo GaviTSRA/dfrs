@@ -90,8 +90,8 @@ impl Decompiler {
                     match &arg.item.data {
                         ArgValueData::Variable { name, scope} => {
                             match scope.as_str() {
-                                "game" => println!("define GAME var {name} !"),
-                                "save" => println!("define SAVE var {name} !"),
+                                "unsaved" => println!("define GAME var {name} !"),
+                                "saved" => println!("define SAVE var {name} !"),
                                 "local" => vars.push(format!("local {name} = `{name}`;")),
                                 "line" => vars.push(format!("line {name} = `{name}`;")),
                                 err => println!("ERR: Unknown var type {err}")
@@ -337,7 +337,19 @@ impl Decompiler {
                     ArgValueData::Simple { name } => {
                         match arg.item.id.as_str() {
                             "comp" => result.push_str(&format!("\"{name}\"")),
-                            "num" => result.push_str(&format!("{name}")),
+                            "num" => {
+                                let mut done = false;
+                                for char in name.clone().chars() {
+                                    if !char.is_numeric() {
+                                        result.push_str(&format!("Number(\"{name}\")"));
+                                        done = true;
+                                        break;
+                                    }
+                                }
+                                if !done {
+                                  result.push_str(&format!("{name}"))
+                                }
+                            },
                             "txt" => result.push_str(&format!("'{name}'")),
                             other => println!("WARN: Unhandled simple arg {other}")
                         }

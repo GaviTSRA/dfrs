@@ -176,6 +176,9 @@ fn compile_cmd(file: &PathBuf) {
                 ParseError::InvalidCall { pos, msg } => {
                     print_err(format!("Invalid function call: {}", msg), data, pos, None)
                 }
+                ParseError::InvalidComplexNumber { pos, msg } => {
+                    print_err(format!("Invalid Number: {}", msg), data, pos, None)
+                }
                 ParseError::InvalidLocation { pos, msg } => {
                     print_err(format!("Invalid Location: {}", msg), data, pos, None)
                 }

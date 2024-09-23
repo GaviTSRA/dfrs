@@ -5,6 +5,7 @@ pub enum ParseError {
     InvalidToken { found: Option<TokenWithPos>, expected: Vec<Token> },
     UnknownVariable { found: String, start_pos: Position, end_pos: Position },
     InvalidCall { pos: Position, msg: String },
+    InvalidComplexNumber { pos: Position, msg: String },
     InvalidLocation { pos: Position, msg: String },
     InvalidVector { pos: Position, msg: String },
     InvalidSound { pos: Position, msg: String },
@@ -745,6 +746,10 @@ impl Parser {
                     }
                     Token::Identifier { value }  => {
                         match value.as_str() {
+                            "Number" => {
+                                params.push(self.make_complex_number()?);
+                                is_value = true;
+                            }
                             "Location" => {
                                 params.push(self.make_location()?);
                                 is_value = true;
@@ -807,6 +812,7 @@ impl Parser {
             let arg_type = match param.value {
                 ArgValue::Empty => ArgType::EMPTY,
                 ArgValue::Number { .. } => ArgType::NUMBER,
+                ArgValue::ComplexNumber { .. } => ArgType::NUMBER,
                 ArgValue::String { .. } => ArgType::STRING,
                 ArgValue::Text { .. } => ArgType::TEXT,
                 ArgValue::Location { .. } => ArgType::LOCATION,
@@ -821,6 +827,27 @@ impl Parser {
             args.push(Arg { value: param.value, index: i as i32, arg_type, start_pos: param.start_pos, end_pos: param.end_pos});
         }
         Ok(args)
+    }
+
+    fn make_complex_number(&mut self) -> Result<ArgValueWithPos, ParseError> {
+        let start_pos = self.current_token.clone().unwrap().start_pos;
+        let params = self.make_params()?;
+
+        if params.len() < 1 {
+            return Err(ParseError::InvalidComplexNumber { pos: self.current_token.clone().unwrap().start_pos, msg: "Not enough arguments".into() })
+        }
+        let number = match params[0].value.clone() {
+            ArgValue::Text { text } => text,
+            _ => return Err(ParseError::InvalidComplexNumber { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid value, should be text".into() })
+        };
+        if params.len() > 1 {
+            return Err(ParseError::InvalidComplexNumber { pos: self.current_token.clone().unwrap().start_pos, msg: "Too many arguments".into() })
+        }
+        Ok(ArgValueWithPos {
+            value: ArgValue::ComplexNumber { number },
+            start_pos,
+            end_pos: self.current_token.clone().unwrap().end_pos
+        })
     }
 
     fn make_location(&mut self) -> Result<ArgValueWithPos, ParseError> {

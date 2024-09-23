@@ -124,6 +124,7 @@ pub struct VariableNode {
 pub enum ArgValue {
     Empty,
     Number { number: f32 },
+    ComplexNumber { number: String },
     String { string: String },
     Text { text: String },
     Location { x: f32, y: f32, z: f32, pitch: Option<f32>, yaw: Option<f32> },
