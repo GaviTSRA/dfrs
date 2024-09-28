@@ -126,6 +126,10 @@ call("functionName", arg1, arg2, ...);
 5
 5.2
 ```
+More complex numbers can also be represented:
+```
+Number("%math(%var(test)+1)")
+```
 ## Locations
 Location(x, y, z, pitch?, yaw?)
 ```
@@ -142,11 +146,15 @@ Sound(name as string or text, volume, pitch)
 ```
 Sound("Cow Ambient", 1, 2) 
 ```
-
 ## Potions
 Sound(type as string or text, amplifier, duration)
 ```
 Potion("strength", 2, 10)
+```
+## Items
+Item(NBT)
+```
+Item("{Count:1b,DF_NBT:3700,id:\"minecraft:stone\",tag:{display:{Name:'{\"italic\":false,\"extra\":[{\"color\":\"green\",\"text\":\"A\"}],\"text\":\"\"}'}}}")
 ```
 
 ## Game values

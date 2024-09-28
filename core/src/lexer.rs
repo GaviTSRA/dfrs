@@ -87,10 +87,10 @@ impl Lexer {
                 break;
             }
 
-            string.push_str(&char.to_string());
-
             if !is_escaped && char == '\\' {
                 escape = true;
+            } else {
+                string.push_str(&char.to_string());
             }
         }
 
@@ -119,10 +119,10 @@ impl Lexer {
                 break;
             }
 
-            string.push_str(&char.to_string());
-
             if !is_escaped && char == '\\' {
                 escape = true;
+            } else {
+                string.push_str(&char.to_string());
             }
         }
 
@@ -151,10 +151,10 @@ impl Lexer {
                 break;
             }
 
-            string.push_str(&char.to_string());
-
             if !is_escaped && char == '\\' {
                 escape = true;
+            } else {
+                string.push_str(&char.to_string());
             }
         }
 

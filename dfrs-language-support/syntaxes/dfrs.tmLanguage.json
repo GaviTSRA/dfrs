@@ -105,7 +105,7 @@
 		},
 		"values": {
 			"name": "support.class",
-			"match": "\\b(Location|Vector|Sound|Potion)\\b"
+			"match": "\\b(Location|Vector|Sound|Potion|Item)\\b"
 		},
 		"strings": {
 			"name": "string.quoted.double.dfrs",

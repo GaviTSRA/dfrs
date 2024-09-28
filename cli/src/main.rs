@@ -191,6 +191,9 @@ fn compile_cmd(file: &PathBuf) {
                 ParseError::InvalidPotion { pos, msg } => {
                     print_err(format!("Invalid Potion: {}", msg), data, pos, None)
                 }
+                ParseError::InvalidItem { pos, msg } => {
+                    print_err(format!("Invalid Item: {}", msg), data, pos, None)
+                }
                 ParseError::UnknownVariable { found, start_pos, end_pos } => {
                     print_err(format!("Unknown variable: {}", found), data, start_pos, Some(end_pos))
                 }

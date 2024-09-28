@@ -1,4 +1,3 @@
 @join {
-    line test;
-    v.add(test, -1, Number("%var(test)"));
+  p:default.giveItems(Item("{Count:1b,DF_NBT:3700,id:\"minecraft:stone\",tag:{display:{Name:'{\"italic\":false,\"extra\":[{\"color\":\"green\",\"text\":\"A\"}],\"text\":\"\"}'}}}"));
 }

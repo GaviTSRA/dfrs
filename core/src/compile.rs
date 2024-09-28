@@ -499,6 +499,9 @@ fn arg_val_from_arg(arg: crate::node::Arg, node_name: String, block: String) -> 
         crate::node::ArgValue::Potion { potion, amplifier, duration } => {
             Some( Arg { item: ArgItem { data: ArgValueData::Potion { potion, amplifier, duration }, id: String::from("pot") }, slot: arg.index } )
         }
+        crate::node::ArgValue::Item { item } => {
+            Some( Arg { item: ArgItem { data: ArgValueData::Item { item }, id: String::from("item") }, slot: arg.index } )
+        }
         crate::node::ArgValue::Tag { tag, value, definition, .. } => {
            Some( Arg { item: ArgItem { data: ArgValueData::Tag {
             action: node_name,
@@ -571,6 +574,7 @@ pub struct ArgItem {
 pub enum ArgValueData {
     Simple { name: String },
     Id { id: String },
+    Item { item: String },
     GameValue {
         game_value: String,
         target: Selector
@@ -620,6 +624,11 @@ impl Serialize for ArgValueData {
             ArgValueData::Id { id } => {
                 let mut state = serializer.serialize_struct("MyEnum", 1)?;
                 state.serialize_field("id", id)?;
+                state.end()
+            }
+            ArgValueData::Item { item } => {
+                let mut state = serializer.serialize_struct("MyEnum", 1)?;
+                state.serialize_field("item", item)?;
                 state.end()
             }
             ArgValueData::GameValue { target, game_value } => {
@@ -694,6 +703,7 @@ impl<'de> Deserialize<'de> for ArgValueData {
         enum Field {
             Name,
             Id,
+            Item,
             Type,
             Target,
             Scope,
@@ -732,6 +742,7 @@ impl<'de> Deserialize<'de> for ArgValueData {
             {
                 let mut name = None;
                 let mut id = None;
+                let mut item = None;
                 let mut game_value = None;
                 let mut target = None;
                 let mut scope = None;
@@ -767,6 +778,12 @@ impl<'de> Deserialize<'de> for ArgValueData {
                                 return Err(de::Error::duplicate_field("id"));
                             }
                             id = Some(map.next_value()?);
+                        }
+                        Field::Item => {
+                            if item.is_some() {
+                                return Err(de::Error::duplicate_field("item"));
+                            }
+                            item = Some(map.next_value()?);
                         }
                         Field::Type => {
                             if game_value.is_some() {
@@ -911,6 +928,8 @@ impl<'de> Deserialize<'de> for ArgValueData {
                     Ok(ArgValueData::Simple { name })
                 } else if let Some(id) = id {
                     Ok(ArgValueData::Id { id })
+                } else if let Some(item) = item {
+                    Ok(ArgValueData::Item { item })
                 } else if let (Some(game_value), Some(target)) = (game_value, target) {
                     Ok(ArgValueData::GameValue { game_value, target })
                 } else if let (Some(is_block), Some(loc)) = (is_block, loc) {

@@ -131,6 +131,7 @@ pub enum ArgValue {
     Vector { x: f32, y: f32, z: f32},
     Sound { sound: String, volume: f32, pitch: f32 },
     Potion { potion: String, amplifier: f32, duration: f32 },
+    Item { item: String },
     Tag { tag: String, value: String, definition: Option<DefinedTag>, name_end_pos: Position, value_start_pos: Position },
     Variable { name: String, scope: String },
     GameValue { value: String, selector: Selector, selector_end_pos: Position },

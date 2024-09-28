@@ -329,6 +329,9 @@ fn compile_file(data: String, path: PathBuf) -> Result<(), CompileErr> {
                 ParseError::InvalidPotion { pos, msg } => {
                     return Err(CompileErr::new(pos, None, format!("Invalid potion '{msg}'")))
                 },
+                ParseError::InvalidItem { pos, msg } => {
+                    return Err(CompileErr::new(pos, None, format!("Invalid item '{msg}'")))
+                },
                 ParseError::UnknownVariable { found, start_pos, end_pos } => {
                     return Err(CompileErr::new(start_pos, Some(end_pos), format!("Unknown variable '{}'", found)))
                 },

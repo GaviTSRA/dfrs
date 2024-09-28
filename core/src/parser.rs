@@ -10,6 +10,7 @@ pub enum ParseError {
     InvalidVector { pos: Position, msg: String },
     InvalidSound { pos: Position, msg: String },
     InvalidPotion { pos: Position, msg: String },
+    InvalidItem { pos: Position, msg: String },
     InvalidType { found: Option<TokenWithPos>, start_pos: Position }
 }
 
@@ -766,6 +767,10 @@ impl Parser {
                                 params.push(self.make_potion()?);
                                 is_value = true;
                             }
+                            "Item" => {
+                                params.push(self.make_item()?);
+                                is_value = true;
+                            }
                             "null" => {
                                 params.push(ArgValueWithPos {
                                     value: ArgValue::Empty,
@@ -818,6 +823,7 @@ impl Parser {
                 ArgValue::Location { .. } => ArgType::LOCATION,
                 ArgValue::Potion { .. } => ArgType::POTION,
                 ArgValue::Sound { .. } => ArgType::SOUND,
+                ArgValue::Item { .. } => ArgType::ITEM,
                 ArgValue::Vector { .. } => ArgType::VECTOR,
                 ArgValue::Tag { ..} => ArgType::TAG,
                 ArgValue::Variable { .. } => ArgType::VARIABLE,
@@ -977,6 +983,28 @@ impl Parser {
         }
         Ok(ArgValueWithPos {
             value: ArgValue::Potion { potion, amplifier, duration },
+            start_pos,
+            end_pos: self.current_token.clone().unwrap().end_pos
+        })
+    }
+
+    fn make_item(&mut self) -> Result<ArgValueWithPos, ParseError> {
+        let start_pos = self.current_token.clone().unwrap().start_pos;
+        let item_params = self.make_params()?;
+
+        if item_params.len() < 1 {
+            return Err(ParseError::InvalidItem { pos: self.current_token.clone().unwrap().start_pos, msg: "Not enough arguments".into() })
+        }
+        let item = match &item_params[0].value {
+            ArgValue::String { string } => string.clone(),
+            ArgValue::Text { text } => text.clone(),
+            _ => return Err(ParseError::InvalidItem { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid item arg type".into() })
+        };
+        if item_params.len() > 1 {
+            return Err(ParseError::InvalidItem { pos: self.current_token.clone().unwrap().start_pos, msg: "Too many arguments".into() })
+        }
+        Ok(ArgValueWithPos {
+            value: ArgValue::Item { item },
             start_pos,
             end_pos: self.current_token.clone().unwrap().end_pos
         })

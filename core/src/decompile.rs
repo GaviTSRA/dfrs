@@ -355,6 +355,9 @@ impl Decompiler {
                         }
                     }
                     ArgValueData::Id { .. } => {}
+                    ArgValueData::Item { item } => {
+                        result.push_str(&format!("Item(\"{}\")", item.replace("\"", "\\\"")));
+                    }
                     ArgValueData::GameValue { game_value, target } => {
                         let selector = if target == Selector::Default {
                             ""
