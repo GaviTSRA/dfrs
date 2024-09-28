@@ -262,7 +262,7 @@ checksum = "7e962a19be5cfc3f3bf6dd8f61eb50107f356ad6270fbb3ed41476571db78be5"
 
 [[package]]
 name = "dfrs_cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
  "colored",
@@ -275,7 +275,7 @@ dependencies = [
 
 [[package]]
 name = "dfrs_core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64",
  "flate2",

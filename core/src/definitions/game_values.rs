@@ -1,10 +1,12 @@
 use crate::definitions::action_dump::ActionDump;
 use crate::utility::to_camel_case;
 
+#[derive(Debug)]
 pub struct GameValues {
     game_values: Vec<GameValue>
 }
 
+#[derive(Debug)]
 pub struct GameValue {
     pub df_name: String,
     pub dfrs_name: String

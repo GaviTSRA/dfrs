@@ -1,13 +1,16 @@
 use std::path::PathBuf;
 
+use dashmap::DashMap;
 use dfrs_core::compile::compile;
 use dfrs_core::definitions::action_dump::ActionDump;
 use dfrs_core::definitions::actions::{EntityActions, GameActions, PlayerActions, VariableActions, ControlActions, SelectActions};
+use dfrs_core::definitions::game_values::GameValues;
 use dfrs_core::lexer::{Lexer, LexerError};
 use dfrs_core::load_config;
 use dfrs_core::parser::{ParseError, Parser};
 use dfrs_core::token::{Keyword, Token};
 use dfrs_core::validate::{ValidateError, Validator};
+use ropey::Rope;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
 use dfrs_core::definitions::events::{EntityEvents, PlayerEvents};
@@ -15,6 +18,7 @@ use dfrs_core::definitions::events::{EntityEvents, PlayerEvents};
 #[derive(Debug)]
 struct Backend {
     client: Client,
+    document_map: DashMap<String, Rope>,
 
     player_events: PlayerEvents,
     entity_events: EntityEvents,
@@ -24,7 +28,9 @@ struct Backend {
     game_actions: GameActions,
     variable_actions: VariableActions,
     control_actions: ControlActions,
-    select_actions: SelectActions
+    select_actions: SelectActions,
+
+    game_values: GameValues
 }
 
 #[tower_lsp::async_trait]
@@ -67,21 +73,136 @@ impl LanguageServer for Backend {
         Ok(())
     }
 
-    async fn did_change(&self, params: DidChangeTextDocumentParams) {
+    async fn did_open(&self, params: DidOpenTextDocumentParams) {
         self.client
-            .log_message(MessageType::INFO, "file changed!")
+            .log_message(MessageType::INFO, "file opened!")
             .await;
+        self.on_change(params.text_document)
+        .await
     }
 
-    async fn completion(&self, params: CompletionParams) ->  tower_lsp::jsonrpc::Result<Option<CompletionResponse>> {
-        let path = params.text_document_position.text_document.uri.to_file_path().unwrap().to_str().unwrap().to_string();
-        let data = std::fs::read_to_string(path).expect("could not open file");
+    async fn did_change(&self, mut params: DidChangeTextDocumentParams) {
+        self.on_change(TextDocumentItem {
+            uri: params.text_document.uri,
+            text: std::mem::take(&mut params.content_changes[0].text),
+            version: params.text_document.version,
+            language_id: "dfrs".into()
+        })
+        .await
+    }
+
+    async fn completion(&self, params: CompletionParams) -> tower_lsp::jsonrpc::Result<Option<CompletionResponse>> {
+        let uri = params.text_document_position.text_document.uri.to_string();
         let line = params.text_document_position.position.line + 1;
         let col = params.text_document_position.position.character;
+        self.get_completions(uri, line, col).await
+    }
+
+    async fn diagnostic(&self, params: DocumentDiagnosticParams) -> tower_lsp::jsonrpc::Result<DocumentDiagnosticReportResult> {
+        let mut result: Vec<Diagnostic> = vec![];
+
+        let path = params.text_document.uri.to_file_path().unwrap().to_str().unwrap().to_string();
+        let data = std::fs::read_to_string(path.clone()).expect("could not open file");
+
+        match compile_file(data, path.into()) {
+            Ok(_) => {},
+            Err(err) => {
+                let mut end_pos = err.pos.clone();
+                if err.end_pos.is_some() {
+                    end_pos = err.end_pos.unwrap();
+                }
+                result.push(Diagnostic {
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    message: err.msg,
+                    range: Range {
+                        start: Position { line: err.pos.line - 1, character: err.pos.col - 1 },
+                        end: Position { line: end_pos.line - 1, character: end_pos.col - 1 }
+                    },
+                    ..Default::default()
+                });
+            }
+        }
+
+        Ok(DocumentDiagnosticReportResult::Report(DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
+            related_documents: None,
+            full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                result_id: None,
+                items: result
+            }
+        })))
+    }
+}
+
+impl Backend {
+    async fn on_change(&self, params: TextDocumentItem) {
+        let rope = ropey::Rope::from_str(&params.text);
+        self.document_map
+            .insert(params.uri.to_string(), rope.clone());
+        // let ParserResult {
+        //     ast,
+        //     parse_errors,
+        //     semantic_tokens,
+        // } = parse(&params.text);
+        // let diagnostics = parse_errors
+        //     .into_iter()
+        //     .filter_map(|item| {
+        //         let (message, span) = match item.reason() {
+        //             chumsky::error::SimpleReason::Unclosed { span, delimiter } => {
+        //                 (format!("Unclosed delimiter {}", delimiter), span.clone())
+        //             }
+        //             chumsky::error::SimpleReason::Unexpected => (
+        //                 format!(
+        //                     "{}, expected {}",
+        //                     if item.found().is_some() {
+        //                         "Unexpected token in input"
+        //                     } else {
+        //                         "Unexpected end of input"
+        //                     },
+        //                     if item.expected().len() == 0 {
+        //                         "something else".to_string()
+        //                     } else {
+        //                         item.expected()
+        //                             .map(|expected| match expected {
+        //                                 Some(expected) => expected.to_string(),
+        //                                 None => "end of input".to_string(),
+        //                             })
+        //                             .collect::<Vec<_>>()
+        //                             .join(", ")
+        //                     }
+        //                 ),
+        //                 item.span(),
+        //             ),
+        //             chumsky::error::SimpleReason::Custom(msg) => (msg.to_string(), item.span()),
+        //         };
+
+        //         || -> Option<Diagnostic> {
+        //             // let start_line = rope.try_char_to_line(span.start)?;
+        //             // let first_char = rope.try_line_to_char(start_line)?;
+        //             // let start_column = span.start - first_char;
+        //             let start_position = offset_to_position(span.start, &rope)?;
+        //             let end_position = offset_to_position(span.end, &rope)?;
+        //             // let end_line = rope.try_char_to_line(span.end)?;
+        //             // let first_char = rope.try_line_to_char(end_line)?;
+        //             // let end_column = span.end - first_char;
+        //             Some(Diagnostic::new_simple(
+        //                 Range::new(start_position, end_position),
+        //                 message,
+        //             ))
+        //         }()
+        //     })
+        //     .collect::<Vec<_>>();
+
+        // self.client
+        //     .publish_diagnostics(params.uri.clone(), diagnostics, Some(params.version))
+        //     .await;
+    }
+
+    async fn get_completions(&self, uri: String, line: u32, col: u32) -> tower_lsp::jsonrpc::Result<Option<CompletionResponse>> {
+        let rope = self.document_map.get(&uri).unwrap();
 
         self.client.log_message(MessageType::INFO, format!("{} {}", line, col)).await;
 
-        let mut lexer = Lexer::new(data);
+        let mut lexer = Lexer::new(rope.to_string());
         let tokens = match lexer.run() {
             Ok(res) => res,
             Err(_) => return Ok(None)
@@ -97,21 +218,35 @@ impl LanguageServer for Backend {
                 let mut is_variable_action = false;
                 let mut is_control_action = false;
                 let mut is_select_action = false;
+                let mut is_game_value = false;
 
                 let mut previous = String::from("");
                 match &token.token {
                     Token::At => {
-                        is_event = true
+                        is_event = true;
                     }
-                    Token::Keyword { value } => {
-                        match value {
-                            Keyword::P => is_player_action = true,
-                            Keyword::E => is_entity_action = true,
-                            Keyword::G => is_game_action = true,
-                            Keyword::V => is_variable_action = true,
-                            Keyword::C => is_control_action = true,
-                            Keyword::S => is_select_action = true,
-                            _ => {}
+                    Token::Dollar => {
+                        is_game_value = true;
+                    }
+                    Token::Dot => {
+                        match last_token.clone() {
+                            Some(last) => {
+                                match last.token {
+                                    Token::Keyword { value } => {
+                                        match value {
+                                            Keyword::P => is_player_action = true,
+                                            Keyword::E => is_entity_action = true,
+                                            Keyword::G => is_game_action = true,
+                                            Keyword::V => is_variable_action = true,
+                                            Keyword::C => is_control_action = true,
+                                            Keyword::S => is_select_action = true,
+                                            _ => {}
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            None => {}
                         }
                     }
                     _ => {}
@@ -120,6 +255,15 @@ impl LanguageServer for Backend {
                     match last_token.unwrap().token {
                         Token::At => {
                             is_event = true;
+                            match token.token.clone() {
+                                Token::Identifier { value } => {
+                                    previous += &value;
+                                }
+                                _ => {}
+                            }
+                        }
+                        Token::Dollar => {
+                            is_game_value = true;
                             match token.token.clone() {
                                 Token::Identifier { value } => {
                                     previous += &value;
@@ -178,45 +322,23 @@ impl LanguageServer for Backend {
                     }
                     return Ok(Some(CompletionResponse::Array(actions)))
                 }
+
+                if is_game_value {
+                    let game_values = self.game_values.all();
+                    let mut result = vec![];
+
+                    for game_value in game_values {
+                        if game_value.dfrs_name.starts_with(&previous) || game_value.df_name.starts_with(&previous) {
+                            result.push(CompletionItem::new_simple(game_value.dfrs_name.clone(), game_value.df_name.clone()));
+                        }
+                    }
+                    return Ok(Some(CompletionResponse::Array(result)))
+                }
             }
             last_token = Some(token);
         }
 
         Ok(None)
-    }
-
-    async fn diagnostic(&self, params: DocumentDiagnosticParams) -> tower_lsp::jsonrpc::Result<DocumentDiagnosticReportResult> {
-        let mut result: Vec<Diagnostic> = vec![];
-
-        let path = params.text_document.uri.to_file_path().unwrap().to_str().unwrap().to_string();
-        let data = std::fs::read_to_string(path.clone()).expect("could not open file");
-
-        match compile_file(data, path.into()) {
-            Ok(_) => {},
-            Err(err) => {
-                let mut end_pos = err.pos.clone();
-                if err.end_pos.is_some() {
-                    end_pos = err.end_pos.unwrap();
-                }
-                result.push(Diagnostic {
-                    severity: Some(DiagnosticSeverity::ERROR),
-                    message: err.msg,
-                    range: Range {
-                        start: Position { line: err.pos.line - 1, character: err.pos.col - 1 },
-                        end: Position { line: end_pos.line - 1, character: end_pos.col - 1 }
-                    },
-                    ..Default::default()
-                });
-            }
-        }
-
-        Ok(DocumentDiagnosticReportResult::Report(DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
-            related_documents: None,
-            full_document_diagnostic_report: FullDocumentDiagnosticReport {
-                result_id: None,
-                items: result
-            }
-        })))
     }
 }
 
@@ -228,6 +350,7 @@ pub async fn run_lsp() {
     let ad = ActionDump::load();
     let (service, socket) = LspService::new(|client| Backend {
         client,
+        document_map: DashMap::new(),
 
         player_events: PlayerEvents::new(&ad),
         entity_events: EntityEvents::new(&ad),
@@ -237,7 +360,9 @@ pub async fn run_lsp() {
         game_actions: GameActions::new(&ad),
         variable_actions: VariableActions::new(&ad),
         control_actions: ControlActions::new(&ad),
-        select_actions: SelectActions::new(&ad)
+        select_actions: SelectActions::new(&ad),
+
+        game_values: GameValues::new(&ad)
     });
     Server::new(stdin, stdout, socket).serve(service).await;
 }
