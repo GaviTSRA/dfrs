@@ -145,6 +145,9 @@ impl Decompiler {
                 "func" => {
                     self.decompile_function(block, vars);
                 }
+                "process" => {
+                    self.decompile_process(block, vars);
+                }
                 "player_action" => {
                     self.decompile_action(block, ActionType::Player);
                 }
@@ -277,6 +280,14 @@ impl Decompiler {
             }
         }
         self.add(&format!("fn {}({}) {{", block.data.unwrap(), result));
+        self.indent();
+        for var in vars {
+            self.add(&var);
+        }
+    }
+
+    fn decompile_process(&mut self, block: Block, vars: Vec<String>) {
+        self.add(&format!("proc {} {{", to_dfrs_name(&block.data.unwrap())));
         self.indent();
         for var in vars {
             self.add(&var);

@@ -12,6 +12,9 @@
 			"include": "#functions"
 		},
 		{
+			"include": "#processes"
+		},
+		{
 			"include": "#repeats"
 		},
 		{
@@ -53,6 +56,17 @@
 			"patterns": [
 				{
 					"match": "(fn) ([A-z]*)",
+					"captures": {
+						"1": { "name": "keyword" },
+						"2": { "name": "support.function" }
+					}
+				}
+			]
+		},
+		"processes": {
+			"patterns": [
+				{
+					"match": "(proc) ([A-z]*)",
 					"captures": {
 						"1": { "name": "keyword" },
 						"2": { "name": "support.function" }

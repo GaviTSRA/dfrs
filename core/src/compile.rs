@@ -1,6 +1,7 @@
 use std::fmt;
 use serde::{de, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::{MapAccess, Visitor};
+use crate::node::ProcessNode;
 use crate::{node::{ActionNode, ActionType, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, FileNode, FunctionNode, RepeatNode}, token::{get_type_str, Selector}};
 
 pub fn compile(node: FileNode, debug: bool) -> Vec<CompiledLine> {
@@ -10,6 +11,22 @@ pub fn compile(node: FileNode, debug: bool) -> Vec<CompiledLine> {
             Ok(result) => {
                 res.push(CompiledLine {
                     name: format!("Function {}", function.name),
+                    code: result.clone()
+                });
+                if debug {
+                    println!("{:?}", result);
+                }
+            }
+            Err(err) => {
+                panic!("Failed to compile: {}", err)
+            }
+        }
+    }
+    for process in node.processes.clone() {
+        match process_node(process.clone()) {
+            Ok(result) => {
+                res.push(CompiledLine {
+                    name: format!("Process {}", process.name),
                     code: result.clone()
                 });
                 if debug {
@@ -139,6 +156,40 @@ fn function_node(function_node: FunctionNode) -> Result<String, serde_json::Erro
     codeline.blocks.push(function_block);
 
     for expr_node in function_node.expressions {
+        if let Some(blocks) = expression_node(expr_node.node) { 
+            for block in blocks {
+                codeline.blocks.push(block)
+            }
+        }
+    }
+
+    let res = serde_json::to_string(&codeline)?;
+
+    Ok(res)
+}
+
+fn process_node(process_node: ProcessNode) -> Result<String, serde_json::Error> {
+    let mut codeline = Codeline { blocks: vec![] };
+
+    let items = vec![
+        Arg { item: ArgItem { data: ArgValueData::Tag { action: "dynamic".into(), block: "process".into(), option: "False".into(),tag: "Is Hidden".into() }, id: "bl_tag".into() }, slot: 26 }
+    ];
+
+    let process_block = Block {
+        id: "block".to_owned(), 
+        block: Some("process".to_owned()),
+        attribute: None,
+        action: None,
+        args: Some(Args { items }),
+        target: None,
+        data: Some(process_node.name),
+        sub_action: None,
+        direct: None,
+        bracket_type: None
+    };
+    codeline.blocks.push(process_block);
+
+    for expr_node in process_node.expressions {
         if let Some(blocks) = expression_node(expr_node.node) { 
             for block in blocks {
                 codeline.blocks.push(block)

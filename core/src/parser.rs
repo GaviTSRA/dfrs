@@ -1,4 +1,4 @@
-use crate::{definitions::ArgType, node::{ActionNode, ActionType, Arg, ArgValue, ArgValueWithPos, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, ExpressionNode, FileNode, FunctionNode, FunctionParamNode, RepeatNode, VariableNode, VariableType}, token::{Keyword, Position, Selector, Token, TokenWithPos, SELECTORS, TYPES}};
+use crate::{definitions::ArgType, node::{ActionNode, ActionType, Arg, ArgValue, ArgValueWithPos, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, ExpressionNode, FileNode, FunctionNode, FunctionParamNode, ProcessNode, RepeatNode, VariableNode, VariableType}, token::{Keyword, Position, Selector, Token, TokenWithPos, SELECTORS, TYPES}};
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -71,6 +71,7 @@ impl Parser {
         let mut token = self.advance();
         let mut events: Vec<EventNode> = vec![];
         let mut functions: Vec<FunctionNode> = vec![];
+        let mut processes: Vec<ProcessNode> = vec![];
         let start_pos = Position::new(1, 0);
 
         while token.is_some() {
@@ -80,6 +81,9 @@ impl Parser {
                     match value {
                         Keyword::Function => {
                             functions.push(self.function()?);
+                        }
+                        Keyword::Process => {
+                            processes.push(self.process()?);
                         }
                         Keyword::VarGame => {
                             let node = self.variable(VariableType::Game)?;
@@ -103,7 +107,7 @@ impl Parser {
         } else {
             start_pos.clone()
         };
-        Ok(FileNode { events, functions, start_pos, end_pos })
+        Ok(FileNode { events, functions, processes, start_pos, end_pos })
     }
 
     fn event(&mut self) -> Result<EventNode, ParseError> {
@@ -287,6 +291,30 @@ impl Parser {
         }
 
         Ok(FunctionNode { name, expressions, start_pos, name_end_pos: name_token.end_pos, end_pos: token.end_pos, params })
+    }
+
+    fn process(&mut self) -> Result<ProcessNode, ParseError> {
+        let mut expressions: Vec<ExpressionNode> = vec![];
+        let start_pos = self.current_token.clone().unwrap().end_pos;
+
+        let name_token = self.advance_err()?;
+        let name = match name_token.token {
+            Token::Identifier { value } => value,
+            _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Identifier { value: String::from("<any>")}] })
+        };
+
+        self.require_token(Token::OpenParenCurly)?;
+
+        let mut token;
+        loop {
+            token = self.advance_err()?;
+            match token.token {
+                Token::CloseParenCurly => break,
+                _ => expressions.push(self.expression()?)
+            }
+        }
+
+        Ok(ProcessNode { name, expressions, start_pos, name_end_pos: name_token.end_pos, end_pos: token.end_pos })
     }
 
     fn expression(&mut self) -> Result<ExpressionNode, ParseError> {

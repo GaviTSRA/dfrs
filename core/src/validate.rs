@@ -79,6 +79,26 @@ impl Validator {
             }
         }
 
+        for process in node.processes.iter_mut() {
+            for expression in process.expressions.iter_mut() {
+                match expression.node.clone() {
+                    Expression::Action { node } => {
+                        expression.node = Expression::Action { node: self.validate_action_node(node)? };
+                    }
+                    Expression::Conditional { node } => {
+                        expression.node = Expression::Conditional { node: self.validate_conditional_node(node)? }
+                    }
+                    Expression::Call { node } => {
+                        expression.node = Expression::Call { node: self.validate_call(node)? }
+                    }
+                    Expression::Repeat { node } => {
+                        expression.node = Expression::Repeat { node: self.validate_repeat_node(node)? }
+                    }
+                    Expression::Variable { .. } => {}
+                }
+            }
+        }
+
         for event in node.events.iter_mut() {
             let mut actual_event;
             

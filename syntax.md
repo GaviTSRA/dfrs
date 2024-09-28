@@ -39,7 +39,11 @@ fn functionName(arg1*: location) {
 ```
 
 # Processes
-TODO
+Process can be created using the proc keyword:
+```
+proc functionName {
+    <expressions...>
+}
 
 ---
 # Expressions

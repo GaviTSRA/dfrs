@@ -8,6 +8,7 @@ pub trait Node {
 pub struct FileNode {
     pub events: Vec<EventNode>,
     pub functions: Vec<FunctionNode>,
+    pub processes: Vec<ProcessNode>,
     pub start_pos: Position,
     pub end_pos: Position
 }
@@ -27,6 +28,15 @@ pub struct EventNode {
 pub struct FunctionNode {
     pub name: String,
     pub params: Vec<FunctionParamNode>,
+    pub expressions: Vec<ExpressionNode>,
+    pub start_pos: Position,
+    pub name_end_pos: Position,
+    pub end_pos: Position
+}
+
+#[derive(Clone, Debug)]
+pub struct ProcessNode {
+    pub name: String,
     pub expressions: Vec<ExpressionNode>,
     pub start_pos: Position,
     pub name_end_pos: Position,
