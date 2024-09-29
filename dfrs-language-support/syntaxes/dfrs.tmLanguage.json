@@ -1,6 +1,6 @@
 {
 	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-	"name": "DiamondFire.rs",
+	"name": "dfrs",
 	"patterns": [
 		{
 			"include": "#comments"
@@ -25,6 +25,9 @@
 		},
 		{
 			"include": "#values"
+		},
+		{
+			"include": "#gamevalues"
 		},
 		{
 			"include": "#strings"
@@ -120,6 +123,18 @@
 		"values": {
 			"name": "support.class",
 			"match": "\\b(Location|Vector|Sound|Potion|Item)\\b"
+		},
+		"gamevalues": {
+			"patterns": [
+				{
+					"name": "support.function",
+					"match": "([$])([A-z]+)\\b",
+					"captures": {
+						"1": { "name": "markup.italic" },
+						"2": { "name": "markup.italic" }
+					}
+				}
+			]
 		},
 		"strings": {
 			"name": "string.quoted.double.dfrs",
