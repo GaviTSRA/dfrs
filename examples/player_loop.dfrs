@@ -1,0 +1,10 @@
+save money;
+
+proc playerMain {
+    repeat forever() {
+        p.actionBar("<green>$%var(money)");
+        c.wait();
+    }
+}
+
+// TODO: Start in join event

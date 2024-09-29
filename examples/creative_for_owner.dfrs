@@ -1,0 +1,5 @@
+@join {
+    ifp hasPermission(permission="Owner") {
+        p.creativeMode();
+    }
+}

@@ -1,0 +1,12 @@
+save playerLocations;
+
+@join {
+    line loc;
+
+    v.getDictValue(loc, playerLocations, $name);
+    p.teleport(loc);
+}
+
+@leave {
+    v.setDictValue(playerLocations, $name, $location);
+}
