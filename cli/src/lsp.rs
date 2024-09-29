@@ -4,6 +4,7 @@ use dashmap::DashMap;
 use dfrs_core::compile::compile;
 use dfrs_core::definitions::action_dump::ActionDump;
 use dfrs_core::definitions::actions::{EntityActions, GameActions, PlayerActions, VariableActions, ControlActions, SelectActions};
+use dfrs_core::definitions::conditionals::{EntityConditionals, GameConditionals, PlayerConditionals, VariableConditionals};
 use dfrs_core::definitions::game_values::GameValues;
 use dfrs_core::lexer::{Lexer, LexerError};
 use dfrs_core::load_config;
@@ -29,6 +30,11 @@ struct Backend {
     variable_actions: VariableActions,
     control_actions: ControlActions,
     select_actions: SelectActions,
+
+    player_conditionals: PlayerConditionals,
+    entity_conditionals: EntityConditionals,
+    game_conditionals: GameConditionals,
+    variable_conditionals: VariableConditionals,
 
     game_values: GameValues
 }
@@ -101,10 +107,11 @@ impl LanguageServer for Backend {
     async fn diagnostic(&self, params: DocumentDiagnosticParams) -> tower_lsp::jsonrpc::Result<DocumentDiagnosticReportResult> {
         let mut result: Vec<Diagnostic> = vec![];
 
-        let path = params.text_document.uri.to_file_path().unwrap().to_str().unwrap().to_string();
-        let data = std::fs::read_to_string(path.clone()).expect("could not open file");
+        let uri = params.text_document.uri.clone();
+        let rope = self.document_map.get(&uri.to_string()).unwrap();
+        let path = params.text_document.uri.to_file_path().unwrap();
 
-        match compile_file(data, path.into()) {
+        match compile_file(rope.to_string(), path) {
             Ok(_) => {},
             Err(err) => {
                 let mut end_pos = err.pos.clone();
@@ -138,63 +145,6 @@ impl Backend {
         let rope = ropey::Rope::from_str(&params.text);
         self.document_map
             .insert(params.uri.to_string(), rope.clone());
-        // let ParserResult {
-        //     ast,
-        //     parse_errors,
-        //     semantic_tokens,
-        // } = parse(&params.text);
-        // let diagnostics = parse_errors
-        //     .into_iter()
-        //     .filter_map(|item| {
-        //         let (message, span) = match item.reason() {
-        //             chumsky::error::SimpleReason::Unclosed { span, delimiter } => {
-        //                 (format!("Unclosed delimiter {}", delimiter), span.clone())
-        //             }
-        //             chumsky::error::SimpleReason::Unexpected => (
-        //                 format!(
-        //                     "{}, expected {}",
-        //                     if item.found().is_some() {
-        //                         "Unexpected token in input"
-        //                     } else {
-        //                         "Unexpected end of input"
-        //                     },
-        //                     if item.expected().len() == 0 {
-        //                         "something else".to_string()
-        //                     } else {
-        //                         item.expected()
-        //                             .map(|expected| match expected {
-        //                                 Some(expected) => expected.to_string(),
-        //                                 None => "end of input".to_string(),
-        //                             })
-        //                             .collect::<Vec<_>>()
-        //                             .join(", ")
-        //                     }
-        //                 ),
-        //                 item.span(),
-        //             ),
-        //             chumsky::error::SimpleReason::Custom(msg) => (msg.to_string(), item.span()),
-        //         };
-
-        //         || -> Option<Diagnostic> {
-        //             // let start_line = rope.try_char_to_line(span.start)?;
-        //             // let first_char = rope.try_line_to_char(start_line)?;
-        //             // let start_column = span.start - first_char;
-        //             let start_position = offset_to_position(span.start, &rope)?;
-        //             let end_position = offset_to_position(span.end, &rope)?;
-        //             // let end_line = rope.try_char_to_line(span.end)?;
-        //             // let first_char = rope.try_line_to_char(end_line)?;
-        //             // let end_column = span.end - first_char;
-        //             Some(Diagnostic::new_simple(
-        //                 Range::new(start_position, end_position),
-        //                 message,
-        //             ))
-        //         }()
-        //     })
-        //     .collect::<Vec<_>>();
-
-        // self.client
-        //     .publish_diagnostics(params.uri.clone(), diagnostics, Some(params.version))
-        //     .await;
     }
 
     async fn get_completions(&self, uri: String, line: u32, col: u32) -> tower_lsp::jsonrpc::Result<Option<CompletionResponse>> {
@@ -218,16 +168,16 @@ impl Backend {
                 let mut is_variable_action = false;
                 let mut is_control_action = false;
                 let mut is_select_action = false;
+                let mut is_player_conditional = false;
+                let mut is_entity_conditional = false;
+                let mut is_game_conditional = false;
+                let mut is_variable_conditional = false;
                 let mut is_game_value = false;
 
                 let mut previous = String::from("");
                 match &token.token {
-                    Token::At => {
-                        is_event = true;
-                    }
-                    Token::Dollar => {
-                        is_game_value = true;
-                    }
+                    Token::At => is_event = true,
+                    Token::Dollar => is_game_value = true,
                     Token::Dot => {
                         match last_token.clone() {
                             Some(last) => {
@@ -256,19 +206,31 @@ impl Backend {
                         Token::At => {
                             is_event = true;
                             match token.token.clone() {
-                                Token::Identifier { value } => {
-                                    previous += &value;
-                                }
+                                Token::Identifier { value } => previous += &value,
                                 _ => {}
                             }
                         }
                         Token::Dollar => {
                             is_game_value = true;
                             match token.token.clone() {
-                                Token::Identifier { value } => {
-                                    previous += &value;
-                                }
+                                Token::Identifier { value } => previous += &value,
                                 _ => {}
+                            }
+                        }
+                        Token::Keyword { value } => {
+                            let mut found = true;
+                            match value {
+                                Keyword::IfP => is_player_conditional = true,
+                                Keyword::IfE => is_entity_conditional = true,
+                                Keyword::IfG => is_game_conditional = true,
+                                Keyword::IfV => is_variable_conditional = true,
+                                _ => found = false
+                            }
+                            if found {
+                                match token.token.clone() {
+                                    Token::Identifier { value } => previous += &value,
+                                    _ => {}
+                                }
                             }
                         }
                         _ => {}
@@ -311,6 +273,20 @@ impl Backend {
                 if is_select_action {
                     all = Some(self.select_actions.all());
                 }
+                if is_player_conditional {
+                    all = Some(self.player_conditionals.all());
+                }
+                if is_entity_conditional {
+                    all = Some(self.entity_conditionals.all());
+                }
+                if is_game_conditional {
+                    all = Some(self.game_conditionals.all());
+                }
+                if is_variable_conditional {
+                    all = Some(self.variable_conditionals.all());
+                }
+
+                self.client.log_message(MessageType::INFO, format!("ev {} pa {} ea {} ga {} va {} pc {} ec {} gc {} vc {} vl {}", is_event, is_player_action, is_entity_action, is_game_action, is_variable_action, is_player_conditional, is_entity_conditional, is_game_conditional, is_variable_conditional, is_game_value)).await;
 
                 if all.is_some() {
                     let mut actions = vec![];
@@ -361,6 +337,11 @@ pub async fn run_lsp() {
         variable_actions: VariableActions::new(&ad),
         control_actions: ControlActions::new(&ad),
         select_actions: SelectActions::new(&ad),
+
+        player_conditionals: PlayerConditionals::new(&ad),
+        entity_conditionals: EntityConditionals::new(&ad), 
+        game_conditionals: GameConditionals::new(&ad),
+        variable_conditionals: VariableConditionals::new(&ad),
 
         game_values: GameValues::new(&ad)
     });
