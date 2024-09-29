@@ -1,20 +1,20 @@
 use std::path::PathBuf;
 
 use dashmap::DashMap;
-use dfrs_core::compile::compile;
-use dfrs_core::definitions::action_dump::ActionDump;
-use dfrs_core::definitions::actions::{EntityActions, GameActions, PlayerActions, VariableActions, ControlActions, SelectActions};
-use dfrs_core::definitions::conditionals::{EntityConditionals, GameConditionals, PlayerConditionals, VariableConditionals};
-use dfrs_core::definitions::game_values::GameValues;
-use dfrs_core::lexer::{Lexer, LexerError};
-use dfrs_core::load_config;
-use dfrs_core::parser::{ParseError, Parser};
-use dfrs_core::token::{Keyword, Token};
-use dfrs_core::validate::{ValidateError, Validator};
+use crate::compile::compile;
+use crate::definitions::action_dump::ActionDump;
+use crate::definitions::actions::{EntityActions, GameActions, PlayerActions, VariableActions, ControlActions, SelectActions};
+use crate::definitions::conditionals::{EntityConditionals, GameConditionals, PlayerConditionals, VariableConditionals};
+use crate::definitions::game_values::GameValues;
+use crate::lexer::{Lexer, LexerError};
+use crate::load_config;
+use crate::parser::{ParseError, Parser};
+use crate::token::{Keyword, Token};
+use crate::validate::{ValidateError, Validator};
 use ropey::Rope;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
-use dfrs_core::definitions::events::{EntityEvents, PlayerEvents};
+use crate::definitions::events::{EntityEvents, PlayerEvents};
 
 #[derive(Debug)]
 struct Backend {
@@ -158,7 +158,7 @@ impl Backend {
             Err(_) => return Ok(None)
         };
 
-        let mut last_token: Option<dfrs_core::token::TokenWithPos> = None;
+        let mut last_token: Option<crate::token::TokenWithPos> = None;
         for token in tokens {
             if token.start_pos.line == line && token.start_pos.col <= col && token.end_pos.col >= col {
                 let mut is_event = false;
@@ -349,13 +349,13 @@ pub async fn run_lsp() {
 }
 
 struct CompileErr {
-    pub pos: dfrs_core::token::Position,
-    pub end_pos: Option<dfrs_core::token::Position>,
+    pub pos: crate::token::Position,
+    pub end_pos: Option<crate::token::Position>,
     pub msg: String
 }
 
 impl CompileErr {
-    pub fn new(pos: dfrs_core::token::Position, end_pos: Option<dfrs_core::token::Position>, msg: String) -> CompileErr {
+    pub fn new(pos: crate::token::Position, end_pos: Option<crate::token::Position>, msg: String) -> CompileErr {
         CompileErr { pos, end_pos, msg }
     }
 }
@@ -365,7 +365,7 @@ fn compile_file(data: String, path: PathBuf) -> Result<(), CompileErr> {
     config_path.set_file_name("dfrs.toml");
     let config = match load_config(&config_path) {
         Ok(res) => res,
-        Err(_) => return Err(CompileErr::new(dfrs_core::token::Position::new(0, 0), None, "No config file found".into()))
+        Err(_) => return Err(CompileErr::new(crate::token::Position::new(0, 0), None, "No config file found".into()))
     };
 
     let mut lexer = Lexer::new(data.clone());

@@ -2,20 +2,45 @@ use std::{cmp, fs};
 use std::path::PathBuf;
 
 use clap::{Parser as _, Subcommand};
-use dfrs_core::config::Config;
-use dfrs_core::send::send;
-use dfrs_core::token::Position;
-use dfrs_core::compile::compile;
-use dfrs_core::lexer::{Lexer, LexerError};
-use dfrs_core::load_config;
-use dfrs_core::parser::{ParseError, Parser};
-use dfrs_core::validate::{Validator, ValidateError};
+use crate::config::Config;
+use crate::send::send;
+use crate::token::Position;
+use crate::compile::compile;
+use crate::lexer::{Lexer, LexerError};
+use crate::parser::{ParseError, Parser};
+use crate::validate::{Validator, ValidateError};
 use lsp::run_lsp;
 
 use colored::Colorize;
-use dfrs_core::decompile::Decompiler;
+use crate::decompile::Decompiler;
 
 mod lsp;
+pub mod config;
+pub mod token;
+pub mod lexer;
+pub mod node;
+pub mod parser;
+pub mod validate;
+pub mod compile;
+pub mod send;
+pub mod definitions;
+pub mod utility;
+pub mod decompile;
+
+pub struct ConfigFileNotFoundError {}
+
+pub fn load_config(file: &PathBuf) -> Result<Config, ConfigFileNotFoundError> {
+    let data = if !file.exists() {
+        return Err(ConfigFileNotFoundError {})
+    } else {
+        std::fs::read_to_string(file).expect("No config file")
+    };
+
+    match toml::from_str(&data) {
+        Ok(res) => Ok(res),
+        Err(err) => panic!("Failed to parse config: {}", err)
+    }
+}
 
 fn print_err(message: String, data: String, start_pos: Position, end_pos: Option<Position>) {
     let lines = data.split("\n").collect::<Vec<&str>>();
@@ -102,19 +127,19 @@ fn compile_cmd(file: &PathBuf) {
                     println!("{}", event.event);
                     for expression in &event.expressions {
                         match &expression.node {
-                            dfrs_core::node::Expression::Action { node } => {
+                            node::Expression::Action { node } => {
                                 println!("{:?} {:?} {:?} {:?}", node.action_type, node.selector, node.name, node.args)
                             } 
-                            dfrs_core::node::Expression::Conditional { node } => {
+                            node::Expression::Conditional { node } => {
                                 println!("{:?} {:?} {:?} {:?}", node.conditional_type, node.selector, node.name, node.args)
                             },
-                            dfrs_core::node::Expression::Call { node } => {
+                            node::Expression::Call { node } => {
                                 println!("{:?} {:?}", node.name, node.args)
                             }
-                            dfrs_core::node::Expression::Repeat { node } => {
+                            node::Expression::Repeat { node } => {
                                 println!("{:?} {:?}", node.name, node.args)
                             },
-                            dfrs_core::node::Expression::Variable { node } => {
+                            node::Expression::Variable { node } => {
                                 println!("{:?} {:?} {:?}", node.var_type, node.dfrs_name, node.df_name)
                             },
                             
@@ -129,19 +154,19 @@ fn compile_cmd(file: &PathBuf) {
                     }
                     for expression in &function.expressions {
                         match &expression.node {
-                            dfrs_core::node::Expression::Action { node } => {
+                            node::Expression::Action { node } => {
                                 println!("{:?} {:?} {:?} {:?}", node.action_type, node.selector, node.name, node.args)
                             }
-                            dfrs_core::node::Expression::Conditional { node } => {
+                            node::Expression::Conditional { node } => {
                                 println!("{:?} {:?} {:?} {:?}", node.conditional_type, node.selector, node.name, node.args)
                             }
-                            dfrs_core::node::Expression::Call { node } => {
+                            node::Expression::Call { node } => {
                                 println!("{:?} {:?}", node.name, node.args)
                             }
-                            dfrs_core::node::Expression::Repeat { node } => {
+                            node::Expression::Repeat { node } => {
                                 println!("{:?} {:?}", node.name, node.args)
                             },
-                            dfrs_core::node::Expression::Variable { node } => {
+                            node::Expression::Variable { node } => {
                                 println!("{:?} {:?} {:?}", node.var_type, node.dfrs_name, node.df_name)
                             },
                             
@@ -288,7 +313,6 @@ fn main() {
                     }
                 }
             } else {
-                println!("f");
                 compile_cmd(path);
             }
         }
