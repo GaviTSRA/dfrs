@@ -65,6 +65,7 @@ pub enum Expression {
     Conditional { node: ConditionalNode },
     Variable { node: VariableNode },
     Call { node: CallNode },
+    Start { node: StartNode },
     Repeat { node: RepeatNode }
 }
 
@@ -97,6 +98,14 @@ pub struct ConditionalNode {
 
 #[derive(Clone, Debug)]
 pub struct CallNode {
+    pub name: String,
+    pub args: Vec<Arg>,
+    pub start_pos: Position,
+    pub end_pos: Position
+}
+
+#[derive(Clone, Debug)]
+pub struct StartNode {
     pub name: String,
     pub args: Vec<Arg>,
     pub start_pos: Position,

@@ -1,6 +1,8 @@
 use crate::{definitions::{action_dump::{Action, ActionDump}, actions::{ControlActions, EntityActions, GameActions, PlayerActions, SelectActions, VariableActions}, conditionals::{EntityConditionals, GameConditionals, PlayerConditionals, VariableConditionals}, repeats::Repeats, ArgType, DefinedArg}, node::{ActionNode, ActionType, Arg, ArgValue, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, FileNode, RepeatNode}, token::Position};
+use crate::definitions::actions::get_start_process_action;
 use crate::definitions::events::{EntityEvents, PlayerEvents};
 use crate::definitions::game_values::GameValues;
+use crate::node::{ExpressionNode, StartNode};
 
 pub enum ValidateError {
     UnknownEvent { node: EventNode },
@@ -23,6 +25,7 @@ pub struct Validator {
     variable_actions: VariableActions,
     control_actions: ControlActions,
     select_actions: SelectActions,
+    start_process_action: Action,
 
     player_conditionals: PlayerConditionals,
     entity_conditionals: EntityConditionals,
@@ -47,6 +50,7 @@ impl Validator {
             variable_actions: VariableActions::new(&action_dump),
             control_actions: ControlActions::new(&action_dump),
             select_actions: SelectActions::new(&action_dump),
+            start_process_action: get_start_process_action(&action_dump),
 
             player_conditionals: PlayerConditionals::new(&action_dump),
             entity_conditionals: EntityConditionals::new(&action_dump),
@@ -61,41 +65,13 @@ impl Validator {
     pub fn validate(&self, mut node: FileNode) -> Result<FileNode, ValidateError> {
         for function in node.functions.iter_mut() {
             for expression in function.expressions.iter_mut() {
-                match expression.node.clone() {
-                    Expression::Action { node } => {
-                        expression.node = Expression::Action { node: self.validate_action_node(node)? };
-                    }
-                    Expression::Conditional { node } => {
-                        expression.node = Expression::Conditional { node: self.validate_conditional_node(node)? }
-                    }
-                    Expression::Call { node } => {
-                        expression.node = Expression::Call { node: self.validate_call(node)? }
-                    }
-                    Expression::Repeat { node } => {
-                        expression.node = Expression::Repeat { node: self.validate_repeat_node(node)? }
-                    }
-                    Expression::Variable { .. } => {}
-                }
+                self.validate_expression_node(expression)?;
             }
         }
 
         for process in node.processes.iter_mut() {
             for expression in process.expressions.iter_mut() {
-                match expression.node.clone() {
-                    Expression::Action { node } => {
-                        expression.node = Expression::Action { node: self.validate_action_node(node)? };
-                    }
-                    Expression::Conditional { node } => {
-                        expression.node = Expression::Conditional { node: self.validate_conditional_node(node)? }
-                    }
-                    Expression::Call { node } => {
-                        expression.node = Expression::Call { node: self.validate_call(node)? }
-                    }
-                    Expression::Repeat { node } => {
-                        expression.node = Expression::Repeat { node: self.validate_repeat_node(node)? }
-                    }
-                    Expression::Variable { .. } => {}
-                }
+                self.validate_expression_node(expression)?;
             }
         }
 
@@ -123,25 +99,33 @@ impl Validator {
             }
 
             for expression in event.expressions.iter_mut() {
-                match expression.node.clone() {
-                    Expression::Action { node } => {
-                        expression.node = Expression::Action { node: self.validate_action_node(node)? };
-                    }
-                    Expression::Conditional { node } => {
-                        expression.node = Expression::Conditional { node: self.validate_conditional_node(node)? }
-                    }
-                    Expression::Call { node } => {
-                        expression.node = Expression::Call { node: self.validate_call(node)? }
-                    }
-                    Expression::Repeat { node } => {
-                        expression.node = Expression::Repeat { node: self.validate_repeat_node(node)? }
-                    }
-                    Expression::Variable { .. } => {}
-                }
+                self.validate_expression_node(expression)?
             }
         }
 
         Ok(node)
+    }
+
+    fn validate_expression_node(&self, mut expression_node: &mut ExpressionNode) -> Result<(), ValidateError> {
+        match expression_node.node.clone() {
+            Expression::Action { node } => {
+                expression_node.node = Expression::Action { node: self.validate_action_node(node)? };
+            }
+            Expression::Conditional { node } => {
+                expression_node.node = Expression::Conditional { node: self.validate_conditional_node(node)? }
+            }
+            Expression::Call { node } => {
+                expression_node.node = Expression::Call { node: self.validate_call(node)? }
+            }
+            Expression::Start { node } => {
+                expression_node.node = Expression::Start { node: self.validate_start(node)? }
+            }
+            Expression::Repeat { node } => {
+                expression_node.node = Expression::Repeat { node: self.validate_repeat_node(node)? }
+            }
+            Expression::Variable { .. } => {}
+        }
+        Ok(())
     }
 
     fn validate_action_node(&self, mut action_node: ActionNode) -> Result<ActionNode, ValidateError> {
@@ -240,39 +224,11 @@ impl Validator {
         };
 
         for expression in conditional_node.expressions.iter_mut() {
-            match expression.node.clone() {
-                Expression::Action { node } => {
-                    expression.node = Expression::Action { node: self.validate_action_node(node)? };
-                }
-                Expression::Conditional { node } => {
-                    expression.node = Expression::Conditional { node: self.validate_conditional_node(node)? }
-                }
-                Expression::Call { node } => {
-                    expression.node = Expression::Call { node: self.validate_call(node)? }
-                }
-                Expression::Repeat { node } => {
-                    expression.node = Expression::Repeat { node: self.validate_repeat_node(node)? }
-                }
-                Expression::Variable { .. } => {}
-            }
+            self.validate_expression_node(expression)?;
         }
 
         for expression in conditional_node.else_expressions.iter_mut() {
-            match expression.node.clone() {
-                Expression::Action { node } => {
-                    expression.node = Expression::Action { node: self.validate_action_node(node)? };
-                }
-                Expression::Conditional { node } => {
-                    expression.node = Expression::Conditional { node: self.validate_conditional_node(node)? }
-                }
-                Expression::Call { node } => {
-                    expression.node = Expression::Call { node: self.validate_call(node)? }
-                }
-                Expression::Repeat { node } => {
-                    expression.node = Expression::Repeat { node: self.validate_repeat_node(node)? }
-                }
-                Expression::Variable { .. } => {}
-            }
+            self.validate_expression_node(expression)?;
         }
 
         Ok(conditional_node)
@@ -304,6 +260,11 @@ impl Validator {
         };
         call_node.args = self.validate_args(call_node.args, &action, call_node.start_pos.clone(), call_node.end_pos.clone())?;
         Ok(call_node)
+    }
+
+    fn validate_start(&self, mut start_node: StartNode) -> Result<StartNode, ValidateError> {
+        start_node.args = self.validate_args(start_node.args, &self.start_process_action, start_node.start_pos.clone(), start_node.end_pos.clone())?;
+        Ok(start_node)
     }
 
     fn validate_repeat_node(&self, mut repeat_node: RepeatNode) -> Result<RepeatNode, ValidateError> {
@@ -351,21 +312,7 @@ impl Validator {
         }
 
         for expression in repeat_node.expressions.iter_mut() {
-            match expression.node.clone() {
-                Expression::Action { node } => {
-                    expression.node = Expression::Action { node: self.validate_action_node(node)? };
-                }
-                Expression::Conditional { node } => {
-                    expression.node = Expression::Conditional { node: self.validate_conditional_node(node)? }
-                }
-                Expression::Call { node } => {
-                    expression.node = Expression::Call { node: self.validate_call(node)? }
-                }
-                Expression::Repeat { node }  => {
-                    expression.node = Expression::Repeat { node: self.validate_repeat_node(node)? }
-                }
-                Expression::Variable { .. } => {}
-            }
+            self.validate_expression_node(expression)?;
         }
 
         Ok(repeat_node)

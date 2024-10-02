@@ -115,6 +115,11 @@ Functions can also be called:
 ```
 call("functionName", arg1, arg2, ...);
 ```
+## Starting processes
+Processes can be started as follows:
+```
+start("processName", localVariables="Copy", targetMode="With no targets");
+```
 ---
 # Values
 ## Text

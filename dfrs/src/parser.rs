@@ -1,4 +1,5 @@
 use crate::{definitions::ArgType, node::{ActionNode, ActionType, Arg, ArgValue, ArgValueWithPos, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, ExpressionNode, FileNode, FunctionNode, FunctionParamNode, ProcessNode, RepeatNode, VariableNode, VariableType}, token::{Keyword, Position, Selector, Token, TokenWithPos, SELECTORS, TYPES}};
+use crate::node::StartNode;
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -391,6 +392,11 @@ impl Parser {
                         end_pos = res.end_pos.clone();
                         node = Expression::Call { node: res }
                     }
+                    Keyword::Start => {
+                        let res = self.start()?;
+                        end_pos = res.end_pos.clone();
+                        node = Expression::Start { node: res }
+                    }
                     Keyword::Repeat => {
                         let res = self.repeat()?;
                         end_pos = res.end_pos.clone();
@@ -566,6 +572,33 @@ impl Parser {
         let end_pos = self.current_token.clone().unwrap().end_pos;
 
         Ok(CallNode {
+            name,
+            args,
+            start_pos,
+            end_pos,
+        })
+    }
+
+    fn start(&mut self) -> Result<StartNode, ParseError> {
+        let start_pos = self.current_token.clone().unwrap().start_pos;
+        let mut args = self.make_args()?;
+
+        if args.is_empty() {
+            return Err(ParseError::InvalidCall { pos: start_pos, msg: "Missing process name".into() })
+        }
+        let name_arg = args.remove(0);
+        let name = match name_arg.value {
+            ArgValue::Text { text } => text,
+            _ => return Err(ParseError::InvalidCall { pos: start_pos, msg: "Invalid process name param type".into() })
+        };
+        for arg in args.iter_mut() {
+            arg.index -= 1;
+        }
+        self.require_token(Token::Semicolon)?;
+
+        let end_pos = self.current_token.clone().unwrap().end_pos;
+
+        Ok(StartNode {
             name,
             args,
             start_pos,

@@ -120,3 +120,15 @@ impl SelectActions {
         &self.select_actions
     }
 }
+
+pub fn get_start_process_action(action_dump: &ActionDump) -> Action {
+    let actions  = get_actions(&action_dump, "START PROCESS");
+    let action = actions.get(0).unwrap();
+    Action {
+        args: action.args.clone(),
+        df_name: action.df_name.clone(),
+        dfrs_name: action.dfrs_name.clone(),
+        tags: action.tags.clone(),
+        has_conditional_arg: action.has_conditional_arg.clone()
+    }
+}

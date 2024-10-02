@@ -1,7 +1,7 @@
 use std::fmt;
 use serde::{de, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::{MapAccess, Visitor};
-use crate::node::ProcessNode;
+use crate::node::{ProcessNode, StartNode};
 use crate::{node::{ActionNode, ActionType, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, FileNode, FunctionNode, RepeatNode}, token::{get_type_str, Selector}};
 
 pub fn compile(node: FileNode, debug: bool) -> Vec<CompiledLine> {
@@ -207,6 +207,7 @@ fn expression_node(node: Expression) -> Option<Vec<Block>> {
         Expression::Action { node } => Some(vec![action_node(node)]),
         Expression::Conditional { node } => Some(conditional_node(node)),
         Expression::Call { node } => Some(vec![call_node(node)]),
+        Expression::Start { node } => Some(vec![start_node(node)]),
         Expression::Repeat { node } => Some(repeat_node(node)),
         Expression::Variable { .. } => None,
     }
@@ -353,6 +354,31 @@ fn call_node(node: CallNode) -> Block {
     Block {
         id: "block".into(),
         block: Some("call_func".into()),
+        args: Some(Args { items: args }),
+        action: None,
+        target: None,
+        data: Some(node.name),
+        attribute: None,
+        direct: None,
+        sub_action: None,
+        bracket_type: None,
+    }
+}
+
+fn start_node(node: StartNode) -> Block {
+    let mut args: Vec<Arg> = vec![];
+
+    for arg in node.args {
+        let arg = match arg_val_from_arg(arg, "dynamic".into(), "start_process".to_owned()) {
+            Some(res) => res,
+            None => continue
+        };
+        args.push(arg);
+    }
+
+    Block {
+        id: "block".into(),
+        block: Some("start_process".into()),
         args: Some(Args { items: args }),
         action: None,
         target: None,

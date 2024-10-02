@@ -187,6 +187,9 @@ impl Decompiler {
                 "call_func" => {
                     self.decompile_call(block);
                 }
+                "start_process" => {
+                    self.decompile_start(block);
+                }
                 other => {
                     println!("WARN: Unhandled block block {other}")
                 }
@@ -287,7 +290,7 @@ impl Decompiler {
     }
 
     fn decompile_process(&mut self, block: Block, vars: Vec<String>) {
-        self.add(&format!("proc {} {{", to_dfrs_name(&block.data.unwrap())));
+        self.add(&format!("proc {} {{", &block.data.unwrap()));
         self.indent();
         for var in vars {
             self.add(&var);
@@ -332,6 +335,10 @@ impl Decompiler {
 
     fn decompile_call(&self, block: Block) {
         self.add(&format!("call(\"{}\", {});", to_dfrs_name(&block.data.clone().unwrap()), self.decompile_params(block)));
+    }
+
+    fn decompile_start(&self, block: Block) {
+        self.add(&format!("start(\"{}\", {});", to_dfrs_name(&block.data.clone().unwrap()), self.decompile_params(block)));
     }
 
     fn decompile_params(&self, block: Block) -> String {
