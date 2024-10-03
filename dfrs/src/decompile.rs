@@ -1,9 +1,11 @@
+use std::collections::HashMap;
 use std::io::{Cursor, Read};
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use flate2::read::GzDecoder;
 use crate::compile::{ArgValueData, Block, Codeline, FunctionDefaultItemData};
-use crate::definitions::action_dump::{ActionDump, RawActionDump};
+use crate::definitions::action_dump::{Action, ActionDump, RawActionDump};
+use crate::definitions::{ArgType, DefinedArg};
 use crate::node::{ActionType, ConditionalType};
 use crate::token::{Selector, SELECTORS};
 use crate::utility::{to_camel_case, to_dfrs_name};
@@ -27,7 +29,8 @@ fn decompress(compressed_code: &str) -> String {
 
 pub struct Decompiler {
     indentation: i32,
-    action_dump: ActionDump
+    action_dump: ActionDump,
+    vars: HashMap<String, String>,
 }
 
 impl Decompiler {
@@ -35,7 +38,8 @@ impl Decompiler {
         let ad = RawActionDump::load();
         Decompiler {
             indentation: 0,
-            action_dump: ActionDump::new(&ad)
+            action_dump: ActionDump::new(&ad),
+            vars: HashMap::new(),
         }
     }
 
@@ -52,9 +56,14 @@ impl Decompiler {
         self.indentation -= 1;
     }
 
+    fn set_var(&mut self, old_name: &str, new_name: &str) {
+        self.vars.insert(old_name.to_string(), new_name.to_string());
+    }
+
     pub fn decompile(&mut self, code: &str) {
         let json = decompress(code);
         let line: Codeline = serde_json::from_str(&json).unwrap();
+        let mut global_vars = vec![];
         let mut vars = vec![];
 
         for block in &line.blocks {
@@ -62,11 +71,19 @@ impl Decompiler {
                 for arg in &args.items {
                     match &arg.item.data {
                         ArgValueData::Variable { name, scope} => {
+                            let new_name = name.replace("-", "_").replace("%", "").replace(" ", "_").replace("(", "_").replace(")", "");
+                            let var = if &new_name != name {
+                                self.set_var(name, &new_name);
+                                format!("{} = `{name}`", new_name)
+                            } else {
+                                self.set_var(name, name);
+                                name.to_string()
+                            };
                             match scope.as_str() {
-                                "unsaved" => println!("save {name};"),
-                                "saved" => println!("save {name};"),
-                                "local" => vars.push(format!("local {name} = `{name}`;")),
-                                "line" => vars.push(format!("line {name} = `{name}`;")),
+                                "unsaved" => global_vars.push(format!("game {var};")),
+                                "saved" => global_vars.push(format!("save {var};")),
+                                "local" => vars.push(format!("local {var};")),
+                                "line" => vars.push(format!("line {var};")),
                                 err => println!("ERR: Unknown var type {err}")
                             }
                         }
@@ -74,6 +91,12 @@ impl Decompiler {
                     }
                 }
             }
+        }
+
+        global_vars.sort();
+        global_vars.dedup();
+        for var in global_vars {
+            self.add(&var);
         }
 
         vars.sort();
@@ -251,6 +274,7 @@ impl Decompiler {
                     }
                     ArgValueData::Id { .. } => {}
                     ArgValueData::Tag { .. } => {}
+                    ArgValueData::Item { .. } => {}
                     other => panic!("Found {other:?}")
                 }
             }
@@ -271,6 +295,15 @@ impl Decompiler {
     }
 
     fn decompile_action(&self, block: Block, action_type: ActionType) {
+        let name = to_dfrs_name(&block.action.clone().unwrap());
+        let action = match action_type {
+            ActionType::Player => self.action_dump.player_actions.get(name.clone()),
+            ActionType::Entity => self.action_dump.entity_actions.get(name.clone()),
+            ActionType::Game => self.action_dump.game_actions.get(name.clone()),
+            ActionType::Variable => self.action_dump.variable_actions.get(name.clone()),
+            ActionType::Control => self.action_dump.control_actions.get(name.clone()),
+            ActionType::Select => self.action_dump.select_actions.get(name.clone()),
+        }.unwrap();
         let prefix = match action_type {
             ActionType::Player => "p",
             ActionType::Entity => "e",
@@ -283,12 +316,17 @@ impl Decompiler {
             Some(res) => &format!(":{}", SELECTORS.entries().find(|e| e.1 == &res).unwrap().0),
             None => ""
         };
-        self.add(&format!("{prefix}{selector}.{}({});", to_dfrs_name(&block.action.clone().unwrap()).replace("+=", "addDirect").replace("-=", "subDirect")
-            .replace('+', "add").replace('-', "sub")
-            .replace('%', "mod").replace('/', "div").replace('=', "equal"), self.decompile_params(block)))
+        self.add(&format!("{prefix}{selector}.{}({});", name, self.decompile_params(block, action)))
     }
 
     fn decompile_conditional(&self, block: Block, conditional_type: ConditionalType) {
+        let name = to_dfrs_name(&block.action.clone().unwrap());
+        let action = match conditional_type {
+            ConditionalType::Player => self.action_dump.player_conditionals.get(name.clone()),
+            ConditionalType::Entity => self.action_dump.entity_conditionals.get(name.clone()),
+            ConditionalType::Game => self.action_dump.game_conditionals.get(name.clone()),
+            ConditionalType::Variable =>self.action_dump.variable_conditionals.get(name.clone())
+        }.unwrap();
         let prefix = match conditional_type {
             ConditionalType::Player => "ifp",
             ConditionalType::Entity => "ife",
@@ -299,30 +337,68 @@ impl Decompiler {
             Some(res) => &format!("{}:", SELECTORS.entries().find(|e| e.1 == &res).unwrap().0),
             None => ""
         };
-        self.add(&format!("{prefix} {selector}{}({}) {{", to_dfrs_name(&block.action.clone().unwrap()).replace('=', "equal"), self.decompile_params(block)))
+        let inverted = if block.attribute.is_some() && block.attribute.clone().unwrap() == "NOT".to_string() {
+            "!"
+        } else {
+            ""
+        };
+        self.add(&format!("{prefix} {inverted}{selector}{}({}) {{", name, self.decompile_params(block, action)))
     }
 
     fn decompile_repeat(&self, block: Block) {
-        self.add(&format!("repeat {}({}) {{", to_dfrs_name(&block.action.clone().unwrap()), self.decompile_params(block)))
+        let name = to_dfrs_name(&block.action.clone().unwrap());
+        let action = self.action_dump.repeats.get(name.clone()).unwrap();
+        self.add(&format!("repeat {}({}) {{", name, self.decompile_params(block, action)))
     }
 
     fn decompile_call(&self, block: Block) {
-        self.add(&format!("call(\"{}\", {});", to_dfrs_name(&block.data.clone().unwrap()), self.decompile_params(block)));
+        let mut args = vec![];
+        for _ in &block.args {
+            args.push(DefinedArg {
+                arg_types: vec![ArgType::ANY],
+                name: "".into(),
+                allow_multiple: false,
+                optional: false,
+            })
+        }
+        let action = &Action {
+            df_name: "internal".into(),
+            dfrs_name: "internal".into(),
+            args,
+            tags: vec![],
+            has_conditional_arg: false
+        };
+        if block.args.iter().len() > 1 {
+            self.add(&format!("call(\"{}\", {});", to_dfrs_name(&block.data.clone().unwrap()), self.decompile_params(block, action)));
+        } else {
+            self.add(&format!("call(\"{}\");", to_dfrs_name(&block.data.clone().unwrap())));
+        }
     }
 
     fn decompile_start(&self, block: Block) {
-        self.add(&format!("start(\"{}\", {});", to_dfrs_name(&block.data.clone().unwrap()), self.decompile_params(block)));
+        let params = self.decompile_params(block.clone(), &self.action_dump.start_process_action);
+        if &params == "" {
+            self.add(&format!("start(\"{}\");", to_dfrs_name(&block.data.clone().unwrap())));
+        } else {
+            self.add(&format!("start(\"{}\", {});", to_dfrs_name(&block.data.clone().unwrap()), params));
+        }
+
     }
 
-    fn decompile_params(&self, block: Block) -> String {
+    fn decompile_params(&self, block: Block, action: &Action) -> String {
         let mut result = String::from("");
         if let Some(args) = block.args {
             let mut is_first_iter = true;
             for arg in args.items {
-                if !is_first_iter {
-                    result.push_str(", ");
-                } else {
-                    is_first_iter = false;
+                match arg.item.data {
+                    ArgValueData::Tag { .. } => {}
+                    _ => {
+                        if !is_first_iter {
+                            result.push_str(", ");
+                        } else {
+                            is_first_iter = false;
+                        }
+                    }
                 }
                 match arg.item.data {
                     ArgValueData::Simple { name } => {
@@ -357,7 +433,7 @@ impl Decompiler {
                         };
                         result.push_str(&format!("${selector}{}", to_dfrs_name(&game_value)))
                     }
-                    ArgValueData::Variable { name, .. } => result.push_str(&format!("{name}")),
+                    ArgValueData::Variable { name, .. } => result.push_str(&format!("{}", self.vars.get(&name).unwrap())),
                     ArgValueData::Location { loc, .. } => {
                         let mut res_loc = format!("Location({}, {}, {}", loc.x, loc.y, loc.z);
                         if let Some(pitch) = loc.pitch {
@@ -379,7 +455,19 @@ impl Decompiler {
                         result.push_str(&format!("Potion(\"{potion}\", {amplifier}, {duration})"));
                     }
                     ArgValueData::Tag { tag, option, .. } => {
-                        result.push_str(&format!("{}=\"{option}\"", to_camel_case(&tag)));
+                        for action_tag in &action.tags {
+                            if &action_tag.df_name == &tag {
+                                if &option != &action_tag.default {
+                                    if !is_first_iter {
+                                        result.push_str(", ");
+                                    } else {
+                                        is_first_iter = false;
+                                    }
+                                    result.push_str(&format!("{}=\"{option}\"", to_camel_case(&tag)));
+                                }
+                                break;
+                            }
+                        }
                     }
                     ArgValueData::FunctionParam { .. } => {}
                 }

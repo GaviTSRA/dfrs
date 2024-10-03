@@ -605,7 +605,7 @@ pub struct Codeline {
     pub blocks: Vec<Block>
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Block {
     pub id: String,
 
@@ -630,24 +630,24 @@ pub struct Block {
     pub bracket_type: Option<String>,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Args {
     pub items: Vec<Arg>
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Arg {
     pub item: ArgItem,
     pub slot: i32
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ArgItem {
     pub data: ArgValueData,
     pub id: String
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ArgValueData {
     Simple { name: String },
     Id { id: String },
@@ -671,13 +671,13 @@ pub enum ArgValueData {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct FunctionDefaultItem {
     pub data: FunctionDefaultItemData,
     pub id: String
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub enum FunctionDefaultItemData {
     Simple { name: String },
     Id { id: String },
@@ -1089,7 +1089,7 @@ impl Serialize for FunctionDefaultItemData {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Location {
     pub x: f32,
     pub y: f32,

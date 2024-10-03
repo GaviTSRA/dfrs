@@ -304,6 +304,7 @@ impl Validator {
         let mut args: Vec<Arg> = vec![];
         let mut index: i32 = -1;
 
+        let mut tags: Vec<Arg> = vec![];
         for arg in action.args.clone() {
             let mut match_more = true;
             let mut matched_one = false;
@@ -331,6 +332,12 @@ impl Validator {
                     }
                 }
                 let mut provided_arg = node_args.remove(0);
+
+                if provided_arg.arg_type == ArgType::TAG {
+                    tags.push(provided_arg);
+                    match_more = true;
+                    continue;
+                }
 
                 if provided_arg.arg_type == ArgType::EMPTY && !arg.optional {
                     return Err(ValidateError::MissingArgument { name: arg.name, start_pos, end_pos })
@@ -367,7 +374,6 @@ impl Validator {
             }
         }
 
-        let mut tags: Vec<Arg> = vec![];
         if !node_args.is_empty() {
             for val in node_args.clone() {
                 if val.arg_type != ArgType::TAG {

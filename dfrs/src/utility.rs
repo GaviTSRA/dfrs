@@ -18,7 +18,16 @@ pub fn to_camel_case(s: &str) -> String {
 }
 
 pub fn to_dfrs_name(s: &str) -> String {
-    let v = s.trim().to_owned();
+    let mut replaced: String = s.trim().to_string();
+    replaced = replaced.replace("+=", "addDirect").replace("-=", "subDirect").replace("<=", "lessEqual").replace(">=", "greaterEqual")
+        .replace(">", "greater").replace("<", "less").replace("!=", "notEqual")
+        .replace('+', "add").replace('-', "sub").replace('%', "mod").replace('/', "div").replace('=', "equal").replace(" ", "");
+
+    if replaced == *"x" {
+        replaced = "mul".into();
+    }
+
+    let v = replaced.trim().to_owned();
     let mut vv: Vec<char> = v.chars().collect();
     vv[0] = vv[0].to_lowercase().next().unwrap();
     let name: String = vv.into_iter().collect();

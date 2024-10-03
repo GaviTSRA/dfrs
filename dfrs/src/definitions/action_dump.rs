@@ -252,14 +252,7 @@ pub fn get_action(action: &ADAction) -> Action {
         tags.push(new_tag);
     }
 
-    let mut replaced: String = action.name.clone().trim()
-        .replace("+=", "addDirect").replace("-=", "subDirect")
-        .replace('+', "add").replace('-', "sub")
-        .replace('%', "mod").replace('/', "div").replace('=', "equal");
-    if replaced == *"x" {
-        replaced = "mul".into();
-    }
-    let name = to_dfrs_name(&replaced);
+    let name = to_dfrs_name(&action.name);
     Action::new(name, &action.name, args, tags, action.sub_action_blocks.is_some() && !action.sub_action_blocks.clone().unwrap().is_empty())
 }
 
