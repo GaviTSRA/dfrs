@@ -79,7 +79,9 @@ pub struct ADIcon {
     #[serde(default="default_i32")]
     pub tags: i32,
     #[serde(default="default_vec_arg")]
-    pub arguments: Vec<ADArgument>
+    pub arguments: Vec<ADArgument>,
+    #[serde(default="default_vec_return", rename="returnValues")]
+    pub return_values: Vec<ADReturnValue>
 }
 
 #[derive(Deserialize)]
@@ -95,6 +97,15 @@ pub struct ADArgument {
     pub description: Vec<String>,
     #[serde(default="default_vec_vec_string")]
     pub notes: Vec<Vec<String>>
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct ADReturnValue {
+    #[serde(rename="type", alias="text")]
+    pub return_type: String,
+    #[serde(default="default_vec_string")]
+    pub description: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -132,6 +143,10 @@ fn default_vec_arg() -> Vec<ADArgument> {
     vec![]
 }
 
+fn default_vec_return() -> Vec<ADReturnValue> {
+    vec![]
+}
+
 #[derive(Debug)]
 pub struct Action {
     pub dfrs_name: String,
@@ -153,6 +168,9 @@ pub fn get_actions(action_dump: &RawActionDump, block: &str) -> Vec<Action> {
     for action in &action_dump.actions {
         if action.codeblock_name != block {
             continue
+        }
+        if action.icon.return_values.len() == 0 && action.icon.arguments.len() == 0 && action.icon.material == "STONE" && action.tags.len() == 0 {
+            continue;
         }
 
         let new_action = get_action(action);

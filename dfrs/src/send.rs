@@ -67,7 +67,9 @@ fn send_codeclient(code: Vec<CompiledLine>, config: Config) {
     if config.debug.connection {
         println!("Connected to server; {:?}", response)
     }
-    
+
+    socket.send(Message::Text("scopes write_code".into())).unwrap();
+
     loop {
         let msg = socket.read().expect("Error reading message");
         
