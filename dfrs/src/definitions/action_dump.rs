@@ -1,12 +1,11 @@
 use serde::Deserialize;
-
 use crate::utility::{to_camel_case, to_dfrs_name};
 
 use super::{ArgType, DefinedArg, DefinedTag};
 
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase")]
-pub struct ActionDump {
+pub struct RawActionDump {
     pub codeblocks: Vec<ADCodeBlock>,
     pub actions: Vec<ADAction>,
     #[serde(skip)]
@@ -106,8 +105,8 @@ pub struct ADGameValue {
     pub icon: ADIcon
 }
 
-impl ActionDump {
-    pub fn load() -> ActionDump {
+impl RawActionDump {
+    pub fn load() -> RawActionDump {
         let file = include_str!("action_dump.json");
         serde_json::from_str(file).expect("Failed to parse action dump")
     }
@@ -129,7 +128,6 @@ fn default_vec_vec_string() -> Vec<Vec<String>> {
     vec![]
 }
 
-
 fn default_vec_arg() -> Vec<ADArgument> {
     vec![]
 }
@@ -149,7 +147,7 @@ impl Action {
     }
 }
 
-pub fn get_actions(action_dump: &ActionDump, block: &str) -> Vec<Action> {
+pub fn get_actions(action_dump: &RawActionDump, block: &str) -> Vec<Action> {
     let mut actions = vec![];
 
     for action in &action_dump.actions {
@@ -263,4 +261,73 @@ pub fn get_action(action: &ADAction) -> Action {
     }
     let name = to_dfrs_name(&replaced);
     Action::new(name, &action.name, args, tags, action.sub_action_blocks.is_some() && !action.sub_action_blocks.clone().unwrap().is_empty())
+}
+
+#[derive(Debug)]
+pub struct ActionList {
+    pub actions: Vec<Action>,
+}
+
+impl ActionList {
+    pub fn new(action_dump: &RawActionDump, block: &str) -> ActionList {
+        let actions = get_actions(action_dump, block);
+        ActionList { actions }
+    }
+
+    pub fn get(&self, dfrs_name: String) -> Option<&Action> {
+        self.actions.iter().find(|&action| action.dfrs_name == dfrs_name)
+    }
+
+    pub fn all(&self) -> &Vec<Action> {
+        &self.actions
+    }
+}
+
+#[derive(Debug)]
+pub struct ActionDump {
+    pub player_actions: ActionList,
+    pub entity_actions: ActionList,
+    pub game_actions: ActionList,
+    pub variable_actions: ActionList,
+    pub control_actions: ActionList,
+    pub select_actions: ActionList,
+    pub start_process_action: Action,
+
+    pub player_conditionals: ActionList,
+    pub entity_conditionals: ActionList,
+    pub game_conditionals: ActionList,
+    pub variable_conditionals: ActionList,
+
+    pub repeats: ActionList,
+}
+
+impl ActionDump {
+    pub fn new(action_dump: &RawActionDump) -> ActionDump {
+        let actions  = get_actions(&action_dump, "START PROCESS");
+        let action = actions.get(0).unwrap();
+        let start_process_action = Action {
+            args: action.args.clone(),
+            df_name: action.df_name.clone(),
+            dfrs_name: action.dfrs_name.clone(),
+            tags: action.tags.clone(),
+            has_conditional_arg: action.has_conditional_arg.clone()
+        };
+
+        ActionDump {
+            player_actions: ActionList::new(action_dump, "PLAYER ACTION"),
+            entity_actions: ActionList::new(action_dump, "ENTITY ACTION"),
+            game_actions: ActionList::new(action_dump, "GAME ACTION"),
+            variable_actions: ActionList::new(action_dump, "SET VARIABLE"),
+            control_actions: ActionList::new(action_dump, "CONTROL"),
+            select_actions: ActionList::new(action_dump, "SELECT OBJECT"),
+            start_process_action,
+
+            player_conditionals: ActionList::new(action_dump, "IF PLAYER"),
+            entity_conditionals: ActionList::new(action_dump, "IF ENTITY"),
+            game_conditionals: ActionList::new(action_dump, "IF GAME"),
+            variable_conditionals: ActionList::new(action_dump, "IF VARIABLE"),
+
+            repeats: ActionList::new(action_dump, "REPEAT"),
+        }
+    }
 }

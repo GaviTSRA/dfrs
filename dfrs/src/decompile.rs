@@ -3,10 +3,7 @@ use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use flate2::read::GzDecoder;
 use crate::compile::{ArgValueData, Block, Codeline, FunctionDefaultItemData};
-use crate::definitions::action_dump::ActionDump;
-use crate::definitions::actions::{ControlActions, EntityActions, GameActions, PlayerActions, SelectActions, VariableActions};
-use crate::definitions::conditionals::{EntityConditionals, GameConditionals, PlayerConditionals};
-use crate::definitions::repeats::Repeats;
+use crate::definitions::action_dump::{ActionDump, RawActionDump};
 use crate::node::{ActionType, ConditionalType};
 use crate::token::{Selector, SELECTORS};
 use crate::utility::{to_camel_case, to_dfrs_name};
@@ -30,39 +27,15 @@ fn decompress(compressed_code: &str) -> String {
 
 pub struct Decompiler {
     indentation: i32,
-
-    player_actions: PlayerActions,
-    entity_actions: EntityActions,
-    game_actions: GameActions,
-    variable_actions: VariableActions,
-    control_actions: ControlActions,
-    select_actions: SelectActions,
-
-    player_conditionals: PlayerConditionals,
-    entity_conditionals: EntityConditionals,
-    game_conditionals: GameConditionals,
-
-    repeats: Repeats
+    action_dump: ActionDump
 }
 
 impl Decompiler {
     pub fn new() -> Decompiler {
-        let ad = ActionDump::load();
+        let ad = RawActionDump::load();
         Decompiler {
             indentation: 0,
-
-            player_actions: PlayerActions::new(&ad),
-            entity_actions: EntityActions::new(&ad),
-            game_actions: GameActions::new(&ad),
-            variable_actions: VariableActions::new(&ad),
-            control_actions: ControlActions::new(&ad),
-            select_actions: SelectActions::new(&ad),
-
-            player_conditionals: PlayerConditionals::new(&ad),
-            entity_conditionals: EntityConditionals::new(&ad),
-            game_conditionals: GameConditionals::new(&ad),
-
-            repeats: Repeats::new(&ad)
+            action_dump: ActionDump::new(&ad)
         }
     }
 
@@ -90,8 +63,8 @@ impl Decompiler {
                     match &arg.item.data {
                         ArgValueData::Variable { name, scope} => {
                             match scope.as_str() {
-                                "unsaved" => println!("define GAME var {name} !"),
-                                "saved" => println!("define SAVE var {name} !"),
+                                "unsaved" => println!("save {name};"),
+                                "saved" => println!("save {name};"),
                                 "local" => vars.push(format!("local {name} = `{name}`;")),
                                 "line" => vars.push(format!("line {name} = `{name}`;")),
                                 err => println!("ERR: Unknown var type {err}")
@@ -272,7 +245,7 @@ impl Decompiler {
                             "var" => "variable",
                             "list" => "list",
                             "dict" => "dict",
-                            _ => panic!("unkown param type")
+                            _ => panic!("unknown param type")
                         };
                         result.push_str(&format!("{name}: {value_type}{is_optional}{is_plural}{default}"))
                     }

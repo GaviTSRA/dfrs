@@ -1,4 +1,4 @@
-use crate::definitions::action_dump::ActionDump;
+use crate::definitions::action_dump::{RawActionDump};
 use crate::utility::to_dfrs_name;
 
 #[derive(Debug)]
@@ -13,7 +13,7 @@ pub struct PlayerEvents {
 }
 
 impl PlayerEvents {
-    pub fn new(action_dump: &ActionDump) -> PlayerEvents {
+    pub fn new(action_dump: &RawActionDump) -> PlayerEvents {
         let mut events = vec![];
         for entry in &action_dump.actions {
             if entry.codeblock_name == "PLAYER EVENT" {
@@ -42,7 +42,7 @@ pub struct EntityEvents {
 }
 
 impl EntityEvents {
-    pub fn new(action_dump: &ActionDump) -> EntityEvents {
+    pub fn new(action_dump: &RawActionDump) -> EntityEvents {
         let mut events = vec![];
         for entry in &action_dump.actions {
             if entry.codeblock_name == "ENTITY EVENT" {

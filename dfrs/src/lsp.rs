@@ -2,9 +2,7 @@ use std::path::PathBuf;
 
 use dashmap::DashMap;
 use crate::compile::compile;
-use crate::definitions::action_dump::ActionDump;
-use crate::definitions::actions::{EntityActions, GameActions, PlayerActions, VariableActions, ControlActions, SelectActions};
-use crate::definitions::conditionals::{EntityConditionals, GameConditionals, PlayerConditionals, VariableConditionals};
+use crate::definitions::action_dump::{ActionDump, RawActionDump};
 use crate::definitions::game_values::GameValues;
 use crate::lexer::{Lexer, LexerError};
 use crate::load_config;
@@ -24,17 +22,7 @@ struct Backend {
     player_events: PlayerEvents,
     entity_events: EntityEvents,
 
-    player_actions: PlayerActions,
-    entity_actions: EntityActions,
-    game_actions: GameActions,
-    variable_actions: VariableActions,
-    control_actions: ControlActions,
-    select_actions: SelectActions,
-
-    player_conditionals: PlayerConditionals,
-    entity_conditionals: EntityConditionals,
-    game_conditionals: GameConditionals,
-    variable_conditionals: VariableConditionals,
+    action_dump: ActionDump,
 
     game_values: GameValues
 }
@@ -142,7 +130,7 @@ impl LanguageServer for Backend {
 
 impl Backend {
     async fn on_change(&self, params: TextDocumentItem) {
-        let rope = ropey::Rope::from_str(&params.text);
+        let rope = Rope::from_str(&params.text);
         self.document_map
             .insert(params.uri.to_string(), rope.clone());
     }
@@ -256,34 +244,34 @@ impl Backend {
 
                 let mut all = None;
                 if is_player_action {
-                    all = Some(self.player_actions.all());
+                    all = Some(self.action_dump.player_actions.all());
                 }
                 if is_entity_action {
-                    all = Some(self.entity_actions.all());
+                    all = Some(self.action_dump.entity_actions.all());
                 }
                 if is_game_action {
-                    all = Some(self.game_actions.all());
+                    all = Some(self.action_dump.game_actions.all());
                 }
                 if is_variable_action {
-                    all = Some(self.variable_actions.all());
+                    all = Some(self.action_dump.variable_actions.all());
                 }
                 if is_control_action {
-                    all = Some(self.control_actions.all());
+                    all = Some(self.action_dump.control_actions.all());
                 }
                 if is_select_action {
-                    all = Some(self.select_actions.all());
+                    all = Some(self.action_dump.select_actions.all());
                 }
                 if is_player_conditional {
-                    all = Some(self.player_conditionals.all());
+                    all = Some(self.action_dump.player_conditionals.all());
                 }
                 if is_entity_conditional {
-                    all = Some(self.entity_conditionals.all());
+                    all = Some(self.action_dump.entity_conditionals.all());
                 }
                 if is_game_conditional {
-                    all = Some(self.game_conditionals.all());
+                    all = Some(self.action_dump.game_conditionals.all());
                 }
                 if is_variable_conditional {
-                    all = Some(self.variable_conditionals.all());
+                    all = Some(self.action_dump.variable_conditionals.all());
                 }
 
                 self.client.log_message(MessageType::INFO, format!("ev {} pa {} ea {} ga {} va {} pc {} ec {} gc {} vc {} vl {}", is_event, is_player_action, is_entity_action, is_game_action, is_variable_action, is_player_conditional, is_entity_conditional, is_game_conditional, is_variable_conditional, is_game_value)).await;
@@ -323,7 +311,7 @@ pub async fn run_lsp() {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
 
-    let ad = ActionDump::load();
+    let ad = RawActionDump::load();
     let (service, socket) = LspService::new(|client| Backend {
         client,
         document_map: DashMap::new(),
@@ -331,17 +319,7 @@ pub async fn run_lsp() {
         player_events: PlayerEvents::new(&ad),
         entity_events: EntityEvents::new(&ad),
 
-        player_actions: PlayerActions::new(&ad),
-        entity_actions: EntityActions::new(&ad), 
-        game_actions: GameActions::new(&ad),
-        variable_actions: VariableActions::new(&ad),
-        control_actions: ControlActions::new(&ad),
-        select_actions: SelectActions::new(&ad),
-
-        player_conditionals: PlayerConditionals::new(&ad),
-        entity_conditionals: EntityConditionals::new(&ad), 
-        game_conditionals: GameConditionals::new(&ad),
-        variable_conditionals: VariableConditionals::new(&ad),
+        action_dump: ActionDump::new(&ad),
 
         game_values: GameValues::new(&ad)
     });

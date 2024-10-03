@@ -1,4 +1,4 @@
-use crate::definitions::action_dump::ActionDump;
+use crate::definitions::action_dump::{RawActionDump};
 use crate::utility::to_camel_case;
 
 #[derive(Debug)]
@@ -13,7 +13,7 @@ pub struct GameValue {
 }
 
 impl GameValues {
-    pub fn new(action_dump: &ActionDump) -> GameValues {
+    pub fn new(action_dump: &RawActionDump) -> GameValues {
         let mut game_values = vec![];
 
         for game_value in &action_dump.game_values {

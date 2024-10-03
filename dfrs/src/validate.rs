@@ -1,5 +1,5 @@
-use crate::{definitions::{action_dump::{Action, ActionDump}, actions::{ControlActions, EntityActions, GameActions, PlayerActions, SelectActions, VariableActions}, conditionals::{EntityConditionals, GameConditionals, PlayerConditionals, VariableConditionals}, repeats::Repeats, ArgType, DefinedArg}, node::{ActionNode, ActionType, Arg, ArgValue, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, FileNode, RepeatNode}, token::Position};
-use crate::definitions::actions::get_start_process_action;
+use crate::{definitions::{action_dump::{Action, ActionDump}, ArgType, DefinedArg}, node::{ActionNode, ActionType, Arg, ArgValue, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, FileNode, RepeatNode}, token::Position};
+use crate::definitions::action_dump::RawActionDump;
 use crate::definitions::events::{EntityEvents, PlayerEvents};
 use crate::definitions::game_values::GameValues;
 use crate::node::{ExpressionNode, StartNode};
@@ -19,45 +19,19 @@ pub struct Validator {
     player_events: PlayerEvents,
     entity_events: EntityEvents,
 
-    player_actions: PlayerActions,
-    entity_actions: EntityActions,
-    game_actions: GameActions,
-    variable_actions: VariableActions,
-    control_actions: ControlActions,
-    select_actions: SelectActions,
-    start_process_action: Action,
-
-    player_conditionals: PlayerConditionals,
-    entity_conditionals: EntityConditionals,
-    game_conditionals: GameConditionals,
-    variable_conditionals: VariableConditionals,
-
-    repeats: Repeats,
+    action_dump: ActionDump,
 
     game_values: GameValues
 }
 
 impl Validator {
     pub fn new() -> Validator {
-        let action_dump = ActionDump::load();
+        let action_dump = RawActionDump::load();
         Validator {
             player_events: PlayerEvents::new(&action_dump),
             entity_events: EntityEvents::new(&action_dump),
 
-            player_actions: PlayerActions::new(&action_dump),
-            entity_actions: EntityActions::new(&action_dump),
-            game_actions: GameActions::new(&action_dump),
-            variable_actions: VariableActions::new(&action_dump),
-            control_actions: ControlActions::new(&action_dump),
-            select_actions: SelectActions::new(&action_dump),
-            start_process_action: get_start_process_action(&action_dump),
-
-            player_conditionals: PlayerConditionals::new(&action_dump),
-            entity_conditionals: EntityConditionals::new(&action_dump),
-            game_conditionals: GameConditionals::new(&action_dump),
-            variable_conditionals: VariableConditionals::new(&action_dump),
-
-            repeats: Repeats::new(&action_dump),
+            action_dump: ActionDump::new(&action_dump),
 
             game_values: GameValues::new(&action_dump)
         }
@@ -131,22 +105,22 @@ impl Validator {
     fn validate_action_node(&self, mut action_node: ActionNode) -> Result<ActionNode, ValidateError> {
         let mut action = match action_node.action_type {
             ActionType::Player => {
-                self.player_actions.get(action_node.clone().name)
+                self.action_dump.player_actions.get(action_node.clone().name)
             }
             ActionType::Entity => {
-                self.entity_actions.get(action_node.clone().name)
+                self.action_dump.entity_actions.get(action_node.clone().name)
             }
             ActionType::Game => {
-                self.game_actions.get(action_node.clone().name)
+                self.action_dump.game_actions.get(action_node.clone().name)
             }
             ActionType::Variable => {
-                self.variable_actions.get(action_node.clone().name)
+                self.action_dump.variable_actions.get(action_node.clone().name)
             }
             ActionType::Control => {
-                self.control_actions.get(action_node.clone().name)
+                self.action_dump.control_actions.get(action_node.clone().name)
             }
             ActionType::Select => {
-                self.select_actions.get(action_node.clone().name)
+                self.action_dump.select_actions.get(action_node.clone().name)
             }
         };
 
@@ -167,10 +141,10 @@ impl Validator {
                     action_node.args = args;
                     was_condition = true;
                     action = match conditional_type {
-                        ConditionalType::Player => self.player_conditionals.get(name),
-                        ConditionalType::Entity => self.entity_conditionals.get(name),
-                        ConditionalType::Game => self.game_conditionals.get(name),
-                        ConditionalType::Variable => self.variable_conditionals.get(name),
+                        ConditionalType::Player => self.action_dump.player_conditionals.get(name),
+                        ConditionalType::Entity => self.action_dump.entity_conditionals.get(name),
+                        ConditionalType::Game => self.action_dump.game_conditionals.get(name),
+                        ConditionalType::Variable => self.action_dump.variable_conditionals.get(name),
                     }
                 }
                 _ => unreachable!()
@@ -205,16 +179,16 @@ impl Validator {
     fn validate_conditional_node(&self, mut conditional_node: ConditionalNode) -> Result<ConditionalNode, ValidateError> {
         let action = match conditional_node.conditional_type {
             ConditionalType::Player => {
-                self.player_conditionals.get(conditional_node.clone().name)
+                self.action_dump.player_conditionals.get(conditional_node.clone().name)
             }
             ConditionalType::Entity => {
-                self.entity_conditionals.get(conditional_node.clone().name)
+                self.action_dump.entity_conditionals.get(conditional_node.clone().name)
             }
             ConditionalType::Game => {
-                self.game_conditionals.get(conditional_node.clone().name)
+                self.action_dump.game_conditionals.get(conditional_node.clone().name)
             }
             ConditionalType::Variable => {
-                self.variable_conditionals.get(conditional_node.clone().name)
+                self.action_dump.variable_conditionals.get(conditional_node.clone().name)
             }
         };
 
@@ -263,12 +237,12 @@ impl Validator {
     }
 
     fn validate_start(&self, mut start_node: StartNode) -> Result<StartNode, ValidateError> {
-        start_node.args = self.validate_args(start_node.args, &self.start_process_action, start_node.start_pos.clone(), start_node.end_pos.clone())?;
+        start_node.args = self.validate_args(start_node.args, &self.action_dump.start_process_action, start_node.start_pos.clone(), start_node.end_pos.clone())?;
         Ok(start_node)
     }
 
     fn validate_repeat_node(&self, mut repeat_node: RepeatNode) -> Result<RepeatNode, ValidateError> {
-        let mut action = self.repeats.get(repeat_node.clone().name);
+        let mut action = self.action_dump.repeats.get(repeat_node.clone().name);
         let mut old_args = vec![];
         let mut old_name = "".into();
         let mut was_condition = false;
@@ -286,10 +260,10 @@ impl Validator {
                     repeat_node.args = args;
                     was_condition = true;
                     action = match conditional_type {
-                        ConditionalType::Player => self.player_conditionals.get(name),
-                        ConditionalType::Entity => self.entity_conditionals.get(name),
-                        ConditionalType::Game => self.game_conditionals.get(name),
-                        ConditionalType::Variable => self.variable_conditionals.get(name),
+                        ConditionalType::Player => self.action_dump.player_conditionals.get(name),
+                        ConditionalType::Entity => self.action_dump.entity_conditionals.get(name),
+                        ConditionalType::Game => self.action_dump.game_conditionals.get(name),
+                        ConditionalType::Variable => self.action_dump.variable_conditionals.get(name),
                     }
                 }
                 _ => unreachable!()
