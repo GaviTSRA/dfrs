@@ -222,7 +222,10 @@ impl Decompiler {
                                         "comp" => format!("\"{name}\""),
                                         "num" => format!("{name}"),
                                         "txt" => format!("'{name}'"),
-                                        other => panic!("ERR: Unhandled simple function arg {other}")
+                                        other => {
+                                            println!("ERR: Unhandled simple function arg {other}");
+                                            "".into()
+                                        }
                                     }
                                 }
                                 FunctionDefaultItemData::Id { .. } => "".into(),
@@ -245,6 +248,10 @@ impl Decompiler {
                                 }
                                 FunctionDefaultItemData::Potion { potion, amplifier, duration } => {
                                     format!("Potion(\"{potion}\", {amplifier}, {duration})")
+                                }
+                                FunctionDefaultItemData::Particle { particle, cluster, data } => {
+                                    // TODO
+                                    "".into()
                                 }
                             };
                             format!("={end}")
@@ -296,14 +303,20 @@ impl Decompiler {
 
     fn decompile_action(&self, block: Block, action_type: ActionType) {
         let name = to_dfrs_name(&block.action.clone().unwrap());
-        let action = match action_type {
+        let action = match match action_type {
             ActionType::Player => self.action_dump.player_actions.get(name.clone()),
             ActionType::Entity => self.action_dump.entity_actions.get(name.clone()),
             ActionType::Game => self.action_dump.game_actions.get(name.clone()),
             ActionType::Variable => self.action_dump.variable_actions.get(name.clone()),
             ActionType::Control => self.action_dump.control_actions.get(name.clone()),
             ActionType::Select => self.action_dump.select_actions.get(name.clone()),
-        }.unwrap();
+        } {
+            Some(res) => res,
+            None => {
+                println!("ERROR DECOMPILING ACTION: {action_type:?} {name:?}");
+                return;
+            }
+        };
         let prefix = match action_type {
             ActionType::Player => "p",
             ActionType::Entity => "e",
@@ -470,6 +483,9 @@ impl Decompiler {
                         }
                     }
                     ArgValueData::FunctionParam { .. } => {}
+                    ArgValueData::Particle { .. } => {
+                        // TODO
+                    }
                 }
             }
         }

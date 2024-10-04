@@ -668,7 +668,30 @@ pub enum ArgValueData {
         optional: bool,
         plural: bool,
         param_type: String
+    },
+    Particle {
+        particle: String,
+        cluster: ParticleCluster,
+        data: ParticleData,
     }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct ParticleCluster {
+    amount: i32,
+    horizontal: f32,
+    vertical: f32
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(rename_all="camelCase")]
+pub struct ParticleData {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rgb: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    color_variation: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    motion_variation: Option<i32>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -677,7 +700,7 @@ pub struct FunctionDefaultItem {
     pub id: String
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub enum FunctionDefaultItemData {
     Simple { name: String },
     Id { id: String },
@@ -685,6 +708,7 @@ pub enum FunctionDefaultItemData {
     Vector { x: f32, y: f32, z: f32 },
     Sound { sound: String, volume: f32, pitch: f32 },
     Potion { potion: String, amplifier: f32, duration: f32 },
+    Particle { particle: String, cluster: ParticleCluster, data: ParticleData },
 }
 
 impl Serialize for ArgValueData {
@@ -758,12 +782,19 @@ impl Serialize for ArgValueData {
             ArgValueData::FunctionParam { default_value, name, optional, plural, param_type } => {
                 let mut state = serializer.serialize_struct("MyEnum", 4)?;
                 if default_value.is_some() {
-                    state.serialize_field("default_value", default_value)?;
+                    state.serialize_field("defaultValue", default_value)?;
                 }
                 state.serialize_field("name", name)?;
                 state.serialize_field("optional", optional)?;
                 state.serialize_field("plural", plural)?;
                 state.serialize_field("type", param_type)?;
+                state.end()
+            }
+            ArgValueData::Particle { particle, cluster, data } => {
+                let mut state = serializer.serialize_struct("MyEnum", 3)?;
+                state.serialize_field("particle", particle)?;
+                state.serialize_field("cluster", cluster)?;
+                state.serialize_field("data", data)?;
                 state.end()
             }
         }
@@ -799,9 +830,13 @@ impl<'de> Deserialize<'de> for ArgValueData {
             Block,
             Option,
             Tag,
+            #[serde(rename="default_value")]
             DefaultValue,
             Optional,
             Plural,
+            Particle,
+            Cluster,
+            Data
         }
 
         struct ArgValueDataVisitor;
@@ -841,6 +876,9 @@ impl<'de> Deserialize<'de> for ArgValueData {
                 let mut default_value = None;
                 let mut optional = None;
                 let mut plural = None;
+                let mut particle = None;
+                let mut cluster = None;
+                let mut data = None;
 
                 while let Some(key) = map.next_key()? {
                     match key {
@@ -988,6 +1026,24 @@ impl<'de> Deserialize<'de> for ArgValueData {
                             }
                             plural = Some(map.next_value()?);
                         }
+                        Field::Particle => {
+                            if particle.is_some() {
+                                return Err(de::Error::duplicate_field("particle"));
+                            }
+                            particle = Some(map.next_value()?);
+                        }
+                        Field::Cluster => {
+                            if cluster.is_some() {
+                                return Err(de::Error::duplicate_field("cluster"));
+                            }
+                            cluster = Some(map.next_value()?);
+                        }
+                        Field::Data => {
+                            if data.is_some() {
+                                return Err(de::Error::duplicate_field("data"));
+                            }
+                            data = Some(map.next_value()?);
+                        }
                     }
                 }
 
@@ -1032,6 +1088,13 @@ impl<'de> Deserialize<'de> for ArgValueData {
                         option,
                         tag,
                     })
+                } else if let (Some(particle), Some(cluster), Some(data)) = (particle, cluster, data)
+                {
+                    Ok(ArgValueData::Particle {
+                        particle,
+                        cluster,
+                        data,
+                    })
                 } else {
                     Err(de::Error::missing_field("required field"))
                 }
@@ -1039,6 +1102,198 @@ impl<'de> Deserialize<'de> for ArgValueData {
         }
 
         deserializer.deserialize_struct("ArgValueData", &[], ArgValueDataVisitor)
+    }
+}
+
+impl<'de> Deserialize<'de> for FunctionDefaultItemData {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(field_identifier, rename_all = "camelCase")]
+        enum Field {
+            Name,
+            Id,
+            IsBlock,
+            Loc,
+            X,
+            Y,
+            Z,
+            Sound,
+            Vol,
+            Pitch,
+            Pot,
+            Amp,
+            Dur,
+            Particle,
+            Cluster,
+            Data
+        }
+
+        struct FunctionDefaultItemDataVisitor;
+
+        impl<'de> Visitor<'de> for FunctionDefaultItemDataVisitor {
+            type Value = FunctionDefaultItemData;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("struct FunctionDefaultItemData")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<Self::Value, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut name = None;
+                let mut id = None;
+                let mut is_block = None;
+                let mut loc = None;
+                let mut x = None;
+                let mut y = None;
+                let mut z = None;
+                let mut sound = None;
+                let mut volume = None;
+                let mut pitch = None;
+                let mut potion = None;
+                let mut amplifier = None;
+                let mut duration = None;
+                let mut particle = None;
+                let mut cluster = None;
+                let mut data = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Name => {
+                            if name.is_some() {
+                                return Err(de::Error::duplicate_field("name"));
+                            }
+                            name = Some(map.next_value()?);
+                        }
+                        Field::Id => {
+                            if id.is_some() {
+                                return Err(de::Error::duplicate_field("id"));
+                            }
+                            id = Some(map.next_value()?);
+                        }
+                        Field::IsBlock => {
+                            if is_block.is_some() {
+                                return Err(de::Error::duplicate_field("isBlock"));
+                            }
+                            is_block = Some(map.next_value()?);
+                        }
+                        Field::Loc => {
+                            if loc.is_some() {
+                                return Err(de::Error::duplicate_field("loc"));
+                            }
+                            loc = Some(map.next_value()?);
+                        }
+                        Field::X => {
+                            if x.is_some() {
+                                return Err(de::Error::duplicate_field("x"));
+                            }
+                            x = Some(map.next_value()?);
+                        }
+                        Field::Y => {
+                            if y.is_some() {
+                                return Err(de::Error::duplicate_field("y"));
+                            }
+                            y = Some(map.next_value()?);
+                        }
+                        Field::Z => {
+                            if z.is_some() {
+                                return Err(de::Error::duplicate_field("z"));
+                            }
+                            z = Some(map.next_value()?);
+                        }
+                        Field::Sound => {
+                            if sound.is_some() {
+                                return Err(de::Error::duplicate_field("sound"));
+                            }
+                            sound = Some(map.next_value()?);
+                        }
+                        Field::Vol => {
+                            if volume.is_some() {
+                                return Err(de::Error::duplicate_field("vol"));
+                            }
+                            volume = Some(map.next_value()?);
+                        }
+                        Field::Pitch => {
+                            if pitch.is_some() {
+                                return Err(de::Error::duplicate_field("pitch"));
+                            }
+                            pitch = Some(map.next_value()?);
+                        }
+                        Field::Pot => {
+                            if potion.is_some() {
+                                return Err(de::Error::duplicate_field("pot"));
+                            }
+                            potion = Some(map.next_value()?);
+                        }
+                        Field::Amp => {
+                            if amplifier.is_some() {
+                                return Err(de::Error::duplicate_field("amp"));
+                            }
+                            amplifier = Some(map.next_value()?);
+                        }
+                        Field::Dur => {
+                            if duration.is_some() {
+                                return Err(de::Error::duplicate_field("dur"));
+                            }
+                            duration = Some(map.next_value()?);
+                        }
+                        Field::Particle => {
+                            if particle.is_some() {
+                                return Err(de::Error::duplicate_field("particle"));
+                            }
+                            particle = Some(map.next_value()?);
+                        }
+                        Field::Cluster => {
+                            if cluster.is_some() {
+                                return Err(de::Error::duplicate_field("cluster"));
+                            }
+                            cluster = Some(map.next_value()?);
+                        }
+                        Field::Data => {
+                            if data.is_some() {
+                                return Err(de::Error::duplicate_field("data"));
+                            }
+                            data = Some(map.next_value()?);
+                        }
+                    }
+                }
+
+                if let Some(name) = name {
+                    Ok(FunctionDefaultItemData::Simple { name })
+                } else if let Some(id) = id {
+                    Ok(FunctionDefaultItemData::Id { id })
+                } else if let (Some(is_block), Some(loc)) = (is_block, loc) {
+                    Ok(FunctionDefaultItemData::Location { is_block, loc })
+                } else if let (Some(x), Some(y), Some(z)) = (x, y, z) {
+                    Ok(FunctionDefaultItemData::Vector { x, y, z })
+                } else if let (Some(sound), Some(volume), Some(pitch)) = (sound, volume, pitch) {
+                    Ok(FunctionDefaultItemData::Sound { sound, volume, pitch })
+                } else if let (Some(potion), Some(amplifier), Some(duration)) =
+                    (potion, amplifier, duration)
+                {
+                    Ok(FunctionDefaultItemData::Potion {
+                        potion,
+                        amplifier,
+                        duration,
+                    })
+                } else if let (Some(particle), Some(cluster), Some(data)) = (particle, cluster, data)
+                {
+                    Ok(FunctionDefaultItemData::Particle {
+                        particle,
+                        cluster,
+                        data,
+                    })
+                } else {
+                    Err(de::Error::missing_field("required field"))
+                }
+            }
+        }
+
+        deserializer.deserialize_struct("FunctionDefaultItemData", &[], FunctionDefaultItemDataVisitor)
     }
 }
 
@@ -1083,6 +1338,13 @@ impl Serialize for FunctionDefaultItemData {
                 state.serialize_field("pot", potion)?;
                 state.serialize_field("amp", amplifier)?;
                 state.serialize_field("dur", duration)?;
+                state.end()
+            }
+            FunctionDefaultItemData::Particle { particle, cluster, data } => {
+                let mut state = serializer.serialize_struct("MyEnum", 3)?;
+                state.serialize_field("particle", particle)?;
+                state.serialize_field("cluster", cluster)?;
+                state.serialize_field("data", data)?;
                 state.end()
             }
         }

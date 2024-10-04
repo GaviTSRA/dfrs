@@ -12,6 +12,8 @@ use crate::validate::{Validator, ValidateError};
 use lsp::run_lsp;
 
 use colored::Colorize;
+use tungstenite::{connect, Message};
+use url::Url;
 use crate::decompile::Decompiler;
 
 mod lsp;
@@ -296,6 +298,7 @@ enum Commands {
     Decompile {
         code: String
     },
+    DecompilePlot {},
     LSP {}
 }
 
@@ -341,6 +344,19 @@ fn main() {
         Some(Commands::Decompile { code }) => {
             let mut decompiler = Decompiler::new();
             decompiler.decompile(code);
+        }
+        Some(Commands::DecompilePlot {}) => {
+            let (mut socket, response) = connect(Url::parse("ws://localhost:31375").unwrap()).expect("Can't connect");
+            socket.send(Message::Text("scopes read_plot".into())).unwrap();
+
+            let msg = socket.read().expect("Error reading message");
+            socket.send(Message::Text("scan".into())).unwrap();
+            let msg = socket.read().expect("Error reading message");
+
+            for line in msg.to_text().unwrap().split('\n') {
+                let mut decompiler = Decompiler::new();
+                decompiler.decompile(line);
+            }
         }
         Some(Commands::LSP {}) => {
             run_lsp();
