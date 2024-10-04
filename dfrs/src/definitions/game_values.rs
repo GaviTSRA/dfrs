@@ -1,5 +1,6 @@
 use crate::definitions::action_dump::{RawActionDump};
-use crate::utility::to_camel_case;
+use crate::definitions::ArgType;
+use crate::utility::to_dfrs_name;
 
 #[derive(Debug)]
 pub struct GameValues {
@@ -9,17 +10,30 @@ pub struct GameValues {
 #[derive(Debug)]
 pub struct GameValue {
     pub df_name: String,
-    pub dfrs_name: String
+    pub dfrs_name: String,
+    pub value_type: ArgType
 }
 
 impl GameValues {
     pub fn new(action_dump: &RawActionDump) -> GameValues {
         let mut game_values = vec![];
 
-        for game_value in &action_dump.game_values {
+        for game_value in action_dump.game_values.clone() {
+            let value_type = match game_value.icon.return_type.unwrap().as_str() {
+                "NUMBER" => ArgType::NUMBER,
+                "COMPONENT" => ArgType::TEXT,
+                "TEXT" => ArgType::STRING,
+                "LOCATION" => ArgType::LOCATION,
+                "VECTOR" => ArgType::VECTOR,
+                "ITEM" => ArgType::ITEM,
+                "LIST" => ArgType::VARIABLE,
+                val => panic!("Unknown game value type: {val}")
+            };
+
             let new_value = GameValue {
                 df_name: game_value.icon.name.clone(),
-                dfrs_name: to_camel_case(&game_value.icon.name.clone())
+                dfrs_name: to_dfrs_name(&game_value.icon.name.clone()),
+                value_type
             };
             game_values.push(new_value);
         }

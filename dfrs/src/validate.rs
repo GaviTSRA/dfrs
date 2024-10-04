@@ -343,23 +343,27 @@ impl Validator {
                     return Err(ValidateError::MissingArgument { name: arg.name, start_pos, end_pos })
                 }
 
-                if let ArgValue::GameValue { value, selector, selector_end_pos } = provided_arg.value {
-                    let actual_game_value = self.game_values.get(value.clone());
+                if let ArgValue::GameValue { df_name, dfrs_name, selector, selector_end_pos } = provided_arg.value {
+                    let actual_game_value = self.game_values.get(dfrs_name.clone());
                     match actual_game_value {
-                        Some(res) => provided_arg.value = ArgValue::GameValue {
-                            value: res.df_name.clone(),
-                            selector,
-                            selector_end_pos
+                        Some(res) => {
+                            provided_arg.value = ArgValue::GameValue {
+                                df_name: Some(res.df_name.clone()),
+                                dfrs_name,
+                                selector,
+                                selector_end_pos
+                            };
+                            provided_arg.arg_type = res.value_type.clone();
                         },
                         None => return Err(ValidateError::UnknownGameValue {
-                            game_value: value,
+                            game_value: dfrs_name,
                             start_pos: provided_arg.start_pos,
                             end_pos: provided_arg.end_pos
                         })
                     }
                 }
 
-                if !arg.arg_types.contains(&provided_arg.arg_type) && !arg.arg_types.contains(&ArgType::ANY) && provided_arg.arg_type != ArgType::VARIABLE && provided_arg.arg_type != ArgType::GameValue {
+                if !arg.arg_types.contains(&provided_arg.arg_type) && !arg.arg_types.contains(&ArgType::ANY) && provided_arg.arg_type != ArgType::VARIABLE {
                     if arg.allow_multiple && matched_one {
                         node_args.insert(0, provided_arg);
                         index -= 1;

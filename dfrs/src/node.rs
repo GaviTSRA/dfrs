@@ -27,7 +27,8 @@ pub struct EventNode {
 
 #[derive(Clone, Debug)]
 pub struct FunctionNode {
-    pub name: String,
+    pub df_name: String,
+    pub dfrs_name: String,
     pub params: Vec<FunctionParamNode>,
     pub expressions: Vec<ExpressionNode>,
     pub start_pos: Position,
@@ -155,7 +156,7 @@ pub enum ArgValue {
     Item { item: String },
     Tag { tag: String, value: Box<ArgValue>, definition: Option<DefinedTag>, name_end_pos: Position, value_start_pos: Position },
     Variable { name: String, scope: String },
-    GameValue { value: String, selector: Selector, selector_end_pos: Position },
+    GameValue { df_name: Option<String>, dfrs_name: String, selector: Selector, selector_end_pos: Position },
     Condition { name: String, args: Vec<Arg>, selector: Selector, conditional_type: ConditionalType, inverted: bool }
 }
 

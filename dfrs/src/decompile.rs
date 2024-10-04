@@ -286,7 +286,13 @@ impl Decompiler {
                 }
             }
         }
-        self.add(&format!("fn {}({}) {{", block.data.unwrap(), result));
+        let name = block.data.clone().unwrap();
+        let new_name = name.replace("-", "_").replace("%", "").replace(" ", "_").replace("(", "_").replace(")", "");
+        if new_name != name {
+            self.add(&format!("fn {} = `{}`({}) {{", new_name, name, result));
+        } else {
+            self.add(&format!("fn {}({}) {{", new_name, result));
+        }
         self.indent();
         for var in vars {
             self.add(&var);
@@ -381,7 +387,7 @@ impl Decompiler {
             tags: vec![],
             has_conditional_arg: false
         };
-        if block.args.iter().len() > 1 {
+        if block.args.is_some() && block.args.clone().unwrap().items.len() > 0 {
             self.add(&format!("call(\"{}\", {});", to_dfrs_name(&block.data.clone().unwrap()), self.decompile_params(block, action)));
         } else {
             self.add(&format!("call(\"{}\");", to_dfrs_name(&block.data.clone().unwrap())));

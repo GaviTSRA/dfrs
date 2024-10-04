@@ -150,12 +150,28 @@ impl Parser {
         let start_pos = self.current_token.clone().unwrap().end_pos;
 
         let name_token = self.advance_err()?;
-        let name = match name_token.token {
+        let dfrs_name = match name_token.token {
             Token::Identifier { value } => value,
             _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Identifier { value: String::from("<any>")}] })
         };
+        let mut df_name = dfrs_name.clone();
 
-        self.require_token(Token::OpenParen)?;
+        let mut token = self.advance_err()?;
+        match token.token {
+            Token::OpenParen => {},
+            Token::Equal => {
+                token = self.advance_err()?;
+                match token.token {
+                    Token::Variable { value } => {
+                        df_name = value;
+                    }
+                    _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::Variable { value: "any".into() }] })
+                }
+                self.require_token(Token::OpenParen)?;
+            }
+            _ => return Err(ParseError::InvalidToken { found: self.current_token.clone(), expected: vec![Token::OpenParen] })
+        }
+
         let mut params: Vec<FunctionParamNode> = vec![];
 
         loop {
@@ -292,7 +308,7 @@ impl Parser {
             }
         }
 
-        Ok(FunctionNode { name, expressions, start_pos, name_end_pos: name_token.end_pos, end_pos: token.end_pos, params })
+        Ok(FunctionNode { df_name, dfrs_name, expressions, start_pos, name_end_pos: name_token.end_pos, end_pos: token.end_pos, params })
     }
 
     fn process(&mut self) -> Result<ProcessNode, ParseError> {
@@ -797,7 +813,8 @@ impl Parser {
                     Token::Identifier { value } => {
                         params.push(ArgValueWithPos {
                             value: ArgValue::GameValue {
-                                value,
+                                dfrs_name: value,
+                                df_name: None,
                                 selector,
                                 selector_end_pos
                             },

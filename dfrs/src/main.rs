@@ -153,7 +153,7 @@ fn compile_cmd(file: &PathBuf) {
                 }
                 println!("\n");
                 for function in &res.functions {
-                    println!("{}", function.name);
+                    println!("{} / {}", function.dfrs_name, function.df_name);
                     for param in &function.params {
                         println!("{:?}", param);
                     }

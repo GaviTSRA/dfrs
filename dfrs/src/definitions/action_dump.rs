@@ -116,7 +116,8 @@ pub struct ADIcon {
     #[serde(default="default_vec_arg")]
     pub arguments: Vec<ADArgument>,
     #[serde(default="default_vec_return", rename="returnValues")]
-    pub return_values: Vec<ADReturnValue>
+    pub return_values: Vec<ADReturnValue>,
+    pub return_type: Option<String>
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -143,7 +144,7 @@ pub struct ADReturnValue {
     pub description: Vec<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all="camelCase")]
 pub struct ADGameValue {
     pub aliases: Vec<String>,
@@ -210,7 +211,7 @@ pub fn get_actions(action_dump: &RawActionDump, block: &str) -> Vec<Action> {
         if action.codeblock_name != block {
             continue
         }
-        if action.icon.return_values.len() == 0 && action.icon.arguments.len() == 0 && action.icon.material == "STONE" && action.tags.len() == 0 {
+        if action.icon.return_values.len() == 0 && action.icon.arguments.len() == 0 && action.icon.material == "STONE" && action.codeblock_name != "START PROCESS" {
             continue;
         }
 
@@ -243,17 +244,17 @@ pub fn get_action(action: &ADAction) -> Action {
             "LIST" => ArgType::VARIABLE,
             "DICT" => ArgType::VARIABLE,
             "VARIABLE" => ArgType::VARIABLE,
-            "ANY_TYPE" => ArgType::ANY, // TODO test
-
-            //TODO all below
-            "VEHICLE" => ArgType::EMPTY,
-            "ENTITY_TYPE" => ArgType::EMPTY,
             "ITEM" => ArgType::ITEM,
             "BLOCK" => ArgType::ITEM,
             "BLOCK_TAG" => ArgType::STRING,
             "PROJECTILE" => ArgType::ITEM,
             "SPAWN_EGG" => ArgType::ITEM,
+            "ANY_TYPE" => ArgType::ANY,
             "NONE" => ArgType::EMPTY,
+
+            //TODO all below
+            "VEHICLE" => ArgType::EMPTY,
+            "ENTITY_TYPE" => ArgType::EMPTY,
             "OR" => {
                 or_index = index - 1;
                 index_after_or = 0;

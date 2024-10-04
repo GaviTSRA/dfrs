@@ -10,7 +10,7 @@ pub fn compile(node: FileNode, debug: bool) -> Vec<CompiledLine> {
         match function_node(function.clone()) {
             Ok(result) => {
                 res.push(CompiledLine {
-                    name: format!("Function {}", function.name),
+                    name: format!("Function {} {}", function.dfrs_name, function.df_name),
                     code: result.clone()
                 });
                 if debug {
@@ -148,7 +148,7 @@ fn function_node(function_node: FunctionNode) -> Result<String, serde_json::Erro
         action: None,
         args: Some(Args { items }),
         target: None,
-        data: Some(function_node.name),
+        data: Some(function_node.df_name),
         sub_action: None,
         direct: None,
         bracket_type: None
@@ -597,8 +597,8 @@ fn arg_val_from_arg(arg: crate::node::Arg, node_name: String, block: String) -> 
         ArgValue::Variable { name, scope } => {
             Some( Arg { item: ArgItem { data: ArgValueData::Variable { name, scope }, id: String::from("var") }, slot: arg.index } )
         }
-         ArgValue::GameValue { value, selector, .. } => {
-            Some ( Arg { item: ArgItem { data: ArgValueData::GameValue { game_value: value, target: selector }, id: String::from("g_val") }, slot: arg.index })
+         ArgValue::GameValue { df_name, selector, .. } => {
+            Some ( Arg { item: ArgItem { data: ArgValueData::GameValue { game_value: df_name.unwrap(), target: selector }, id: String::from("g_val") }, slot: arg.index })
         }
          ArgValue::Condition { .. } => {
             unreachable!();
