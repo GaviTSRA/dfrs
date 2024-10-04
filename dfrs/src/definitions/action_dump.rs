@@ -13,18 +13,53 @@ pub struct RawActionDump {
     pub game_values: Vec<ADGameValue>,
     #[serde(skip)]
     pub particle_categories: String,
-    #[serde(skip)]
-    pub particles: String,
+    pub particles: Vec<ADParticle>,
     #[serde(skip)]
     pub sound_categories: String,
-    #[serde(skip)]
-    pub sounds: String,
-    #[serde(skip)]
-    pub potions: String,
+    pub sounds: Vec<ADSound>,
+    pub potions: Vec<ADPotion>,
     #[serde(skip)]
     pub cosmetics: String,
     #[serde(skip)]
     pub shops: String
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct ADParticle {
+    particle: String,
+    icon: ADIcon,
+    category: Option<String>,
+    fields: Vec<String>
+}
+
+impl DFRSValue for ADParticle {
+    fn dfrs_name(&self) -> String {
+        self.particle.clone()
+    }
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct ADSound {
+    sound: String,
+    icon: ADIcon,
+}
+
+impl DFRSValue for ADSound {
+    fn dfrs_name(&self) -> String {
+        self.sound.clone()
+    }
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct ADPotion {
+    potion: String,
+    icon: ADIcon,
+}
+
+impl DFRSValue for ADPotion {
+    fn dfrs_name(&self) -> String {
+        self.potion.clone()
+    }
 }
 
 #[derive(Deserialize)]
@@ -61,7 +96,7 @@ pub struct ADTagOption {
     pub aliases: Vec<String>
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all="camelCase")]
 pub struct ADIcon {
     pub material: String,
@@ -84,7 +119,7 @@ pub struct ADIcon {
     pub return_values: Vec<ADReturnValue>
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all="camelCase")]
 pub struct ADArgument {
     #[serde(rename="type", alias="text")]
@@ -99,7 +134,7 @@ pub struct ADArgument {
     pub notes: Vec<Vec<String>>
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all="camelCase")]
 pub struct ADReturnValue {
     #[serde(rename="type", alias="text")]
@@ -159,6 +194,12 @@ pub struct Action {
 impl Action {
     pub fn new(dfrs_name: String, df_name: &str, args: Vec<DefinedArg>, tags: Vec<DefinedTag>, has_conditional_arg: bool) -> Action {
         Action {dfrs_name, df_name: df_name.to_owned(), args, tags, has_conditional_arg}
+    }
+}
+
+impl DFRSValue for Action {
+    fn dfrs_name(&self) -> String {
+        self.dfrs_name.clone()
     }
 }
 
@@ -274,42 +315,49 @@ pub fn get_action(action: &ADAction) -> Action {
     Action::new(name, &action.name, args, tags, action.sub_action_blocks.is_some() && !action.sub_action_blocks.clone().unwrap().is_empty())
 }
 
-#[derive(Debug)]
-pub struct ActionList {
-    pub actions: Vec<Action>,
+trait DFRSValue {
+    fn dfrs_name(&self) -> String;
 }
 
-impl ActionList {
-    pub fn new(action_dump: &RawActionDump, block: &str) -> ActionList {
-        let actions = get_actions(action_dump, block);
-        ActionList { actions }
+#[derive(Debug)]
+pub struct ValueList<T> where T: DFRSValue {
+    pub values: Vec<T>,
+}
+
+impl<T> ValueList<T> where T: DFRSValue {
+    pub fn new(values: Vec<T>) -> ValueList<T> {
+        ValueList { values }
     }
 
-    pub fn get(&self, dfrs_name: String) -> Option<&Action> {
-        self.actions.iter().find(|&action| action.dfrs_name == dfrs_name)
+    pub fn get(&self, dfrs_name: String) -> Option<&T> {
+        self.values.iter().find(|&action| action.dfrs_name() == dfrs_name)
     }
 
-    pub fn all(&self) -> &Vec<Action> {
-        &self.actions
+    pub fn all(&self) -> &Vec<T> {
+        &self.values
     }
 }
 
 #[derive(Debug)]
 pub struct ActionDump {
-    pub player_actions: ActionList,
-    pub entity_actions: ActionList,
-    pub game_actions: ActionList,
-    pub variable_actions: ActionList,
-    pub control_actions: ActionList,
-    pub select_actions: ActionList,
+    pub player_actions: ValueList<Action>,
+    pub entity_actions: ValueList<Action>,
+    pub game_actions: ValueList<Action>,
+    pub variable_actions: ValueList<Action>,
+    pub control_actions: ValueList<Action>,
+    pub select_actions: ValueList<Action>,
     pub start_process_action: Action,
 
-    pub player_conditionals: ActionList,
-    pub entity_conditionals: ActionList,
-    pub game_conditionals: ActionList,
-    pub variable_conditionals: ActionList,
+    pub player_conditionals: ValueList<Action>,
+    pub entity_conditionals: ValueList<Action>,
+    pub game_conditionals: ValueList<Action>,
+    pub variable_conditionals: ValueList<Action>,
 
-    pub repeats: ActionList,
+    pub repeats: ValueList<Action>,
+
+    pub sounds: ValueList<ADSound>,
+    pub potions: ValueList<ADPotion>,
+    pub particles: ValueList<ADParticle>
 }
 
 impl ActionDump {
@@ -325,20 +373,24 @@ impl ActionDump {
         };
 
         ActionDump {
-            player_actions: ActionList::new(action_dump, "PLAYER ACTION"),
-            entity_actions: ActionList::new(action_dump, "ENTITY ACTION"),
-            game_actions: ActionList::new(action_dump, "GAME ACTION"),
-            variable_actions: ActionList::new(action_dump, "SET VARIABLE"),
-            control_actions: ActionList::new(action_dump, "CONTROL"),
-            select_actions: ActionList::new(action_dump, "SELECT OBJECT"),
+            player_actions: ValueList::new(get_actions(action_dump, "PLAYER ACTION")),
+            entity_actions: ValueList::new(get_actions(action_dump, "ENTITY ACTION")),
+            game_actions: ValueList::new(get_actions(action_dump, "GAME ACTION")),
+            variable_actions: ValueList::new(get_actions(action_dump, "SET VARIABLE")),
+            control_actions: ValueList::new(get_actions(action_dump, "CONTROL")),
+            select_actions: ValueList::new(get_actions(action_dump, "SELECT OBJECT")),
             start_process_action,
 
-            player_conditionals: ActionList::new(action_dump, "IF PLAYER"),
-            entity_conditionals: ActionList::new(action_dump, "IF ENTITY"),
-            game_conditionals: ActionList::new(action_dump, "IF GAME"),
-            variable_conditionals: ActionList::new(action_dump, "IF VARIABLE"),
+            player_conditionals: ValueList::new(get_actions(action_dump, "IF PLAYER")),
+            entity_conditionals: ValueList::new(get_actions(action_dump, "IF ENTITY")),
+            game_conditionals: ValueList::new(get_actions(action_dump, "IF GAME")),
+            variable_conditionals: ValueList::new(get_actions(action_dump, "IF VARIABLE")),
 
-            repeats: ActionList::new(action_dump, "REPEAT"),
+            repeats: ValueList::new(get_actions(action_dump, "REPEAT")),
+
+            sounds: ValueList::new(action_dump.sounds.clone()),
+            potions: ValueList::new(action_dump.potions.clone()),
+            particles: ValueList::new(action_dump.particles.clone())
         }
     }
 }

@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use crate::{definitions::{ArgType, DefinedTag}, token::{Position, Selector, Type}};
 
 pub trait Node {
@@ -150,11 +151,46 @@ pub enum ArgValue {
     Vector { x: f32, y: f32, z: f32},
     Sound { sound: String, volume: f32, pitch: f32 },
     Potion { potion: String, amplifier: f32, duration: f32 },
+    Particle { particle: String, cluster: ParticleCluster, data: ParticleData },
     Item { item: String },
-    Tag { tag: String, value: String, definition: Option<DefinedTag>, name_end_pos: Position, value_start_pos: Position },
+    Tag { tag: String, value: Box<ArgValue>, definition: Option<DefinedTag>, name_end_pos: Position, value_start_pos: Position },
     Variable { name: String, scope: String },
     GameValue { value: String, selector: Selector, selector_end_pos: Position },
     Condition { name: String, args: Vec<Arg>, selector: Selector, conditional_type: ConditionalType, inverted: bool }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct ParticleCluster {
+    pub amount: i32,
+    pub horizontal: f32,
+    pub vertical: f32
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(rename_all="camelCase")]
+pub struct ParticleData {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub x: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub y: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub z: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub motion_variation: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rgb: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none", rename="rgb_fade")]
+    pub rgb_fade: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color_variation: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub material: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size_variation: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub roll: Option<f32>,
 }
 
 #[derive(Clone, Debug)]

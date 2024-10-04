@@ -224,6 +224,9 @@ fn compile_cmd(file: &PathBuf) {
                 ParseError::InvalidPotion { pos, msg } => {
                     print_err(format!("Invalid Potion: {}", msg), data, pos, None)
                 }
+                ParseError::InvalidParticle { pos, msg } => {
+                    print_err(format!("Invalid Particle: {}", msg), data, pos, None)
+                }
                 ParseError::InvalidItem { pos, msg } => {
                     print_err(format!("Invalid Item: {}", msg), data, pos, None)
                 }

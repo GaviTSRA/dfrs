@@ -413,6 +413,9 @@ fn compile_file(data: String, path: PathBuf) -> Result<(), CompileErr> {
                 ParseError::InvalidPotion { pos, msg } => {
                     return Err(CompileErr::new(pos, None, format!("Invalid potion '{msg}'")))
                 },
+                ParseError::InvalidParticle { pos, msg } => {
+                    return Err(CompileErr::new(pos, None, format!("Invalid particle '{msg}'")))
+                },
                 ParseError::InvalidItem { pos, msg } => {
                     return Err(CompileErr::new(pos, None, format!("Invalid item '{msg}'")))
                 },

@@ -407,8 +407,12 @@ impl Validator {
             for given_tag in tags.clone() {
                 match given_tag.value {
                     ArgValue::Tag { tag: tag_name, value, name_end_pos, value_start_pos , ..} => {
+                        let actual = match value.clone().as_ref() {
+                            ArgValue::Text { text } => text.clone(),
+                            err => return Err(ValidateError::InvalidTagOption { tag_name, provided: format!("{err:?}"), options: tag.options, start_pos: value_start_pos, end_pos: given_tag.end_pos })
+                        };
                         if tag.dfrs_name == tag_name {
-                            if tag.options.contains(&value) {
+                            if tag.options.contains(&actual) {
                                 matched = true;
                                 args.push(Arg {
                                     arg_type: ArgType::TAG,
@@ -418,7 +422,7 @@ impl Validator {
                                     end_pos: given_tag.end_pos
                                 });
                             } else {
-                                return Err(ValidateError::InvalidTagOption { tag_name, provided: value, options: tag.options, start_pos: value_start_pos, end_pos: given_tag.end_pos });
+                                return Err(ValidateError::InvalidTagOption { tag_name, provided: actual, options: tag.options, start_pos: value_start_pos, end_pos: given_tag.end_pos });
                             }
                         }
                     }
@@ -426,9 +430,10 @@ impl Validator {
                 }
             }
             if !matched {
+                let data = Box::new(ArgValue::Text {text:tag.default.clone()});
                 args.push(Arg {
                     arg_type: ArgType::TAG,
-                    value: ArgValue::Tag { tag: tag.df_name.clone(), value: tag.default.clone(), definition: Some(tag.clone()), name_end_pos: Position::new(0, 0), value_start_pos: Position::new(0, 0) },
+                    value: ArgValue::Tag { tag: tag.df_name.clone(), value: data, definition: Some(tag.clone()), name_end_pos: Position::new(0, 0), value_start_pos: Position::new(0, 0) },
                     index: tag.slot as i32,
                     start_pos: Position::new(0, 0),
                     end_pos: Position::new(0, 0)

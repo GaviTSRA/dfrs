@@ -26,12 +26,9 @@ Available configs:
 - Documentation is lacking
 - The extension is not ready for use
 - Variables are not type checked
-- There is no way to represent items
-- Processes cannot be created or called
 - Actions with multiple possible arguments are not correctly type checked
 - Function calls are not validated
-- Potion names and sound names are not validated
-- Particles cannot be represented
+- Potions, sounds and particles names are not validated
 - Error handling is lacking
 - Some argument types are not implemented
 - Multiline errors are not properly printed

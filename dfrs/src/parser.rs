@@ -1,5 +1,5 @@
 use crate::{definitions::ArgType, node::{ActionNode, ActionType, Arg, ArgValue, ArgValueWithPos, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, ExpressionNode, FileNode, FunctionNode, FunctionParamNode, ProcessNode, RepeatNode, VariableNode, VariableType}, token::{Keyword, Position, Selector, Token, TokenWithPos, SELECTORS, TYPES}};
-use crate::node::StartNode;
+use crate::node::{ParticleCluster, ParticleData, StartNode};
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -11,6 +11,7 @@ pub enum ParseError {
     InvalidVector { pos: Position, msg: String },
     InvalidSound { pos: Position, msg: String },
     InvalidPotion { pos: Position, msg: String },
+    InvalidParticle { pos: Position, msg: String },
     InvalidItem { pos: Position, msg: String },
     InvalidType { found: Option<TokenWithPos>, start_pos: Position }
 }
@@ -730,20 +731,48 @@ impl Parser {
                 is_tag = false;
                 match token.token.clone() {
                     Token::String { value } => {
+                        let data = Box::new(ArgValue::Text {text: value});
                         params.push(ArgValueWithPos {
-                            value: ArgValue::Tag { tag: tag_name.clone(), value, definition: None, name_end_pos: tag_end_pos.clone(), value_start_pos: token.start_pos.clone() },
+                            value: ArgValue::Tag { tag: tag_name.clone(), value: data, definition: None, name_end_pos: tag_end_pos.clone(), value_start_pos: token.start_pos.clone() },
                             start_pos: tag_start_pos.clone(),
                             end_pos: token.end_pos
                         });
                         is_value = true;
                     }
                     Token::Text { value } => {
+                        let data = Box::new(ArgValue::Text {text: value});
                         params.push(ArgValueWithPos {
-                            value: ArgValue::Tag { tag: tag_name.clone(), value, definition: None, name_end_pos: tag_end_pos.clone(), value_start_pos: token.start_pos },
+                            value: ArgValue::Tag { tag: tag_name.clone(), value: data, definition: None, name_end_pos: tag_end_pos.clone(), value_start_pos: token.start_pos },
                             start_pos: tag_start_pos.clone(),
                             end_pos: token.end_pos
                         });
                         is_value = true;
+                    }
+                    Token::Number { value } => {
+                        let data = Box::new(ArgValue::Number {number: value});
+                        params.push(ArgValueWithPos {
+                            value: ArgValue::Tag { tag: tag_name.clone(), value: data, definition: None, name_end_pos: tag_end_pos.clone(), value_start_pos: token.start_pos },
+                            start_pos: tag_start_pos.clone(),
+                            end_pos: token.end_pos
+                        });
+                        is_value = true;
+                    }
+                    Token::Identifier { value } => {
+                        match value.as_str() {
+                            "Vector" => {
+                                let vector = self.make_vector()?;
+                                let data = Box::new(vector.value);
+                                params.push(ArgValueWithPos {
+                                    value: ArgValue::Tag { tag: tag_name.clone(), value: data, definition: None, name_end_pos: tag_end_pos.clone(), value_start_pos: token.start_pos },
+                                    start_pos: tag_start_pos.clone(),
+                                    end_pos: token.end_pos
+                                });
+                                is_value = true;
+                            }
+                            _ => {
+                                return Err(ParseError::InvalidToken { found: Some(token), expected: vec![Token::String { value: "<any>".into() }, Token::Text { value: "<any>".into() }] })
+                            }
+                        }
                     }
                     _ => {
                         return Err(ParseError::InvalidToken { found: Some(token), expected: vec![Token::String { value: "<any>".into() }, Token::Text { value: "<any>".into() }] })
@@ -828,6 +857,10 @@ impl Parser {
                                 params.push(self.make_potion()?);
                                 is_value = true;
                             }
+                            "Particle" => {
+                                params.push(self.make_particle()?);
+                                is_value = true;
+                            }
                             "Item" => {
                                 params.push(self.make_item()?);
                                 is_value = true;
@@ -884,6 +917,7 @@ impl Parser {
                 ArgValue::Location { .. } => ArgType::LOCATION,
                 ArgValue::Potion { .. } => ArgType::POTION,
                 ArgValue::Sound { .. } => ArgType::SOUND,
+                ArgValue::Particle { .. } => ArgType::PARTICLE,
                 ArgValue::Item { .. } => ArgType::ITEM,
                 ArgValue::Vector { .. } => ArgType::VECTOR,
                 ArgValue::Tag { ..} => ArgType::TAG,
@@ -1044,6 +1078,138 @@ impl Parser {
         }
         Ok(ArgValueWithPos {
             value: ArgValue::Potion { potion, amplifier, duration },
+            start_pos,
+            end_pos: self.current_token.clone().unwrap().end_pos
+        })
+    }
+
+    fn make_particle(&mut self) -> Result<ArgValueWithPos, ParseError> {
+        let start_pos = self.current_token.clone().unwrap().start_pos;
+        let mut particle_params = self.make_params()?;
+
+        if particle_params.len() < 4 {
+            return Err(ParseError::InvalidParticle { pos: self.current_token.clone().unwrap().start_pos, msg: "Not enough arguments".into() })
+        }
+        let particle = match particle_params.remove(0).value {
+            ArgValue::String { string } => string.clone(),
+            ArgValue::Text { text } => text.clone(),
+            _ => return Err(ParseError::InvalidParticle { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid particle type".into() })
+        };
+        let amount = match particle_params.remove(0).value {
+            ArgValue::Number { number } => number as i32,
+            _ => return Err(ParseError::InvalidParticle { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid particle amount".into() })
+        };
+        let horizontal = match particle_params.remove(0).value {
+            ArgValue::Number { number } => number,
+            _ => return Err(ParseError::InvalidParticle { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid particle horizontal spread".into() })
+        };
+        let vertical = match particle_params.remove(0).value {
+            ArgValue::Number { number } => number,
+            _ => return Err(ParseError::InvalidParticle { pos: self.current_token.clone().unwrap().start_pos, msg: "Invalid particle vertical spread".into() })
+        };
+
+        let mut x: Option<f32> = None;
+        let mut y: Option<f32> = None;
+        let mut z: Option<f32> = None;
+        let mut motion_variation: Option<i32> = None;
+        let mut rgb: Option<i32> = None;
+        let mut rgb_fade: Option<i32> = None;
+        let mut color_variation: Option<i32> = None;
+        let mut material: Option<String> = None;
+        let mut size: Option<f32> = None;
+        let mut size_variation: Option<i32> = None;
+        let mut roll: Option<f32> = None;
+        for arg in particle_params {
+            match arg.value {
+                ArgValue::Tag { tag, value, ..} => {
+                    match tag.as_str() {
+                        "motion" => {
+                            match value.as_ref() {
+                                ArgValue::Vector { x: x2, y: y2, z: z2} => {
+                                    x = Some(x2.clone());
+                                    y = Some(y2.clone());
+                                    z = Some(z2.clone());
+                                }
+                                _ => return Err(ParseError::InvalidParticle { pos: self.current_token.clone().unwrap().start_pos, msg: "Expected motion to be vector".into() })
+                            }
+                        }
+                        "motionVariation" => {
+                            match value.as_ref() {
+                                ArgValue::Number { number } => motion_variation = Some(number.clone() as i32),
+                                _ => return Err(ParseError::InvalidParticle { pos: self.current_token.clone().unwrap().start_pos, msg: "Expected motion variation to be number".into() })
+                            }
+                        }
+                        "rgb" => {
+                            match value.as_ref() {
+                                ArgValue::Number { number } => rgb = Some(number.clone() as i32),
+                                _ => return Err(ParseError::InvalidParticle { pos: self.current_token.clone().unwrap().start_pos, msg: "Expected rgb to be number".into() })
+                            }
+                        }
+                        "rgbFade" => {
+                            match value.as_ref() {
+                                ArgValue::Number { number } => rgb_fade = Some(number.clone() as i32),
+                                _ => return Err(ParseError::InvalidParticle { pos: self.current_token.clone().unwrap().start_pos, msg: "Expected rgb fade to be number".into() })
+                            }
+                        }
+                        "colorVariation" => {
+                            match value.as_ref() {
+                                ArgValue::Number { number } => color_variation = Some(number.clone() as i32),
+                                _ => return Err(ParseError::InvalidParticle { pos: self.current_token.clone().unwrap().start_pos, msg: "Expected color variation to be number".into() })
+                            }
+                        }
+                        "material" => {
+                            match value.as_ref() {
+                                ArgValue::Text { text } => material = Some(text.clone()),
+                                _ => return Err(ParseError::InvalidParticle { pos: self.current_token.clone().unwrap().start_pos, msg: "Expected material to be text".into() })
+                            }
+                        }
+                        "size" => {
+                            match value.as_ref() {
+                                ArgValue::Number { number } => size = Some(number.clone()),
+                                _ => return Err(ParseError::InvalidParticle { pos: self.current_token.clone().unwrap().start_pos, msg: "Expected size to be number".into() })
+                            }
+                        }
+                        "sizeVariation" => {
+                            match value.as_ref() {
+                                ArgValue::Number { number } => size_variation = Some(number.clone() as i32),
+                                _ => return Err(ParseError::InvalidParticle { pos: self.current_token.clone().unwrap().start_pos, msg: "Expected size variation to be number".into() })
+                            }
+                        }
+                        "roll" => {
+                            match value.as_ref() {
+                                ArgValue::Number { number } => roll = Some(number.clone()),
+                                _ => return Err(ParseError::InvalidParticle { pos: self.current_token.clone().unwrap().start_pos, msg: "Expected roll to be number".into() })
+                            }
+                        }
+                        _ => return Err(ParseError::InvalidParticle { pos: self.current_token.clone().unwrap().start_pos, msg: "Unknown tag".into() })
+                    }
+                }
+                _ => return Err(ParseError::InvalidParticle { pos: self.current_token.clone().unwrap().start_pos, msg: "Too many arguments".into() })
+            }
+        }
+
+        Ok(ArgValueWithPos {
+            value: ArgValue::Particle {
+                particle,
+                cluster: ParticleCluster {
+                    amount,
+                    horizontal,
+                    vertical
+                },
+                data: ParticleData {
+                    x,
+                    y,
+                    z,
+                    motion_variation,
+                    rgb,
+                    rgb_fade,
+                    color_variation,
+                    material,
+                    size,
+                    size_variation,
+                    roll,
+                }
+            },
             start_pos,
             end_pos: self.current_token.clone().unwrap().end_pos
         })

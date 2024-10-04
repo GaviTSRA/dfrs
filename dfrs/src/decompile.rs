@@ -483,8 +483,37 @@ impl Decompiler {
                         }
                     }
                     ArgValueData::FunctionParam { .. } => {}
-                    ArgValueData::Particle { .. } => {
-                        // TODO
+                    ArgValueData::Particle { particle, cluster, data } => {
+                        let mut tags = String::new();
+                        if let (Some(x), Some(y), Some(z)) = (data.x, data.y, data.z) {
+                            tags.push_str(&format!(", motion=Vector({x},{y},{z})"))
+                        }
+                        if let Some(motionVariation) = data.motion_variation {
+                            tags.push_str(&format!(", motionVariation={motionVariation}"))
+                        }
+                        if let Some(rgb) = data.rgb {
+                            tags.push_str(&format!(", rgb={rgb}"))
+                        }
+                        if let Some(rgb_fade) = data.rgb_fade {
+                            tags.push_str(&format!(", rgb_fade={rgb_fade}"))
+                        }
+                        if let Some(color_variation) = data.color_variation {
+                            tags.push_str(&format!(", colorVariation={color_variation}"))
+                        }
+                        if let Some(material) = data.material {
+                            tags.push_str(&format!(", material=\"{material}\""))
+                        }
+                        if let Some(size) = data.size {
+                            tags.push_str(&format!(", size={size}"))
+                        }
+                        if let Some(size_variation) = data.size_variation {
+                            tags.push_str(&format!(", sizeVariation={size_variation}"))
+                        }
+                        if let Some(roll) = data.roll {
+                            tags.push_str(&format!(", roll={roll}"))
+                        }
+
+                        result.push_str(&format!("Particle(\"{particle}\", {}, {}, {}{tags})", cluster.amount, cluster.horizontal, cluster.vertical))
                     }
                 }
             }

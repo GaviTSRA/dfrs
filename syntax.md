@@ -156,9 +156,14 @@ Sound(name as string or text, volume, pitch)
 Sound("Cow Ambient", 1, 2) 
 ```
 ## Potions
-Sound(type as string or text, amplifier, duration)
+Potion(type as string or text, amplifier, duration)
 ```
 Potion("strength", 2, 10)
+```
+## Particles
+Particle(type as text, amount, horizontal_spread, verticle_spread, [tags])
+```
+Particle("Cloud", 1, 1, 0, motionVariation=50, motion=Vector(0, 1, 0))
 ```
 ## Items
 Item(NBT)

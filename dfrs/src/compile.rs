@@ -1,7 +1,7 @@
 use std::fmt;
 use serde::{de, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::{MapAccess, Visitor};
-use crate::node::{ProcessNode, StartNode};
+use crate::node::{ArgValue, ParticleCluster, ParticleData, ProcessNode, StartNode};
 use crate::{node::{ActionNode, ActionType, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, FileNode, FunctionNode, RepeatNode}, token::{get_type_str, Selector}};
 
 pub fn compile(node: FileNode, debug: bool) -> Vec<CompiledLine> {
@@ -399,7 +399,7 @@ fn repeat_node(node: RepeatNode) -> Vec<Block> {
     if !node.clone().args.is_empty() {
         let arg =  node.args.get(0).clone().unwrap();
         match arg.value.clone() {
-            crate::node::ArgValue::Condition { name, args: new_args, selector, inverted, .. } => {
+            ArgValue::Condition { name, args: new_args, selector, inverted, .. } => {
                 for arg in new_args {
                     let arg = match arg_val_from_arg(arg, node.name.clone(), "repeat".to_owned()) {
                         Some(res) => res,
@@ -437,7 +437,7 @@ fn repeat_node(node: RepeatNode) -> Vec<Block> {
             attribute,
             data: None,
             direct: None,
-            sub_action: sub_action,
+            sub_action,
             bracket_type: None
         },
         Block {
@@ -497,7 +497,7 @@ fn action_node(node: ActionNode) -> Block {
     if !node.clone().args.is_empty() {
         let arg =  node.args.get(0).clone().unwrap();
         match arg.value.clone() {
-            crate::node::ArgValue::Condition { name, args: new_args, selector, inverted, .. } => {
+            ArgValue::Condition { name, args: new_args, selector, inverted, .. } => {
                 for arg in new_args {
                     let arg = match arg_val_from_arg(arg, node.name.clone(), "repeat".to_owned()) {
                         Some(res) => res,
@@ -551,49 +551,56 @@ fn action_node(node: ActionNode) -> Block {
 
 fn arg_val_from_arg(arg: crate::node::Arg, node_name: String, block: String) -> Option<Arg> {
     let arg = match arg.value {
-        crate::node::ArgValue::Empty => None,
-        crate::node::ArgValue::Text { text } => {
+        ArgValue::Empty => None,
+        ArgValue::Text { text } => {
             Some( Arg { item: ArgItem { data: ArgValueData::Simple { name: text }, id: String::from("comp") }, slot: arg.index } )       
         }
-        crate::node::ArgValue::Number { number } => {
+        ArgValue::Number { number } => {
             Some( Arg { item: ArgItem { data: ArgValueData::Simple { name: number.to_string() }, id: String::from("num") }, slot: arg.index} )
         }
-        crate::node::ArgValue::ComplexNumber { number } => {
+        ArgValue::ComplexNumber { number } => {
             Some( Arg { item: ArgItem { data: ArgValueData::Simple { name: number.to_string() }, id: String::from("num") }, slot: arg.index} )
         }
-        crate::node::ArgValue::String { string } => {
+        ArgValue::String { string } => {
             Some( Arg { item: ArgItem { data: ArgValueData::Simple { name: string }, id: String::from("txt") }, slot: arg.index } )
         }
-        crate::node::ArgValue::Location { x, y, z, pitch, yaw } => {
+        ArgValue::Location { x, y, z, pitch, yaw } => {
             Some( Arg { item: ArgItem { data: ArgValueData::Location { is_block: false, loc: Location { x, y, z, pitch, yaw } }, id: String::from("loc") }, slot: arg.index } )
         } 
-        crate::node::ArgValue::Vector { x, y, z } => {
+        ArgValue::Vector { x, y, z } => {
             Some( Arg { item: ArgItem { data: ArgValueData::Vector { x, y, z }, id: String::from("vec") }, slot: arg.index } )
         }
-        crate::node::ArgValue::Sound { sound, volume, pitch } => {
+        ArgValue::Sound { sound, volume, pitch } => {
             Some( Arg { item: ArgItem { data: ArgValueData::Sound { sound, volume, pitch }, id: String::from("snd") }, slot: arg.index } )
         }
-        crate::node::ArgValue::Potion { potion, amplifier, duration } => {
+        ArgValue::Potion { potion, amplifier, duration } => {
             Some( Arg { item: ArgItem { data: ArgValueData::Potion { potion, amplifier, duration }, id: String::from("pot") }, slot: arg.index } )
         }
-        crate::node::ArgValue::Item { item } => {
+        ArgValue::Particle { particle, cluster, data } => {
+            Some( Arg { item: ArgItem { data: ArgValueData::Particle { particle, cluster, data }, id: String::from("part") }, slot: arg.index } )
+        }
+        ArgValue::Item { item } => {
             Some( Arg { item: ArgItem { data: ArgValueData::Item { item }, id: String::from("item") }, slot: arg.index } )
         }
-        crate::node::ArgValue::Tag { tag, value, definition, .. } => {
-           Some( Arg { item: ArgItem { data: ArgValueData::Tag {
-            action: node_name,
-            block,
-            option: value,
-            tag
-           }, id: String::from("bl_tag")}, slot: definition.unwrap().slot as i32})
+        ArgValue::Tag { tag, value, definition, .. } => {
+            let value = match value.as_ref() {
+                ArgValue::Text { text } => text.clone(),
+                _ => unreachable!()
+            };
+            Some( Arg { item: ArgItem { data: ArgValueData::Tag {
+                action: node_name,
+                block,
+                option: value,
+                tag
+            }, id: String::from("bl_tag")}, slot: definition.unwrap().slot as i32})
         }
-        crate::node::ArgValue::Variable { name, scope } => {
+        ArgValue::Variable { name, scope } => {
             Some( Arg { item: ArgItem { data: ArgValueData::Variable { name, scope }, id: String::from("var") }, slot: arg.index } )
         }
-        crate::node::ArgValue::GameValue { value, selector, .. } => {
+         ArgValue::GameValue { value, selector, .. } => {
             Some ( Arg { item: ArgItem { data: ArgValueData::GameValue { game_value: value, target: selector }, id: String::from("g_val") }, slot: arg.index })
         }
-        crate::node::ArgValue::Condition { .. } => {
+         ArgValue::Condition { .. } => {
             unreachable!();
         }
     };
@@ -674,24 +681,6 @@ pub enum ArgValueData {
         cluster: ParticleCluster,
         data: ParticleData,
     }
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct ParticleCluster {
-    amount: i32,
-    horizontal: f32,
-    vertical: f32
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(rename_all="camelCase")]
-pub struct ParticleData {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    rgb: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    color_variation: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    motion_variation: Option<i32>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
