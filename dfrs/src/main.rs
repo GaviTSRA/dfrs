@@ -299,9 +299,12 @@ enum Commands {
         path: PathBuf,
     },
     Decompile {
-        code: String
+        code: String,
+        file: Option<PathBuf>
     },
-    DecompilePlot {},
+    DecompilePlot {
+        file: Option<PathBuf>
+    },
     LSP {}
 }
 
@@ -344,11 +347,16 @@ fn main() {
             new_config.save(&config_path);
             println!("{} {}", "Created new config".green(), config_path.to_string_lossy());
         }
-        Some(Commands::Decompile { code }) => {
+        Some(Commands::Decompile { code, file }) => {
             let mut decompiler = Decompiler::new();
-            decompiler.decompile(code);
+            let result = decompiler.decompile(code);
+            if let Some(file) = file {
+                fs::write(file, result).expect("Failed to write file");
+            } else {
+                println!("{}", result)
+            }
         }
-        Some(Commands::DecompilePlot {}) => {
+        Some(Commands::DecompilePlot { file }) => {
             let (mut socket, response) = connect(Url::parse("ws://localhost:31375").unwrap()).expect("Can't connect");
             socket.send(Message::Text("scopes read_plot".into())).unwrap();
 
@@ -356,9 +364,17 @@ fn main() {
             socket.send(Message::Text("scan".into())).unwrap();
             let msg = socket.read().expect("Error reading message");
 
+            let mut result = String::new();
             for line in msg.to_text().unwrap().split('\n') {
                 let mut decompiler = Decompiler::new();
-                decompiler.decompile(line);
+                result.push_str(&decompiler.decompile(line));
+                result.push_str("\n");
+            }
+
+            if let Some(file) = file {
+                fs::write(file, result).expect("Failed to write file");
+            } else {
+                println!("{}", result)
             }
         }
         Some(Commands::LSP {}) => {

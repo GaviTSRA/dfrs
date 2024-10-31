@@ -31,6 +31,7 @@ pub struct Decompiler {
     indentation: i32,
     action_dump: ActionDump,
     vars: HashMap<String, String>,
+    result: String
 }
 
 impl Decompiler {
@@ -40,12 +41,13 @@ impl Decompiler {
             indentation: 0,
             action_dump: ActionDump::new(&ad),
             vars: HashMap::new(),
+            result: String::new(),
         }
     }
 
-    fn add(&self, line: &str) {
+    fn add(&mut self, line: &str) {
         let indentation = " ".repeat((self.indentation*2) as usize);
-        println!("{indentation}{line}");
+        self.result.push_str(&format!("{indentation}{line}\n"));
     }
 
     fn indent(&mut self) {
@@ -60,7 +62,7 @@ impl Decompiler {
         self.vars.insert(old_name.to_string(), new_name.to_string());
     }
 
-    pub fn decompile(&mut self, code: &str) {
+    pub fn decompile(&mut self, code: &str) -> String {
         let json = decompress(code);
         let line: Codeline = serde_json::from_str(&json).unwrap();
         let mut global_vars = vec![];
@@ -117,6 +119,7 @@ impl Decompiler {
         }
         self.unindent();
         self.add("}");
+        self.result.clone()
     }
 
     fn decompile_bracket(&mut self, block: Block) {
@@ -307,7 +310,7 @@ impl Decompiler {
         }
     }
 
-    fn decompile_action(&self, block: Block, action_type: ActionType) {
+    fn decompile_action(&mut self, block: Block, action_type: ActionType) {
         let name = to_dfrs_name(&block.action.clone().unwrap());
         let action = match match action_type {
             ActionType::Player => self.action_dump.player_actions.get(name.clone()),
@@ -338,14 +341,14 @@ impl Decompiler {
         self.add(&format!("{prefix}{selector}.{}({});", name, self.decompile_params(block, action)))
     }
 
-    fn decompile_conditional(&self, block: Block, conditional_type: ConditionalType) {
+    fn decompile_conditional(&mut self, block: Block, conditional_type: ConditionalType) {
         let name = to_dfrs_name(&block.action.clone().unwrap());
         let action = match conditional_type {
             ConditionalType::Player => self.action_dump.player_conditionals.get(name.clone()),
             ConditionalType::Entity => self.action_dump.entity_conditionals.get(name.clone()),
             ConditionalType::Game => self.action_dump.game_conditionals.get(name.clone()),
             ConditionalType::Variable =>self.action_dump.variable_conditionals.get(name.clone())
-        }.unwrap();
+        }.unwrap().clone();
         let prefix = match conditional_type {
             ConditionalType::Player => "ifp",
             ConditionalType::Entity => "ife",
@@ -361,16 +364,16 @@ impl Decompiler {
         } else {
             ""
         };
-        self.add(&format!("{prefix} {inverted}{selector}{}({}) {{", name, self.decompile_params(block, action)))
+        self.add(&format!("{prefix} {inverted}{selector}{}({}) {{", name, self.decompile_params(block, &action)))
     }
 
-    fn decompile_repeat(&self, block: Block) {
+    fn decompile_repeat(&mut self, block: Block) {
         let name = to_dfrs_name(&block.action.clone().unwrap());
-        let action = self.action_dump.repeats.get(name.clone()).unwrap();
-        self.add(&format!("repeat {}({}) {{", name, self.decompile_params(block, action)))
+        let action = self.action_dump.repeats.get(name.clone()).unwrap().clone();
+        self.add(&format!("repeat {}({}) {{", name, self.decompile_params(block, &action)))
     }
 
-    fn decompile_call(&self, block: Block) {
+    fn decompile_call(&mut self, block: Block) {
         let mut args = vec![];
         for _ in &block.args {
             args.push(DefinedArg {
@@ -388,14 +391,14 @@ impl Decompiler {
             has_conditional_arg: false
         };
         if block.args.is_some() && block.args.clone().unwrap().items.len() > 0 {
-            self.add(&format!("call(\"{}\", {});", to_dfrs_name(&block.data.clone().unwrap()), self.decompile_params(block, action)));
+            self.add(&format!("call(\"{}\", {});", to_dfrs_name(&block.data.clone().unwrap()), self.decompile_params(block.clone(), action)));
         } else {
             self.add(&format!("call(\"{}\");", to_dfrs_name(&block.data.clone().unwrap())));
         }
     }
 
-    fn decompile_start(&self, block: Block) {
-        let params = self.decompile_params(block.clone(), &self.action_dump.start_process_action);
+    fn decompile_start(&mut self, block: Block) {
+        let params = self.decompile_params(block.clone(), &self.action_dump.start_process_action.clone());
         if &params == "" {
             self.add(&format!("start(\"{}\");", to_dfrs_name(&block.data.clone().unwrap())));
         } else {

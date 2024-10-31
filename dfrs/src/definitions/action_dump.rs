@@ -183,7 +183,7 @@ fn default_vec_return() -> Vec<ADReturnValue> {
     vec![]
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Action {
     pub dfrs_name: String,
     pub df_name: String,
