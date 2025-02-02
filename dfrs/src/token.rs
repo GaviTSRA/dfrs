@@ -189,7 +189,7 @@ pub enum Selector {
     Projectile,
     AllEntities,
     AllMobs,
-    LastSpawned
+    LastEntity
 }
 
 pub static SELECTORS: phf::Map<&'static str, Selector> = phf_map! {
@@ -203,7 +203,7 @@ pub static SELECTORS: phf::Map<&'static str, Selector> = phf_map! {
     "projectile" => Selector::Projectile,
     "allEntities" => Selector::AllEntities,
     "allMobs" => Selector::AllMobs,
-    "last" => Selector::LastSpawned,
+    "last" => Selector::LastEntity,
 };
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]

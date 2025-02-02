@@ -105,22 +105,22 @@ impl Validator {
     fn validate_action_node(&self, mut action_node: ActionNode) -> Result<ActionNode, ValidateError> {
         let mut action = match action_node.action_type {
             ActionType::Player => {
-                self.action_dump.player_actions.get(action_node.clone().name)
+                self.action_dump.player_actions.get(&action_node.name)
             }
             ActionType::Entity => {
-                self.action_dump.entity_actions.get(action_node.clone().name)
+                self.action_dump.entity_actions.get(&action_node.name)
             }
             ActionType::Game => {
-                self.action_dump.game_actions.get(action_node.clone().name)
+                self.action_dump.game_actions.get(&action_node.name)
             }
             ActionType::Variable => {
-                self.action_dump.variable_actions.get(action_node.clone().name)
+                self.action_dump.variable_actions.get(&action_node.name)
             }
             ActionType::Control => {
-                self.action_dump.control_actions.get(action_node.clone().name)
+                self.action_dump.control_actions.get(&action_node.name)
             }
             ActionType::Select => {
-                self.action_dump.select_actions.get(action_node.clone().name)
+                self.action_dump.select_actions.get(&action_node.name)
             }
         };
 
@@ -141,10 +141,10 @@ impl Validator {
                     action_node.args = args;
                     was_condition = true;
                     action = match conditional_type {
-                        ConditionalType::Player => self.action_dump.player_conditionals.get(name),
-                        ConditionalType::Entity => self.action_dump.entity_conditionals.get(name),
-                        ConditionalType::Game => self.action_dump.game_conditionals.get(name),
-                        ConditionalType::Variable => self.action_dump.variable_conditionals.get(name),
+                        ConditionalType::Player => self.action_dump.player_conditionals.get(&name),
+                        ConditionalType::Entity => self.action_dump.entity_conditionals.get(&name),
+                        ConditionalType::Game => self.action_dump.game_conditionals.get(&name),
+                        ConditionalType::Variable => self.action_dump.variable_conditionals.get(&name),
                     }
                 }
                 _ => unreachable!()
@@ -179,16 +179,16 @@ impl Validator {
     fn validate_conditional_node(&self, mut conditional_node: ConditionalNode) -> Result<ConditionalNode, ValidateError> {
         let action = match conditional_node.conditional_type {
             ConditionalType::Player => {
-                self.action_dump.player_conditionals.get(conditional_node.clone().name)
+                self.action_dump.player_conditionals.get(&conditional_node.name)
             }
             ConditionalType::Entity => {
-                self.action_dump.entity_conditionals.get(conditional_node.clone().name)
+                self.action_dump.entity_conditionals.get(&conditional_node.name)
             }
             ConditionalType::Game => {
-                self.action_dump.game_conditionals.get(conditional_node.clone().name)
+                self.action_dump.game_conditionals.get(&conditional_node.name)
             }
             ConditionalType::Variable => {
-                self.action_dump.variable_conditionals.get(conditional_node.clone().name)
+                self.action_dump.variable_conditionals.get(&conditional_node.name)
             }
         };
 
@@ -228,6 +228,7 @@ impl Validator {
         let action = Action {
             df_name: "internal".into(),
             dfrs_name: "internal".into(),
+            aliases: vec![],
             args,
             tags: vec![],
             has_conditional_arg: false
@@ -242,7 +243,7 @@ impl Validator {
     }
 
     fn validate_repeat_node(&self, mut repeat_node: RepeatNode) -> Result<RepeatNode, ValidateError> {
-        let mut action = self.action_dump.repeats.get(repeat_node.clone().name);
+        let mut action = self.action_dump.repeats.get(&repeat_node.name);
         let mut old_args = vec![];
         let mut old_name = "".into();
         let mut was_condition = false;
@@ -260,10 +261,10 @@ impl Validator {
                     repeat_node.args = args;
                     was_condition = true;
                     action = match conditional_type {
-                        ConditionalType::Player => self.action_dump.player_conditionals.get(name),
-                        ConditionalType::Entity => self.action_dump.entity_conditionals.get(name),
-                        ConditionalType::Game => self.action_dump.game_conditionals.get(name),
-                        ConditionalType::Variable => self.action_dump.variable_conditionals.get(name),
+                        ConditionalType::Player => self.action_dump.player_conditionals.get(&name),
+                        ConditionalType::Entity => self.action_dump.entity_conditionals.get(&name),
+                        ConditionalType::Game => self.action_dump.game_conditionals.get(&name),
+                        ConditionalType::Variable => self.action_dump.variable_conditionals.get(&name),
                     }
                 }
                 _ => unreachable!()

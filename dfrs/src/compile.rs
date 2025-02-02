@@ -497,9 +497,21 @@ fn action_node(node: ActionNode) -> Block {
     if !node.clone().args.is_empty() {
         let arg =  node.args.get(0).clone().unwrap();
         match arg.value.clone() {
-            ArgValue::Condition { name, args: new_args, selector, inverted, .. } => {
+            ArgValue::Condition { mut name, args: new_args, selector, inverted, conditional_type } => {
+                // TODO temporary fix
+                if name == String::from("NameEquals") && conditional_type == ConditionalType::Entity {
+                    name = String::from("ENameEquals");
+                }
+
                 for arg in new_args {
-                    let arg = match arg_val_from_arg(arg, node.name.clone(), "repeat".to_owned()) {
+                    let sub_block = match conditional_type {
+                        ConditionalType::Player => "if_player".to_string(),
+                        ConditionalType::Entity => "if_entity".to_string(),
+                        ConditionalType::Game => "if_game".to_string(),
+                        ConditionalType::Variable => "if_var".to_string(),
+                    };
+
+                    let arg = match arg_val_from_arg(arg, name.clone(), sub_block) {
                         Some(res) => res,
                         None => continue
                     };

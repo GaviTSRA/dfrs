@@ -313,12 +313,12 @@ impl Decompiler {
     fn decompile_action(&mut self, block: Block, action_type: ActionType) {
         let name = to_dfrs_name(&block.action.clone().unwrap());
         let action = match match action_type {
-            ActionType::Player => self.action_dump.player_actions.get(name.clone()),
-            ActionType::Entity => self.action_dump.entity_actions.get(name.clone()),
-            ActionType::Game => self.action_dump.game_actions.get(name.clone()),
-            ActionType::Variable => self.action_dump.variable_actions.get(name.clone()),
-            ActionType::Control => self.action_dump.control_actions.get(name.clone()),
-            ActionType::Select => self.action_dump.select_actions.get(name.clone()),
+            ActionType::Player => self.action_dump.player_actions.get(&name),
+            ActionType::Entity => self.action_dump.entity_actions.get(&name),
+            ActionType::Game => self.action_dump.game_actions.get(&name),
+            ActionType::Variable => self.action_dump.variable_actions.get(&name),
+            ActionType::Control => self.action_dump.control_actions.get(&name),
+            ActionType::Select => self.action_dump.select_actions.get(&name),
         } {
             Some(res) => res,
             None => {
@@ -344,10 +344,10 @@ impl Decompiler {
     fn decompile_conditional(&mut self, block: Block, conditional_type: ConditionalType) {
         let name = to_dfrs_name(&block.action.clone().unwrap());
         let action = match conditional_type {
-            ConditionalType::Player => self.action_dump.player_conditionals.get(name.clone()),
-            ConditionalType::Entity => self.action_dump.entity_conditionals.get(name.clone()),
-            ConditionalType::Game => self.action_dump.game_conditionals.get(name.clone()),
-            ConditionalType::Variable =>self.action_dump.variable_conditionals.get(name.clone())
+            ConditionalType::Player => self.action_dump.player_conditionals.get(&name),
+            ConditionalType::Entity => self.action_dump.entity_conditionals.get(&name),
+            ConditionalType::Game => self.action_dump.game_conditionals.get(&name),
+            ConditionalType::Variable =>self.action_dump.variable_conditionals.get(&name)
         }.unwrap().clone();
         let prefix = match conditional_type {
             ConditionalType::Player => "ifp",
@@ -369,7 +369,7 @@ impl Decompiler {
 
     fn decompile_repeat(&mut self, block: Block) {
         let name = to_dfrs_name(&block.action.clone().unwrap());
-        let action = self.action_dump.repeats.get(name.clone()).unwrap().clone();
+        let action = self.action_dump.repeats.get(&name).unwrap().clone();
         self.add(&format!("repeat {}({}) {{", name, self.decompile_params(block, &action)))
     }
 
@@ -386,6 +386,7 @@ impl Decompiler {
         let action = &Action {
             df_name: "internal".into(),
             dfrs_name: "internal".into(),
+            aliases: vec![],
             args,
             tags: vec![],
             has_conditional_arg: false
@@ -409,6 +410,22 @@ impl Decompiler {
 
     fn decompile_params(&self, block: Block, action: &Action) -> String {
         let mut result = String::from("");
+
+        if let Some(sub_action_name) = block.sub_action.clone() {
+            if let Some(action) = &self.action_dump.player_conditionals.get_df(&sub_action_name) {
+                result.push_str(&format!("ifp {}(", action.dfrs_name));
+            }
+            if let Some(action) = &self.action_dump.entity_conditionals.get(&sub_action_name) {
+                result.push_str(&format!("ife {}(", action.dfrs_name));
+            }
+            if let Some(action) = &self.action_dump.game_conditionals.get(&sub_action_name) {
+                result.push_str(&format!("ifg {}(", action.dfrs_name));
+            }
+            if let Some(action) = &self.action_dump.variable_conditionals.get(&sub_action_name) {
+                result.push_str(&format!("ifv {}(", action.dfrs_name));
+            }
+        }
+
         if let Some(args) = block.args {
             let mut is_first_iter = true;
             for arg in args.items {
@@ -526,6 +543,9 @@ impl Decompiler {
                     }
                 }
             }
+        }
+        if block.sub_action.is_some() {
+            result.push_str(")");
         }
         result
     }

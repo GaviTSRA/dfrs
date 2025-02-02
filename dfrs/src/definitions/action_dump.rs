@@ -33,8 +33,11 @@ pub struct ADParticle {
 }
 
 impl DFRSValue for ADParticle {
-    fn dfrs_name(&self) -> String {
-        self.particle.clone()
+    fn dfrs_equals(&self, value: &str) -> bool {
+        self.particle == value
+    }
+    fn df_equals(&self, value: &str) -> bool {
+        self.particle == value
     }
 }
 
@@ -45,8 +48,11 @@ pub struct ADSound {
 }
 
 impl DFRSValue for ADSound {
-    fn dfrs_name(&self) -> String {
-        self.sound.clone()
+    fn dfrs_equals(&self, value: &str) -> bool {
+        self.sound == value
+    }
+    fn df_equals(&self, value: &str) -> bool {
+        self.sound == value
     }
 }
 
@@ -57,8 +63,11 @@ pub struct ADPotion {
 }
 
 impl DFRSValue for ADPotion {
-    fn dfrs_name(&self) -> String {
-        self.potion.clone()
+    fn dfrs_equals(&self, value: &str) -> bool {
+        self.potion == value
+    }
+    fn df_equals(&self, value: &str) -> bool {
+        self.potion == value
     }
 }
 
@@ -187,20 +196,24 @@ fn default_vec_return() -> Vec<ADReturnValue> {
 pub struct Action {
     pub dfrs_name: String,
     pub df_name: String,
+    pub aliases: Vec<String>,
     pub has_conditional_arg: bool,
     pub args: Vec<DefinedArg>,
     pub tags: Vec<DefinedTag>
 }
 
 impl Action {
-    pub fn new(dfrs_name: String, df_name: &str, args: Vec<DefinedArg>, tags: Vec<DefinedTag>, has_conditional_arg: bool) -> Action {
-        Action {dfrs_name, df_name: df_name.to_owned(), args, tags, has_conditional_arg}
+    pub fn new(dfrs_name: String, df_name: &str, aliases: Vec<String>, args: Vec<DefinedArg>, tags: Vec<DefinedTag>, has_conditional_arg: bool) -> Action {
+        Action {dfrs_name, df_name: df_name.to_owned(), aliases, args, tags, has_conditional_arg}
     }
 }
 
 impl DFRSValue for Action {
-    fn dfrs_name(&self) -> String {
-        self.dfrs_name.clone()
+    fn dfrs_equals(&self, value: &str) -> bool {
+        self.dfrs_name == value
+    }
+    fn df_equals(&self, value: &str) -> bool {
+        self.df_name == value || self.aliases.contains(&value.to_string())
     }
 }
 
@@ -264,7 +277,7 @@ pub fn get_action(action: &ADAction) -> Action {
             },
             "" => {
                 if is_or {
-                    return Action::new(action.name.clone() + "-NotYetSupported", &action.name, vec![], vec![], action.sub_action_blocks.is_some() && !action.sub_action_blocks.clone().unwrap().is_empty());
+                    return Action::new(action.name.clone() + "-NotYetSupported", &action.name, action.aliases.clone(), vec![], vec![], action.sub_action_blocks.is_some() && !action.sub_action_blocks.clone().unwrap().is_empty());
                 }
                 for arg in current_args {
                     args.push(arg);
@@ -313,11 +326,12 @@ pub fn get_action(action: &ADAction) -> Action {
     }
 
     let name = to_dfrs_name(&action.name);
-    Action::new(name, &action.name, args, tags, action.sub_action_blocks.is_some() && !action.sub_action_blocks.clone().unwrap().is_empty())
+    Action::new(name, &action.name, action.aliases.clone(), args, tags, action.sub_action_blocks.is_some() && !action.sub_action_blocks.clone().unwrap().is_empty())
 }
 
 trait DFRSValue {
-    fn dfrs_name(&self) -> String;
+    fn dfrs_equals(&self, value: &str) -> bool;
+    fn df_equals(&self, value: &str) -> bool;
 }
 
 #[derive(Debug)]
@@ -330,8 +344,12 @@ impl<T> ValueList<T> where T: DFRSValue {
         ValueList { values }
     }
 
-    pub fn get(&self, dfrs_name: String) -> Option<&T> {
-        self.values.iter().find(|&action| action.dfrs_name() == dfrs_name)
+    pub fn get(&self, dfrs_name: &str) -> Option<&T> {
+        self.values.iter().find(|&action| action.dfrs_equals(dfrs_name))
+    }
+
+    pub fn get_df(&self, df_name: &str) -> Option<&T> {
+        self.values.iter().find(|&action| action.df_equals(df_name))
     }
 
     pub fn all(&self) -> &Vec<T> {
@@ -369,6 +387,7 @@ impl ActionDump {
             args: action.args.clone(),
             df_name: action.df_name.clone(),
             dfrs_name: action.dfrs_name.clone(),
+            aliases: action.aliases.clone(),
             tags: action.tags.clone(),
             has_conditional_arg: action.has_conditional_arg.clone()
         };
