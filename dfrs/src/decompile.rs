@@ -4,8 +4,9 @@ use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use flate2::read::GzDecoder;
 use crate::compile::{ArgValueData, Block, Codeline, FunctionDefaultItemData};
-use crate::definitions::action_dump::{Action, ActionDump, RawActionDump};
-use crate::definitions::{ArgType, DefinedArg};
+use crate::definitions::action_dump::{ActionDump, RawActionDump};
+use crate::definitions::{ArgType, DefinedArg, DefinedArgBranch, DefinedArgOption};
+use crate::definitions::actions::Action;
 use crate::node::{ActionType, ConditionalType};
 use crate::token::{Selector, SELECTORS};
 use crate::utility::{to_camel_case, to_dfrs_name};
@@ -377,17 +378,16 @@ impl Decompiler {
         let mut args = vec![];
         for _ in &block.args {
             args.push(DefinedArg {
-                arg_types: vec![ArgType::ANY],
-                name: "".into(),
-                allow_multiple: false,
-                optional: false,
+                options: vec![DefinedArgOption::new(String::from(""), ArgType::ANY, false, false)],
             })
         }
         let action = &Action {
             df_name: "internal".into(),
             dfrs_name: "internal".into(),
             aliases: vec![],
-            args,
+            args: vec![DefinedArgBranch {
+                paths: vec![args]
+            }],
             tags: vec![],
             has_conditional_arg: false
         };

@@ -1,5 +1,7 @@
-use crate::{definitions::{action_dump::{Action, ActionDump}, ArgType, DefinedArg}, node::{ActionNode, ActionType, Arg, ArgValue, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, FileNode, RepeatNode}, token::Position};
+use crate::{definitions::{action_dump::ActionDump, ArgType, DefinedArg}, node::{ActionNode, ActionType, Arg, ArgValue, CallNode, ConditionalNode, ConditionalType, EventNode, Expression, FileNode, RepeatNode}, token::Position};
 use crate::definitions::action_dump::RawActionDump;
+use crate::definitions::actions::Action;
+use crate::definitions::{DefinedArgBranch, DefinedArgOption};
 use crate::definitions::events::{EntityEvents, PlayerEvents};
 use crate::definitions::game_values::GameValues;
 use crate::node::{ExpressionNode, StartNode};
@@ -219,17 +221,16 @@ impl Validator {
         let mut args = vec![];
         for arg in &call_node.args {
             args.push(DefinedArg {
-                arg_types: vec![ArgType::ANY],
-                name: "".into(),
-                allow_multiple: false,
-                optional: false,
+                options: vec![DefinedArgOption::new("".into(), ArgType::ANY, false, false)],
             })
         }
         let action = Action {
             df_name: "internal".into(),
             dfrs_name: "internal".into(),
             aliases: vec![],
-            args,
+            args: vec![DefinedArgBranch {
+                paths: vec![args]
+            }],
             tags: vec![],
             has_conditional_arg: false
         };
@@ -306,76 +307,82 @@ impl Validator {
         let mut index: i32 = -1;
 
         let mut tags: Vec<Arg> = vec![];
-        for arg in action.args.clone() {
-            let mut match_more = true;
-            let mut matched_one = false;
-            while match_more {
-                if !arg.allow_multiple {
-                    match_more = false;
-                }
-                index += 1;
-                if node_args.is_empty() {
-                    if arg.optional {
-                        if !matched_one {
-                            args.push(Arg {
-                                arg_type: ArgType::EMPTY,
-                                value: ArgValue::Empty ,
-                                index,
-                                start_pos: Position::new(0, 0),
-                                end_pos: Position::new(0, 0)
-                            });
+        for branch in action.args.clone() {
+            for defined_args in branch.paths.get(0) {
+                for arg in defined_args {
+                    for option in arg.options.clone() {
+                        let mut match_more = true;
+                        let mut matched_one = false;
+                        while match_more {
+                            if !option.plural {
+                                match_more = false;
+                            }
+                            index += 1;
+                            if node_args.is_empty() {
+                                if option.optional {
+                                    if !matched_one {
+                                        args.push(Arg {
+                                            arg_type: ArgType::EMPTY,
+                                            value: ArgValue::Empty ,
+                                            index,
+                                            start_pos: Position::new(0, 0),
+                                            end_pos: Position::new(0, 0)
+                                        });
+                                    }
+                                    break;
+                                } else if !matched_one {
+                                    return Err(ValidateError::MissingArgument { name: arg.options.get(0).unwrap().clone().name, start_pos, end_pos })
+                                } else {
+                                    break;
+                                }
+                            }
+                            let mut provided_arg = node_args.remove(0);
+
+                            if provided_arg.arg_type == ArgType::TAG {
+                                tags.push(provided_arg);
+                                match_more = true;
+                                continue;
+                            }
+
+                            if provided_arg.arg_type == ArgType::EMPTY && !option.optional {
+                                return Err(ValidateError::MissingArgument { name: arg.options.get(0).unwrap().clone().name, start_pos, end_pos })
+                            }
+
+                            if let ArgValue::GameValue { df_name, dfrs_name, selector, selector_end_pos } = provided_arg.value {
+                                let actual_game_value = self.game_values.get(dfrs_name.clone());
+                                match actual_game_value {
+                                    Some(res) => {
+                                        provided_arg.value = ArgValue::GameValue {
+                                            df_name: Some(res.df_name.clone()),
+                                            dfrs_name,
+                                            selector,
+                                            selector_end_pos
+                                        };
+                                        provided_arg.arg_type = res.value_type.clone();
+                                    },
+                                    None => return Err(ValidateError::UnknownGameValue {
+                                        game_value: dfrs_name,
+                                        start_pos: provided_arg.start_pos,
+                                        end_pos: provided_arg.end_pos
+                                    })
+                                }
+                            }
+
+                            if &option.arg_type != &provided_arg.arg_type && &option.arg_type != &ArgType::ANY && provided_arg.arg_type != ArgType::VARIABLE {
+                                if option.plural && matched_one {
+                                    node_args.insert(0, provided_arg);
+                                    index -= 1;
+                                    break;
+                                }
+                                return Err(ValidateError::WrongArgumentType { args: all_provided_args, index, name: arg.options.get(0).unwrap().clone().name, expected_types: vec![option.arg_type.clone()], found_type: provided_arg.arg_type })
+                            }
+
+                            provided_arg.index = index;
+                            args.push(provided_arg);
+                            matched_one = true;
                         }
-                        break;
-                    } else if !matched_one {
-                        return Err(ValidateError::MissingArgument { name: arg.name, start_pos, end_pos })
-                    } else {
-                        break;
                     }
                 }
-                let mut provided_arg = node_args.remove(0);
-
-                if provided_arg.arg_type == ArgType::TAG {
-                    tags.push(provided_arg);
-                    match_more = true;
-                    continue;
-                }
-
-                if provided_arg.arg_type == ArgType::EMPTY && !arg.optional {
-                    return Err(ValidateError::MissingArgument { name: arg.name, start_pos, end_pos })
-                }
-
-                if let ArgValue::GameValue { df_name, dfrs_name, selector, selector_end_pos } = provided_arg.value {
-                    let actual_game_value = self.game_values.get(dfrs_name.clone());
-                    match actual_game_value {
-                        Some(res) => {
-                            provided_arg.value = ArgValue::GameValue {
-                                df_name: Some(res.df_name.clone()),
-                                dfrs_name,
-                                selector,
-                                selector_end_pos
-                            };
-                            provided_arg.arg_type = res.value_type.clone();
-                        },
-                        None => return Err(ValidateError::UnknownGameValue {
-                            game_value: dfrs_name,
-                            start_pos: provided_arg.start_pos,
-                            end_pos: provided_arg.end_pos
-                        })
-                    }
-                }
-
-                if !arg.arg_types.contains(&provided_arg.arg_type) && !arg.arg_types.contains(&ArgType::ANY) && provided_arg.arg_type != ArgType::VARIABLE {
-                    if arg.allow_multiple && matched_one {
-                        node_args.insert(0, provided_arg);
-                        index -= 1;
-                        break;
-                    }
-                    return Err(ValidateError::WrongArgumentType { args: all_provided_args, index, name: arg.name, expected_types: arg.arg_types, found_type: provided_arg.arg_type })
-                }
-
-                provided_arg.index = index;
-                args.push(provided_arg);
-                matched_one = true;
             }
         }
 

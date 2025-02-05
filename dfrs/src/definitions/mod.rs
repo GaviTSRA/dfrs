@@ -1,18 +1,41 @@
 pub mod action_dump;
 pub mod game_values;
 pub mod events;
+pub mod actions;
+
+#[derive(Clone, Debug)]
+pub struct DefinedArgBranch {
+    pub paths: Vec<Vec<DefinedArg>>,
+}
+
+impl DefinedArgBranch {
+    pub fn new(paths: Vec<Vec<DefinedArg>>) -> DefinedArgBranch {
+        DefinedArgBranch { paths }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct DefinedArg {
-    pub arg_types: Vec<ArgType>,
-    pub name: String,
-    pub allow_multiple: bool,
-    pub optional: bool
+    pub options: Vec<DefinedArgOption>,
 }
 
 impl DefinedArg {
-    pub fn new(name: &str, arg_types: Vec<ArgType>, optional: bool, allow_multiple: bool) -> DefinedArg {
-        DefinedArg {name: name.to_owned(), arg_types, allow_multiple, optional}
+    pub fn new(options: Vec<DefinedArgOption>) -> DefinedArg {
+        DefinedArg { options }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct DefinedArgOption {
+    pub name: String,
+    pub arg_type: ArgType,
+    pub plural: bool,
+    pub optional: bool
+}
+
+impl DefinedArgOption {
+    pub fn new(name: String, arg_type: ArgType, optional: bool, plural: bool) -> DefinedArgOption {
+        DefinedArgOption { name, arg_type, plural, optional }
     }
 }
 

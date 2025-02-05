@@ -1,5 +1,5 @@
 [sending]
-api = "recode"
+api = "codeclient"
 
 [debug]
 tokens=false
