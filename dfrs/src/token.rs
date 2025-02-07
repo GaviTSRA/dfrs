@@ -5,153 +5,156 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
 pub struct Position {
-    pub line: u32,
-    pub col: u32
+  pub line: u32,
+  pub col: u32,
 }
 
 impl Position {
-    pub fn new(line: u32, col: u32) -> Position {
-        Position { line, col }
-    }
+  pub fn new(line: u32, col: u32) -> Position {
+    Position { line, col }
+  }
 
-    pub fn advance(&mut self) {
-        self.col += 1;
-    }
+  pub fn advance(&mut self) {
+    self.col += 1;
+  }
 
-    pub fn next_line(&mut self) {
-        self.col = 1;
-        self.line += 1;
-    }
+  pub fn next_line(&mut self) {
+    self.col = 1;
+    self.line += 1;
+  }
 }
 
 impl Display for Position {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}", self.line, self.col)
-    }
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}:{}", self.line, self.col)
+  }
 }
 
 #[derive(Debug, Clone)]
 pub struct TokenWithPos {
-    pub token: Token,
-    pub start_pos: Position,
-    pub end_pos: Position
+  pub token: Token,
+  pub start_pos: Position,
+  pub end_pos: Position,
 }
 
 impl TokenWithPos {
-    pub fn new(token: Token, start_pos: Position, end_pos: Position) -> TokenWithPos {
-        TokenWithPos { token, start_pos, end_pos }
+  pub fn new(token: Token, start_pos: Position, end_pos: Position) -> TokenWithPos {
+    TokenWithPos {
+      token,
+      start_pos,
+      end_pos,
     }
+  }
 }
-
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Token {
-    Plus,
-    Minus,
-    Multiply,
-    Divide,
-    At,
-    Colon,
-    ExclamationMark,
-    Dot,
-    Comma,
-    Equal,
-    Semicolon,
-    QuestionMark,
-    Dollar,
-    OpenParen,
-    CloseParen,
-    OpenParenCurly,
-    CloseParenCurly,
-    Number { value: f32 },
-    String { value: String },
-    Text { value: String },
-    Variable { value: String },
-    Identifier { value: String },
-    Keyword { value: Keyword },
-    Selector { value: Selector }
+  Plus,
+  Minus,
+  Multiply,
+  Divide,
+  At,
+  Colon,
+  ExclamationMark,
+  Dot,
+  Comma,
+  Equal,
+  Semicolon,
+  QuestionMark,
+  Dollar,
+  OpenParen,
+  CloseParen,
+  OpenParenCurly,
+  CloseParenCurly,
+  Number { value: f32 },
+  String { value: String },
+  Text { value: String },
+  Variable { value: String },
+  Identifier { value: String },
+  Keyword { value: Keyword },
+  Selector { value: Selector },
 }
 
 impl Display for Token {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Token::Plus => write!(f, "+"),
-            Token::Minus => write!(f, "-"),
-            Token::Multiply => write!(f, "*"),
-            Token::Divide => write!(f, "/"),
-            Token::At => write!(f, "@"),
-            Token::Colon => write!(f, ":"),
-            Token::ExclamationMark => write!(f, "!"),
-            Token::Dot => write!(f, "."),
-            Token::Comma => write!(f, ","),
-            Token::Equal => write!(f, "="),
-            Token::Semicolon => write!(f, ";"),
-            Token::QuestionMark => write!(f, "?"),
-            Token::Dollar => write!(f, "$"),
-            Token::OpenParen => write!(f, "("),
-            Token::CloseParen => write!(f, ")"),
-            Token::OpenParenCurly => write!(f, "{{"),
-            Token::CloseParenCurly => write!(f, "}}"),
-            Token::Number { .. } => write!(f, "Number"),
-            Token::String { .. } => write!(f, "String"),
-            Token::Text { .. } => write!(f, "Text"),
-            Token::Variable { .. } => write!(f, "Variable"),
-            Token::Identifier { .. } => write!(f, "Identifier"),
-            Token::Keyword { value } => write!(f, "Keyword:{}", value),
-            Token::Selector { .. } => write!(f, "Selector")
-        }
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Token::Plus => write!(f, "+"),
+      Token::Minus => write!(f, "-"),
+      Token::Multiply => write!(f, "*"),
+      Token::Divide => write!(f, "/"),
+      Token::At => write!(f, "@"),
+      Token::Colon => write!(f, ":"),
+      Token::ExclamationMark => write!(f, "!"),
+      Token::Dot => write!(f, "."),
+      Token::Comma => write!(f, ","),
+      Token::Equal => write!(f, "="),
+      Token::Semicolon => write!(f, ";"),
+      Token::QuestionMark => write!(f, "?"),
+      Token::Dollar => write!(f, "$"),
+      Token::OpenParen => write!(f, "("),
+      Token::CloseParen => write!(f, ")"),
+      Token::OpenParenCurly => write!(f, "{{"),
+      Token::CloseParenCurly => write!(f, "}}"),
+      Token::Number { .. } => write!(f, "Number"),
+      Token::String { .. } => write!(f, "String"),
+      Token::Text { .. } => write!(f, "Text"),
+      Token::Variable { .. } => write!(f, "Variable"),
+      Token::Identifier { .. } => write!(f, "Identifier"),
+      Token::Keyword { value } => write!(f, "Keyword:{}", value),
+      Token::Selector { .. } => write!(f, "Selector"),
     }
+  }
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Keyword {
-    P,
-    E,
-    G,
-    V,
-    C,
-    S,
-    IfP,
-    IfE,
-    IfG,
-    IfV,
-    Else,
-    VarLine,
-    VarLocal,
-    VarGame,
-    VarSave,
-    Function,
-    Process,
-    Call,
-    Start,
-    Repeat,
+  P,
+  E,
+  G,
+  V,
+  C,
+  S,
+  IfP,
+  IfE,
+  IfG,
+  IfV,
+  Else,
+  VarLine,
+  VarLocal,
+  VarGame,
+  VarSave,
+  Function,
+  Process,
+  Call,
+  Start,
+  Repeat,
 }
 
 impl Display for Keyword {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Keyword::P => write!(f, "p"),
-            Keyword::E => write!(f, "e"),
-            Keyword::G => write!(f, "g"),
-            Keyword::V => write!(f, "v"),
-            Keyword::C => write!(f, "c"),
-            Keyword::S => write!(f, "s"),
-            Keyword::IfP => write!(f, "ifp"),
-            Keyword::IfE => write!(f, "ife"),
-            Keyword::IfG => write!(f, "ifg"),
-            Keyword::IfV => write!(f, "ifv"),
-            Keyword::Else => write!(f, "else"),
-            Keyword::VarLine => write!(f, "line"),
-            Keyword::VarLocal => write!(f, "local"),
-            Keyword::VarGame => write!(f, "game"),
-            Keyword::VarSave => write!(f, "save"),
-            Keyword::Function => write!(f, "function"),
-            Keyword::Process => write!(f, "process"),
-            Keyword::Call => write!(f, "call"),
-            Keyword::Start => write!(f, "start"),
-            Keyword::Repeat => write!(f, "repeat"),
-        }
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Keyword::P => write!(f, "p"),
+      Keyword::E => write!(f, "e"),
+      Keyword::G => write!(f, "g"),
+      Keyword::V => write!(f, "v"),
+      Keyword::C => write!(f, "c"),
+      Keyword::S => write!(f, "s"),
+      Keyword::IfP => write!(f, "ifp"),
+      Keyword::IfE => write!(f, "ife"),
+      Keyword::IfG => write!(f, "ifg"),
+      Keyword::IfV => write!(f, "ifv"),
+      Keyword::Else => write!(f, "else"),
+      Keyword::VarLine => write!(f, "line"),
+      Keyword::VarLocal => write!(f, "local"),
+      Keyword::VarGame => write!(f, "game"),
+      Keyword::VarSave => write!(f, "save"),
+      Keyword::Function => write!(f, "function"),
+      Keyword::Process => write!(f, "process"),
+      Keyword::Call => write!(f, "call"),
+      Keyword::Start => write!(f, "start"),
+      Keyword::Repeat => write!(f, "repeat"),
     }
+  }
 }
 
 pub static KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
@@ -179,17 +182,17 @@ pub static KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum Selector {
-    Default,
-    Selection,
-    Killer,
-    Damager,
-    Shooter,
-    Victim,
-    AllPlayers,
-    Projectile,
-    AllEntities,
-    AllMobs,
-    LastEntity
+  Default,
+  Selection,
+  Killer,
+  Damager,
+  Shooter,
+  Victim,
+  AllPlayers,
+  Projectile,
+  AllEntities,
+  AllMobs,
+  LastEntity,
 }
 
 pub static SELECTORS: phf::Map<&'static str, Selector> = phf_map! {
@@ -208,19 +211,19 @@ pub static SELECTORS: phf::Map<&'static str, Selector> = phf_map! {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum Type {
-    String,
-    Text,
-    Number,
-    Location,
-    Vector,
-    Sound,
-    Particle,
-    Potion,
-    Item,
-    Any,
-    Variable,
-    List,
-    Dict
+  String,
+  Text,
+  Number,
+  Location,
+  Vector,
+  Sound,
+  Particle,
+  Potion,
+  Item,
+  Any,
+  Variable,
+  List,
+  Dict,
 }
 
 pub static TYPES: phf::Map<&'static str, Type> = phf_map! {
@@ -240,19 +243,20 @@ pub static TYPES: phf::Map<&'static str, Type> = phf_map! {
 };
 
 pub fn get_type_str(input: Type) -> String {
-    match input {
-        Type::String => "txt",
-        Type::Text => "comp",
-        Type::Number => "num",
-        Type::Location => "loc",
-        Type::Vector => "vec",
-        Type::Sound => "snd",
-        Type::Particle => "part",
-        Type::Potion => "pot",
-        Type::Item => "item",
-        Type::Any => "any",
-        Type::Variable => "var",
-        Type::List => "list",
-        Type::Dict => "dict"
-    }.into()
+  match input {
+    Type::String => "txt",
+    Type::Text => "comp",
+    Type::Number => "num",
+    Type::Location => "loc",
+    Type::Vector => "vec",
+    Type::Sound => "snd",
+    Type::Particle => "part",
+    Type::Potion => "pot",
+    Type::Item => "item",
+    Type::Any => "any",
+    Type::Variable => "var",
+    Type::List => "list",
+    Type::Dict => "dict",
+  }
+  .into()
 }
