@@ -105,7 +105,7 @@ fn compile_cmd(file: &PathBuf) {
 
   let data = std::fs::read_to_string(file).expect("could not open file");
 
-  let mut lexer = Lexer::new(data.clone());
+  let mut lexer = Lexer::new(&data.clone());
   let result = lexer.run();
 
   let res = match result {

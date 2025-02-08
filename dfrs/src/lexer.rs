@@ -1,6 +1,6 @@
 use crate::token::{Position, Token, TokenWithPos, KEYWORDS, SELECTORS};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LexerError {
   InvalidNumber { pos: Position },
   InvalidToken { token: char, pos: Position },
@@ -18,9 +18,9 @@ pub struct Lexer {
 }
 
 impl Lexer {
-  pub fn new(input: String) -> Lexer {
+  pub fn new(input: &str) -> Lexer {
     Lexer {
-      input,
+      input: input.to_owned(),
       current_char: None,
       char_pos: -1,
       position: Position::new(1, 0),
@@ -47,6 +47,13 @@ impl Lexer {
     }
   }
 
+  fn rewind(&mut self) {
+    self.char_pos -= 1;
+    self.position.rewind();
+    self.current_char = Some(self.input.chars().nth(self.char_pos as usize).unwrap());
+    self.next_char_in_new_line = self.current_char.is_some() && self.current_char.unwrap() == '\n';
+  }
+
   fn make_number(&mut self) -> Result<TokenWithPos, LexerError> {
     let mut num_string: String = String::from("");
     let mut dot_count = 0;
@@ -55,8 +62,13 @@ impl Lexer {
     while self.current_char.is_some()
       && (self.current_char.unwrap().is_ascii_digit()
         || self.current_char.unwrap() == '.'
+        || self.current_char.unwrap() == '_'
         || self.current_char.unwrap() == '-')
     {
+      if self.current_char.unwrap() == '_' {
+        self.advance();
+        continue;
+      }
       if self.current_char.unwrap() == '.' {
         dot_count += 1
       }
@@ -74,13 +86,16 @@ impl Lexer {
       self.advance();
     }
 
-    if num_string.is_empty() {
+    if num_string.is_empty() || num_string == "-" {
       return Err(LexerError::InvalidNumber { pos: start_pos });
     }
 
     Ok(TokenWithPos {
       token: Token::Number {
-        value: num_string.parse::<f32>().unwrap(),
+        value: match num_string.parse::<f32>() {
+          Ok(res) => res,
+          Err(_) => return Err(LexerError::InvalidNumber { pos: start_pos }),
+        },
       },
       start_pos,
       end_pos: self.position.clone(),
@@ -292,8 +307,11 @@ impl Lexer {
           let token = match self.make_number() {
             Ok(res) => res,
             Err(_) => {
+              self.rewind();
+              let token = self.token(Token::Minus);
               self.advance();
-              self.token(Token::Minus)
+              println!("{}", self.position);
+              token
             }
           };
           result.push(token);
@@ -369,5 +387,505 @@ impl Lexer {
 
   fn token(&self, token: Token) -> TokenWithPos {
     TokenWithPos::new(token, self.position.clone(), self.position.clone())
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::token::{Keyword, Selector};
+
+  use super::*;
+
+  #[test]
+  pub fn basic_tokens() {
+    let values = vec![
+      ("+", Token::Plus),
+      ("-", Token::Minus),
+      ("*", Token::Multiply),
+      ("/", Token::Divide),
+      ("@", Token::At),
+      (":", Token::Colon),
+      ("!", Token::ExclamationMark),
+      (".", Token::Dot),
+      (",", Token::Comma),
+      ("=", Token::Equal),
+      (";", Token::Semicolon),
+      ("?", Token::QuestionMark),
+      ("$", Token::Dollar),
+      ("(", Token::OpenParen),
+      (")", Token::CloseParen),
+      ("{", Token::OpenParenCurly),
+      ("}", Token::CloseParenCurly),
+    ];
+
+    for value in values {
+      println!("Testing token {:?} to be '{:?}'", value.0, value.1);
+      let result = Lexer::new(value.0).run().expect("Lexer failed");
+      let token = result.get(0).expect("Lexer did not return tokens");
+      assert_eq!(token.token, value.1);
+    }
+  }
+
+  #[test]
+  pub fn multiple_tokens() {
+    let result = Lexer::new("+-*/@:!.,=;?$(){}").run().expect("Lexer failed");
+    let tokens: Vec<&Token> = result.iter().map(|t| &t.token).collect();
+    assert_eq!(
+      tokens,
+      vec![
+        &Token::Plus,
+        &Token::Minus,
+        &Token::Multiply,
+        &Token::Divide,
+        &Token::At,
+        &Token::Colon,
+        &Token::ExclamationMark,
+        &Token::Dot,
+        &Token::Comma,
+        &Token::Equal,
+        &Token::Semicolon,
+        &Token::QuestionMark,
+        &Token::Dollar,
+        &Token::OpenParen,
+        &Token::CloseParen,
+        &Token::OpenParenCurly,
+        &Token::CloseParenCurly
+      ]
+    );
+  }
+
+  #[test]
+  pub fn whitespace() {
+    let result = Lexer::new(" \n\t\r").run().expect("Lexer failed");
+    let tokens: Vec<&Token> = result.iter().map(|t| &t.token).collect();
+    assert_eq!(tokens.len(), 0);
+  }
+
+  #[test]
+  pub fn comments() {
+    let values = vec![("//abc\n+", Token::Plus), ("+ //abc", Token::Plus)];
+
+    for value in values {
+      println!("Testing token {:?} to be '{:?}'", value.0, value.1);
+      let result = Lexer::new(value.0).run().expect("Lexer failed");
+      let token = result.get(0).expect("Lexer did not return tokens");
+      assert_eq!(token.token, value.1);
+    }
+  }
+
+  #[test]
+  pub fn numbers() {
+    let values = vec![
+      ("1", Token::Number { value: 1.0 }),
+      ("254", Token::Number { value: 254.0 }),
+      ("0.2", Token::Number { value: 0.2 }),
+      ("17.24", Token::Number { value: 17.24 }),
+      ("172_424", Token::Number { value: 172424.0 }),
+      ("172_424.51", Token::Number { value: 172424.51 }),
+      ("-172_424.51", Token::Number { value: -172424.51 }),
+      ("-1", Token::Number { value: -1.0 }),
+      ("-153", Token::Number { value: -153.0 }),
+      ("-92.45", Token::Number { value: -92.45 }),
+    ];
+
+    for value in values {
+      println!("Testing token {:?} to be '{:?}'", value.0, value.1);
+      let result = Lexer::new(value.0).run().expect("Lexer failed");
+      let token = result.get(0).expect("Lexer did not return tokens");
+      assert_eq!(token.token, value.1);
+    }
+  }
+
+  #[test]
+  pub fn invalid_numbers() {
+    let values = vec!["0.0.0", "1.-2", "0.."];
+    for value in values {
+      println!("Testing {:?}", value);
+      let result = Lexer::new(value).run();
+      assert!(result.is_err());
+    }
+  }
+
+  #[test]
+  pub fn strings() {
+    let values = vec![
+      (
+        "'abc'",
+        Token::String {
+          value: "abc".to_string(),
+        },
+      ),
+      (
+        "'a\"ce'",
+        Token::String {
+          value: "a\"ce".to_string(),
+        },
+      ),
+      (
+        "'a b c'",
+        Token::String {
+          value: "a b c".to_string(),
+        },
+      ),
+      (
+        "'a b '",
+        Token::String {
+          value: "a b ".to_string(),
+        },
+      ),
+      (
+        "'abc\\'abc'",
+        Token::String {
+          value: "abc'abc".to_string(),
+        },
+      ),
+    ];
+
+    for value in values {
+      println!("Testing token {:?} to be '{:?}'", value.0, value.1);
+      let result = Lexer::new(value.0).run().expect("Lexer failed");
+      let token = result.get(0).expect("Lexer did not return tokens");
+      assert_eq!(token.token, value.1);
+    }
+  }
+
+  #[test]
+  pub fn string_must_terminate() {
+    let result = Lexer::new("'abc").run();
+    assert!(result.is_err());
+  }
+
+  #[test]
+  pub fn text() {
+    let values = vec![
+      (
+        "\"abc\"",
+        Token::Text {
+          value: "abc".to_string(),
+        },
+      ),
+      (
+        "\"a'ce\"",
+        Token::Text {
+          value: "a'ce".to_string(),
+        },
+      ),
+      (
+        "\"a b c\"",
+        Token::Text {
+          value: "a b c".to_string(),
+        },
+      ),
+      (
+        "\"a b \"",
+        Token::Text {
+          value: "a b ".to_string(),
+        },
+      ),
+      (
+        "\"abc\\\"abc\"",
+        Token::Text {
+          value: "abc\"abc".to_string(),
+        },
+      ),
+    ];
+
+    for value in values {
+      println!("Testing token {:?} to be '{:?}'", value.0, value.1);
+      let result = Lexer::new(value.0).run().expect("Lexer failed");
+      let token = result.get(0).expect("Lexer did not return tokens");
+      assert_eq!(token.token, value.1);
+    }
+  }
+
+  #[test]
+  pub fn text_must_terminate() {
+    let result = Lexer::new("\"abc").run();
+    assert!(result.is_err());
+  }
+
+  #[test]
+  pub fn variables() {
+    let values = vec![
+      (
+        "`abc`",
+        Token::Variable {
+          value: "abc".to_string(),
+        },
+      ),
+      (
+        "`a b c`",
+        Token::Variable {
+          value: "a b c".to_string(),
+        },
+      ),
+      (
+        "`a b `",
+        Token::Variable {
+          value: "a b ".to_string(),
+        },
+      ),
+      (
+        "`abc\\`abc`",
+        Token::Variable {
+          value: "abc`abc".to_string(),
+        },
+      ),
+    ];
+
+    for value in values {
+      println!("Testing token {:?} to be '{:?}'", value.0, value.1);
+      let result = Lexer::new(value.0).run().expect("Lexer failed");
+      let token = result.get(0).expect("Lexer did not return tokens");
+      assert_eq!(token.token, value.1);
+    }
+  }
+
+  #[test]
+  pub fn variable_must_terminate() {
+    let result = Lexer::new("`abc").run();
+    assert!(result.is_err());
+  }
+
+  #[test]
+  pub fn keywords() {
+    let values = vec![
+      ("p", Token::Keyword { value: Keyword::P }),
+      ("e", Token::Keyword { value: Keyword::E }),
+      ("g", Token::Keyword { value: Keyword::G }),
+      ("v", Token::Keyword { value: Keyword::V }),
+      ("c", Token::Keyword { value: Keyword::C }),
+      ("s", Token::Keyword { value: Keyword::S }),
+      (
+        "ifp",
+        Token::Keyword {
+          value: Keyword::IfP,
+        },
+      ),
+      (
+        "ife",
+        Token::Keyword {
+          value: Keyword::IfE,
+        },
+      ),
+      (
+        "ifg",
+        Token::Keyword {
+          value: Keyword::IfG,
+        },
+      ),
+      (
+        "ifv",
+        Token::Keyword {
+          value: Keyword::IfV,
+        },
+      ),
+      (
+        "else",
+        Token::Keyword {
+          value: Keyword::Else,
+        },
+      ),
+      (
+        "line",
+        Token::Keyword {
+          value: Keyword::VarLine,
+        },
+      ),
+      (
+        "local",
+        Token::Keyword {
+          value: Keyword::VarLocal,
+        },
+      ),
+      (
+        "game",
+        Token::Keyword {
+          value: Keyword::VarGame,
+        },
+      ),
+      (
+        "save",
+        Token::Keyword {
+          value: Keyword::VarSave,
+        },
+      ),
+      (
+        "fn",
+        Token::Keyword {
+          value: Keyword::Function,
+        },
+      ),
+      (
+        "proc",
+        Token::Keyword {
+          value: Keyword::Process,
+        },
+      ),
+      (
+        "call",
+        Token::Keyword {
+          value: Keyword::Call,
+        },
+      ),
+      (
+        "start",
+        Token::Keyword {
+          value: Keyword::Start,
+        },
+      ),
+      (
+        "repeat",
+        Token::Keyword {
+          value: Keyword::Repeat,
+        },
+      ),
+    ];
+
+    for value in values {
+      println!("Testing token {:?} to be '{:?}'", value.0, value.1);
+      let result = Lexer::new(value.0).run().expect("Lexer failed");
+      let token = result.get(0).expect("Lexer did not return tokens");
+      assert_eq!(token.token, value.1);
+    }
+  }
+
+  #[test]
+  pub fn selectors() {
+    let values = vec![
+      (
+        "default",
+        Token::Selector {
+          value: Selector::Default,
+        },
+      ),
+      (
+        "selection",
+        Token::Selector {
+          value: Selector::Selection,
+        },
+      ),
+      (
+        "killer",
+        Token::Selector {
+          value: Selector::Killer,
+        },
+      ),
+      (
+        "damager",
+        Token::Selector {
+          value: Selector::Damager,
+        },
+      ),
+      (
+        "shooter",
+        Token::Selector {
+          value: Selector::Shooter,
+        },
+      ),
+      (
+        "victim",
+        Token::Selector {
+          value: Selector::Victim,
+        },
+      ),
+      (
+        "allPlayers",
+        Token::Selector {
+          value: Selector::AllPlayers,
+        },
+      ),
+      (
+        "projectile",
+        Token::Selector {
+          value: Selector::Projectile,
+        },
+      ),
+      (
+        "allEntities",
+        Token::Selector {
+          value: Selector::AllEntities,
+        },
+      ),
+      (
+        "allMobs",
+        Token::Selector {
+          value: Selector::AllMobs,
+        },
+      ),
+      (
+        "lastEntity",
+        Token::Selector {
+          value: Selector::LastEntity,
+        },
+      ),
+    ];
+
+    for value in values {
+      println!("Testing token {:?} to be '{:?}'", value.0, value.1);
+      let result = Lexer::new(value.0).run().expect("Lexer failed");
+      let token = result.get(0).expect("Lexer did not return tokens");
+      assert_eq!(token.token, value.1);
+    }
+  }
+
+  #[test]
+  pub fn identifiers() {
+    let values = vec![
+      (
+        "test",
+        Token::Identifier {
+          value: "test".to_string(),
+        },
+      ),
+      (
+        "test_2",
+        Token::Identifier {
+          value: "test_2".to_string(),
+        },
+      ),
+    ];
+
+    for value in values {
+      println!("Testing token {:?} to be '{:?}'", value.0, value.1);
+      let result = Lexer::new(value.0).run().expect("Lexer failed");
+      let token = result.get(0).expect("Lexer did not return tokens");
+      assert_eq!(token.token, value.1);
+    }
+  }
+
+  #[test]
+  pub fn positions() {
+    let result = Lexer::new("+  -\n*/\n'abc'`test`  \n123 ")
+      .run()
+      .expect("Lexer failed");
+    assert_eq!(
+      result,
+      vec![
+        TokenWithPos::new(Token::Plus, Position::new(1, 1), Position::new(1, 1)),
+        TokenWithPos::new(Token::Minus, Position::new(1, 4), Position::new(1, 4)),
+        TokenWithPos::new(Token::Multiply, Position::new(2, 1), Position::new(2, 1)),
+        TokenWithPos::new(Token::Divide, Position::new(2, 2), Position::new(2, 2)),
+        TokenWithPos::new(
+          Token::String {
+            value: "abc".to_owned()
+          },
+          Position::new(3, 1),
+          Position::new(3, 6)
+        ),
+        TokenWithPos::new(
+          Token::Variable {
+            value: "test".to_owned()
+          },
+          Position::new(3, 6),
+          Position::new(3, 12)
+        ),
+        TokenWithPos::new(
+          Token::Number { value: 123.0 },
+          Position::new(4, 1),
+          Position::new(4, 4)
+        ),
+      ]
+    );
   }
 }

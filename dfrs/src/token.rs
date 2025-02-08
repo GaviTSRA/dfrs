@@ -3,7 +3,7 @@ use std::fmt::Display;
 use phf::phf_map;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Position {
   pub line: u32,
   pub col: u32,
@@ -18,6 +18,14 @@ impl Position {
     self.col += 1;
   }
 
+  pub fn rewind(&mut self) {
+    self.col -= 1;
+    if self.col <= 0 {
+      self.col = 1;
+      self.line -= 1;
+    }
+  }
+
   pub fn next_line(&mut self) {
     self.col = 1;
     self.line += 1;
@@ -30,7 +38,7 @@ impl Display for Position {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TokenWithPos {
   pub token: Token,
   pub start_pos: Position,
@@ -202,11 +210,11 @@ pub static SELECTORS: phf::Map<&'static str, Selector> = phf_map! {
     "damager" => Selector::Damager,
     "shooter" => Selector::Shooter,
     "victim" => Selector::Victim,
-    "all" => Selector::AllPlayers,
+    "allPlayers" => Selector::AllPlayers,
     "projectile" => Selector::Projectile,
     "allEntities" => Selector::AllEntities,
     "allMobs" => Selector::AllMobs,
-    "last" => Selector::LastEntity,
+    "lastEntity" => Selector::LastEntity,
 };
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
