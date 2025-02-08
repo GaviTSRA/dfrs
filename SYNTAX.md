@@ -196,6 +196,11 @@ save levels;
 ```
 The way variables are named on DF can be overridden:
 ```
-line var = `%default data`;
+line var: `%default data`;
 p.sendMessage(var);
+```
+Variables can be directly assigned a value:
+```
+line test = v.add(2, 2);
+local example: `example variable` = v.equal(Location(0, 0, 0));
 ```

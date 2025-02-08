@@ -1,5 +1,6 @@
 @join {
-  p.playEntitySound(Sound("Cow Death", 1, 1), "", 1);
+  line test = v.add(2, 2);
+local example: `example variable` = v.equal(Location(0, 0, 0));
 }
 
 // Comm -> Remove bossbar

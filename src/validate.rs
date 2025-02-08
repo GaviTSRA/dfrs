@@ -3,7 +3,7 @@ use crate::definitions::actions::Action;
 use crate::definitions::events::{EntityEvents, PlayerEvents};
 use crate::definitions::game_values::GameValues;
 use crate::definitions::{DefinedArgBranch, DefinedArgOption};
-use crate::node::{ExpressionNode, StartNode};
+use crate::node::{ExpressionNode, StartNode, VariableType};
 use crate::{
   definitions::{action_dump::ActionDump, ArgType, DefinedArg},
   node::{
@@ -162,7 +162,30 @@ impl Validator {
           node: self.validate_repeat_node(node)?,
         }
       }
-      Expression::Variable { .. } => {}
+      Expression::Variable { node } => {
+        if let Some(mut action) = node.action.clone() {
+          action.args.insert(
+            0,
+            Arg {
+              arg_type: ArgType::VARIABLE,
+              index: -1,
+              value: ArgValue::Variable {
+                name: node.df_name,
+                scope: match node.var_type {
+                  VariableType::Line => "line".to_owned(),
+                  VariableType::Local => "local".to_owned(),
+                  _ => unreachable!(),
+                },
+              },
+              start_pos: node.start_pos,
+              end_pos: node.end_pos,
+            },
+          );
+          expression_node.node = Expression::Action {
+            node: self.validate_action_node(action)?,
+          }
+        }
+      }
     }
     Ok(())
   }

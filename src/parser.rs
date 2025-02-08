@@ -65,6 +65,8 @@ pub struct Parser {
   variables: Vec<VariableNode>,
 }
 
+// TODO expected types for basically everything
+
 impl Parser {
   pub fn new(tokens: Vec<TokenWithPos>) -> Parser {
     Parser {
@@ -428,6 +430,7 @@ impl Parser {
       self.variables.push(VariableNode {
         dfrs_name: param_name.clone(),
         df_name: param_name.clone(),
+        action: None,
         var_type: VariableType::Line,
         start_pos: Position::new(0, 0),
         end_pos: Position::new(0, 0),
@@ -931,14 +934,54 @@ impl Parser {
     };
 
     let token = self.advance_err()?;
+    let mut df_name = dfrs_name.clone();
     match token.token {
+      Token::Colon => {
+        let token = self.advance_err()?;
+        df_name = match token.token {
+          Token::Variable { value } => value,
+          _ => {
+            return Err(ParseError::InvalidToken {
+              found: self.current_token.clone(),
+              expected: vec![Token::Variable {
+                value: "any".into(),
+              }],
+            })
+          }
+        };
+        let token = self.advance_err()?;
+        match token.token {
+          Token::Equal => {}
+          Token::Semicolon => {
+            return {
+              let node = VariableNode {
+                dfrs_name: dfrs_name.clone(),
+                df_name,
+                var_type,
+                action: None,
+                start_pos,
+                end_pos,
+              };
+              self.variables.push(node.clone());
+              Ok(node)
+            }
+          }
+          _ => {
+            return Err(ParseError::InvalidToken {
+              found: self.current_token.clone(),
+              expected: vec![Token::Equal, Token::Semicolon],
+            })
+          }
+        }
+      }
       Token::Equal => {}
       Token::Semicolon => {
         return {
           let node = VariableNode {
             dfrs_name: dfrs_name.clone(),
-            df_name: dfrs_name,
+            df_name,
             var_type,
+            action: None,
             start_pos,
             end_pos,
           };
@@ -955,23 +998,33 @@ impl Parser {
     };
 
     let token = self.advance_err()?;
-    let df_name = match token.token {
-      Token::Variable { value } => value,
+    let action = match token.token {
+      Token::Keyword { value } => match value {
+        Keyword::P => self.action(ActionType::Player)?,
+        Keyword::E => self.action(ActionType::Entity)?,
+        Keyword::G => self.action(ActionType::Game)?,
+        Keyword::V => self.action(ActionType::Variable)?,
+        Keyword::C => self.action(ActionType::Control)?,
+        Keyword::S => self.action(ActionType::Select)?,
+        _ => {
+          return Err(ParseError::InvalidToken {
+            found: self.current_token.clone(),
+            expected: vec![Token::Keyword { value: Keyword::P }],
+          })
+        }
+      },
       _ => {
         return Err(ParseError::InvalidToken {
           found: self.current_token.clone(),
-          expected: vec![Token::Variable {
-            value: "any".into(),
-          }],
+          expected: vec![Token::Keyword { value: Keyword::P }],
         })
       }
     };
 
-    self.require_token(Token::Semicolon)?;
-
     let node = VariableNode {
       dfrs_name,
       df_name,
+      action: Some(action),
       var_type,
       start_pos,
       end_pos,
@@ -1002,19 +1055,7 @@ impl Parser {
     let mut comma_pos = Position::new(0, 0);
     let mut is_game_value = false;
 
-    let expected = vec![
-      Token::CloseParen,
-      Token::Text {
-        value: "<any>".into(),
-      },
-      Token::String {
-        value: "<any>".into(),
-      },
-      Token::Number { value: 0.0 },
-      Token::Identifier {
-        value: "Location".into(),
-      },
-    ];
+    let expected = vec![Token::CloseParen];
     loop {
       let mut token = self.advance_err()?;
 

@@ -140,6 +140,7 @@ pub struct VariableNode {
   pub dfrs_name: String,
   pub df_name: String,
   pub var_type: VariableType,
+  pub action: Option<ActionNode>,
   pub start_pos: Position,
   pub end_pos: Position,
 }
