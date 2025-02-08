@@ -44,8 +44,8 @@ Process can be created using the proc keyword:
 proc functionName {
     <expressions...>
 }
+```
 
----
 # Expressions
 Every event, function or process contains a list of expressions.
 ## Actions
@@ -134,6 +134,7 @@ start("processName", localVariables="Copy", targetMode="With no targets");
 ```
 5
 5.2
+123_456.7
 ```
 More complex numbers can also be represented:
 ```
