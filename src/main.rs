@@ -340,29 +340,45 @@ fn compile_cmd(file: &PathBuf) {
           );
         }
         ValidateError::MissingArgument {
-          name,
+          options,
           start_pos,
           end_pos,
         } => {
-          print_err(
-            format!("Missing argument '{}'", name),
-            data,
-            start_pos,
-            Some(end_pos),
-          );
+          let message = if options.len() > 1 {
+            format!(
+              "Missing argument, possible options:\n     - {}",
+              options.join("\n     - ")
+            )
+          } else {
+            format!("Missing argument '{}'", options.get(0).unwrap())
+          };
+          print_err(message, data, start_pos, Some(end_pos));
         }
         ValidateError::WrongArgumentType {
           args,
           index,
-          name,
-          expected_types,
+          options,
           found_type,
         } => {
-          print_err(
+          let option_texts: Vec<String> = options
+            .iter()
+            .map(|option| format!("\n     - {:?} ({})", option.arg_type, option.name).to_owned())
+            .collect();
+          let message = if options.len() > 1 {
+            format!(
+              "Wrong argument type, found '{:?}' but expected one of{}",
+              found_type,
+              option_texts.join(""),
+            )
+          } else {
+            let option = options.get(0).unwrap().clone();
             format!(
               "Wrong argument type for '{}', expected '{:?}' but found '{:?}'",
-              name, expected_types, found_type
-            ),
+              option.name, option.arg_type, found_type
+            )
+          };
+          print_err(
+            message,
             data,
             args.get(index as usize).unwrap().start_pos.clone(),
             Some(args.get(index as usize).unwrap().end_pos.clone()),

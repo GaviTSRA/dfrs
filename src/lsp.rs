@@ -564,24 +564,25 @@ fn compile_file(data: String, path: PathBuf) -> Result<(), CompileErr> {
         ValidateError::MissingArgument {
           start_pos,
           end_pos,
-          name,
+          options,
         } => Err(CompileErr::new(
           start_pos,
           Some(end_pos),
-          format!("Missing argument '{}'", name),
+          format!("Missing argument '{}'", options.join(",")),
         )),
         ValidateError::WrongArgumentType {
           args,
           index,
-          name,
-          expected_types,
+          options,
           found_type,
         } => Err(CompileErr::new(
           args.get(index as usize).unwrap().start_pos.clone(),
           Some(args.get(index as usize).unwrap().end_pos.clone()),
           format!(
             "Wrong argument type for '{}', expected '{:?}' but found '{:?}'",
-            name, expected_types, found_type
+            options.get(0).unwrap().name.clone(),
+            options.get(0).unwrap().arg_type.clone(),
+            found_type
           ),
         )),
         ValidateError::TooManyArguments {

@@ -1,7 +1,5 @@
 @join {
-  line location;
-  v.equal(location, Location(0, 0, 0));
-  p.particle(Particle("Flame", 1, 0, 0), Location(0, 0, 0));
+  p.playEntitySound(Sound("Cow Death", 1, 1), "", 1);
 }
 
 // Comm -> Remove bossbar
