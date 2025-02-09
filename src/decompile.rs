@@ -70,8 +70,11 @@ impl Decompiler {
     let mut vars = vec![];
 
     for block in &line.blocks {
-      if let Some(args) = &block.args {
-        for arg in &args.items {
+      if let Some(args) = &block.args.clone() {
+        for (arg_index, arg) in args.items.iter().enumerate() {
+          if arg_index == 0 {
+            continue;
+          }
           match &arg.item.data {
             ArgValueData::Variable { name, scope } => {
               let new_name = name
@@ -372,6 +375,44 @@ impl Decompiler {
       Some(res) => &format!(":{}", SELECTORS.entries().find(|e| e.1 == &res).unwrap().0),
       None => "",
     };
+
+    if let Some(mut args) = block.args.clone() {
+      if args.items.len() > 0 {
+        let arg = args.items.get(0).unwrap();
+        match arg.item.data.clone() {
+          ArgValueData::Variable {
+            name: var_name,
+            scope,
+          } => {
+            if scope == "line" || scope == "local" {
+              let new_name = var_name
+                .replace("-", "_")
+                .replace("%", "")
+                .replace(" ", "_")
+                .replace("(", "_")
+                .replace(")", "");
+
+              let var_assignment = if new_name == var_name {
+                ""
+              } else {
+                &format!(": `{var_name}`")
+              };
+
+              let mut new_block = block.clone();
+              args.items.remove(0);
+              new_block.args = Some(args);
+              return self.add(&format!(
+                "{scope} {new_name}{var_assignment} = {prefix}{selector}.{}({});",
+                name,
+                self.decompile_params(new_block, action)
+              ));
+            }
+          }
+          _ => {}
+        }
+      }
+    }
+
     self.add(&format!(
       "{prefix}{selector}.{}({});",
       name,
@@ -600,8 +641,8 @@ impl Decompiler {
             if let (Some(x), Some(y), Some(z)) = (data.x, data.y, data.z) {
               tags.push_str(&format!(", motion=Vector({x},{y},{z})"))
             }
-            if let Some(motionVariation) = data.motion_variation {
-              tags.push_str(&format!(", motionVariation={motionVariation}"))
+            if let Some(motion_variation) = data.motion_variation {
+              tags.push_str(&format!(", motionVariation={motion_variation}"))
             }
             if let Some(rgb) = data.rgb {
               tags.push_str(&format!(", rgb={rgb}"))
