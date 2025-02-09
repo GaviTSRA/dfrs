@@ -68,13 +68,11 @@ impl Decompiler {
     let line: Codeline = serde_json::from_str(&json).unwrap();
     let mut global_vars = vec![];
     let mut vars = vec![];
+    let mut direct_vars = vec![];
 
     for block in &line.blocks {
       if let Some(args) = &block.args.clone() {
         for (arg_index, arg) in args.items.iter().enumerate() {
-          if arg_index == 0 {
-            continue;
-          }
           match &arg.item.data {
             ArgValueData::Variable { name, scope } => {
               let new_name = name
@@ -83,18 +81,31 @@ impl Decompiler {
                 .replace(" ", "_")
                 .replace("(", "_")
                 .replace(")", "");
+
               let var = if &new_name != name {
                 self.set_var(name, &new_name);
-                format!("{} = `{name}`", new_name)
+                format!("{new_name}: `{name}`")
               } else {
                 self.set_var(name, name);
                 name.to_string()
               };
+
               match scope.as_str() {
                 "unsaved" => global_vars.push(format!("game {var};")),
                 "saved" => global_vars.push(format!("save {var};")),
-                "local" => vars.push(format!("local {var};")),
-                "line" => vars.push(format!("line {var};")),
+                "local" => {
+                  if arg_index == 0 {
+                    direct_vars.push(format!("local {var};"));
+                  }
+                  vars.push(format!("local {var};"))
+                }
+                "line" => {
+                  if arg_index == 0 {
+                    direct_vars.push(format!("line {var};"));
+                  }
+                  vars.push(format!("line {var};"))
+                }
+
                 err => println!("ERR: Unknown var type {err}"),
               }
             }
@@ -116,7 +127,7 @@ impl Decompiler {
     for block in line.blocks {
       match block.id.as_str() {
         "block" => {
-          self.decompile_block(block, vars.clone());
+          self.decompile_block(block, vars.clone(), direct_vars.clone());
         }
         "bracket" => {
           self.decompile_bracket(block);
@@ -144,17 +155,17 @@ impl Decompiler {
     }
   }
 
-  fn decompile_block(&mut self, block: Block, vars: Vec<String>) {
+  fn decompile_block(&mut self, block: Block, vars: Vec<String>, direct_vars: Vec<String>) {
     if let Some(block_name) = block.block.clone() {
       match block_name.as_str() {
         "event" => {
-          self.decompile_event(block, vars);
+          self.decompile_event(block, vars, direct_vars);
         }
         "func" => {
-          self.decompile_function(block, vars);
+          self.decompile_function(block, vars, direct_vars);
         }
         "process" => {
-          self.decompile_process(block, vars);
+          self.decompile_process(block, vars, direct_vars);
         }
         "player_action" => {
           self.decompile_action(block, ActionType::Player);
@@ -205,7 +216,7 @@ impl Decompiler {
     }
   }
 
-  fn decompile_event(&mut self, block: Block, vars: Vec<String>) {
+  fn decompile_event(&mut self, block: Block, vars: Vec<String>, direct_vars: Vec<String>) {
     let extra = if block.attribute.is_some() && block.attribute.unwrap() == "LS-CANCEL" {
       "!"
     } else {
@@ -217,11 +228,14 @@ impl Decompiler {
     ));
     self.indent();
     for var in vars {
+      if direct_vars.contains(&var) {
+        continue;
+      }
       self.add(&var);
     }
   }
 
-  fn decompile_function(&mut self, block: Block, vars: Vec<String>) {
+  fn decompile_function(&mut self, block: Block, vars: Vec<String>, direct_vars: Vec<String>) {
     let mut result = String::from("");
     if let Some(args) = block.args {
       let mut is_first_iter = true;
@@ -335,14 +349,20 @@ impl Decompiler {
     }
     self.indent();
     for var in vars {
+      if direct_vars.contains(&var) {
+        continue;
+      }
       self.add(&var);
     }
   }
 
-  fn decompile_process(&mut self, block: Block, vars: Vec<String>) {
+  fn decompile_process(&mut self, block: Block, vars: Vec<String>, direct_vars: Vec<String>) {
     self.add(&format!("proc {} {{", &block.data.unwrap()));
     self.indent();
     for var in vars {
+      if direct_vars.contains(&var) {
+        continue;
+      }
       self.add(&var);
     }
   }
