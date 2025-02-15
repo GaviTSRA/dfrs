@@ -40,6 +40,9 @@ pub fn to_dfrs_name(s: &str) -> String {
 
   let v = replaced.trim().to_owned();
   let mut vv: Vec<char> = v.chars().collect();
+  if vv.is_empty() {
+    return "".to_string();
+  }
   vv[0] = vv[0].to_lowercase().next().unwrap();
   let name: String = vv.into_iter().collect();
   name

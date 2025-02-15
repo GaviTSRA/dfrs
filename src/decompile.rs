@@ -309,8 +309,8 @@ impl Decompiler {
               is_first_iter = false;
             }
             let value_type = match param_type.as_str() {
-              "str" => "string",
-              "txt" => "text",
+              "txt" => "string",
+              "comp" => "text",
               "num" => "number",
               "loc" => "location",
               "vec" => "vector",
@@ -322,7 +322,7 @@ impl Decompiler {
               "var" => "variable",
               "list" => "list",
               "dict" => "dict",
-              _ => panic!("unknown param type"),
+              err => panic!("unknown param type '{err}'"),
             };
             result.push_str(&format!(
               "{name}: {value_type}{is_optional}{is_plural}{default}"
@@ -573,7 +573,7 @@ impl Decompiler {
         }
         match arg.item.data {
           ArgValueData::Simple { name } => match arg.item.id.as_str() {
-            "comp" => result.push_str(&format!("\"{name}\"")),
+            "comp" => result.push_str(&format!("\"{}\"", name.replace("\"", "\\\""))),
             "num" => {
               let mut done = false;
               for char in name.clone().chars() {
@@ -587,7 +587,7 @@ impl Decompiler {
                 result.push_str(&format!("{name}"))
               }
             }
-            "txt" => result.push_str(&format!("'{name}'")),
+            "txt" => result.push_str(&format!("'{}'", name.replace("'", "\\'"))),
             other => println!("WARN: Unhandled simple arg {other}"),
           },
           ArgValueData::Id { .. } => {}
