@@ -1,18 +1,18 @@
-use std::path::PathBuf;
-use std::{cmp, fs};
-
 use crate::compile::compile;
 use crate::config::Config;
+use crate::decompile::Decompiler;
 use crate::lexer::{Lexer, LexerError};
 use crate::parser::{ParseError, Parser};
 use crate::send::send;
 use crate::token::Position;
 use crate::validate::{ValidateError, Validator};
 use clap::{Parser as _, Subcommand};
-use lsp::run_lsp;
-
-use crate::decompile::Decompiler;
 use colored::Colorize;
+use lsp::run_lsp;
+use std::io::Write;
+use std::path::PathBuf;
+use std::time::Instant;
+use std::{cmp, fs};
 use tungstenite::{connect, Message};
 use url::Url;
 
@@ -88,6 +88,7 @@ fn compile_cmd(file: &PathBuf) {
     "Compiling".bright_black(),
     file.file_name().unwrap().to_string_lossy()
   );
+
   let mut config_file = file.clone();
   config_file.set_file_name("dfrs.toml");
   let config = match load_config(&config_file) {
@@ -103,9 +104,10 @@ fn compile_cmd(file: &PathBuf) {
     }
   };
 
-  let data = std::fs::read_to_string(file).expect("could not open file");
+  let data = fs::read_to_string(file).expect("could not open file");
 
-  let mut lexer = Lexer::new(&data.clone());
+  let input = &data.clone();
+  let mut lexer = Lexer::new(input);
   let result = lexer.run();
 
   let res = match result {
@@ -157,6 +159,7 @@ fn compile_cmd(file: &PathBuf) {
 
   let mut parser = Parser::new(res);
   let res = parser.run();
+
   let node;
   match res {
     Ok(res) => {
@@ -314,9 +317,8 @@ fn compile_cmd(file: &PathBuf) {
     }
   }
 
-  let validated;
-  match Validator::new().validate(node) {
-    Ok(res) => validated = res,
+  let validated = match Validator::new().validate(node) {
+    Ok(res) => res,
     Err(err) => {
       match err {
         ValidateError::UnknownEvent { node } => {
@@ -441,7 +443,7 @@ fn compile_cmd(file: &PathBuf) {
       }
       std::process::exit(0);
     }
-  }
+  };
 
   let compiled = compile(validated, config.debug.compile);
   println!(

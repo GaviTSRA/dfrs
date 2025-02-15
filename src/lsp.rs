@@ -163,7 +163,8 @@ impl Backend {
       .log_message(MessageType::INFO, format!("{} {}", line, col))
       .await;
 
-    let mut lexer = Lexer::new(&rope.to_string());
+    let input = &rope.to_string();
+    let mut lexer = Lexer::new(input);
     let tokens = match lexer.run() {
       Ok(res) => res,
       Err(_) => return Ok(None),
@@ -405,7 +406,8 @@ fn compile_file(data: String, path: PathBuf) -> Result<(), CompileErr> {
     }
   };
 
-  let mut lexer = Lexer::new(&data.clone());
+  let input = &data.clone();
+  let mut lexer = Lexer::new(input);
   let result = lexer.run();
 
   let res = match result {

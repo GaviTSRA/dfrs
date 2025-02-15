@@ -9,34 +9,34 @@ pub enum LexerError {
   UnterminatedVariable { pos: Position },
 }
 
-pub struct Lexer {
-  char_pos: i32,
+pub struct Lexer<'a> {
   input: String,
+  chars: std::str::Chars<'a>,
+  char_stack: Vec<char>,
   position: Position,
   current_char: Option<char>,
   next_char_in_new_line: bool,
 }
 
-impl Lexer {
+impl<'a> Lexer<'a> {
   pub fn new(input: &str) -> Lexer {
     Lexer {
       input: input.to_owned(),
       current_char: None,
-      char_pos: -1,
+      chars: input.chars(),
+      char_stack: Vec::new(),
       position: Position::new(1, 0),
       next_char_in_new_line: false,
     }
   }
 
   fn advance(&mut self) {
-    self.char_pos += 1;
-    self.position.advance();
-
-    if self.char_pos >= self.input.chars().count() as i32 {
-      self.current_char = None
-    } else {
-      self.current_char = Some(self.input.chars().nth(self.char_pos as usize).unwrap())
+    if let Some(c) = self.current_char {
+      self.char_stack.push(c);
     }
+
+    self.position.advance();
+    self.current_char = self.chars.next();
 
     if self.next_char_in_new_line {
       self.next_char_in_new_line = false;
@@ -48,9 +48,14 @@ impl Lexer {
   }
 
   fn rewind(&mut self) {
-    self.char_pos -= 1;
     self.position.rewind();
-    self.current_char = Some(self.input.chars().nth(self.char_pos as usize).unwrap());
+
+    if let Some(prev_char) = self.char_stack.pop() {
+      self.current_char = Some(prev_char);
+    } else {
+      self.current_char = None;
+    }
+
     self.next_char_in_new_line = self.current_char.is_some() && self.current_char.unwrap() == '\n';
   }
 
