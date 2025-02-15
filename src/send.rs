@@ -11,8 +11,11 @@ use url::Url;
 
 pub fn send(code: Vec<CompiledLine>, config: Config) {
   match config.sending.api {
-    crate::config::SendApi::CodeClient => {
-      send_codeclient(code, config);
+    crate::config::SendApi::CodeClientGive => {
+      send_codeclient_give(code, config.debug.connection);
+    }
+    crate::config::SendApi::CodeClientPlace => {
+      send_codeclient_place(code, config);
     }
     crate::config::SendApi::Recode => {
       for line in code {
@@ -23,6 +26,7 @@ pub fn send(code: Vec<CompiledLine>, config: Config) {
 }
 
 fn send_recode(code: String, name: String, debug: bool) {
+  println!("WARN: Recode API is deprecated");
   let data = ("{\"type\": \"template\", \"source\": \"df.rs\", \"data\": \"{\\\"name\\\": \\\""
     .to_owned()
     + &name
@@ -66,8 +70,53 @@ fn send_recode(code: String, name: String, debug: bool) {
   }
 }
 
-fn send_codeclient(code: Vec<CompiledLine>, config: Config) {
-  //TODO error handling
+fn send_codeclient_give(code: Vec<CompiledLine>, debug: bool) {
+  let (mut socket, response) =
+    connect(Url::parse("ws://localhost:31375").unwrap()).expect("Can't connect");
+
+  if debug {
+    println!("Connected to server; {:?}", response)
+  }
+
+  for line in code {
+    let data = "{\"Count\":1b, \"id\":\"minecraft:ender_chest\", \"components\":{\"minecraft:custom_data\":{PublicBukkitValues:{\"hypercube:codetemplatedata\":\'{\"author\":\"Compiled using dfrs\",\"name\":\""
+      .to_owned()
+    + &line.name
+    + "\",\"version\":1,\"code\":\""
+    + &compress(line.code)
+    + "\"}'}},\"minecraft:custom_name\":'{\"extra\":[{\"bold\":true,\"color\":\"aqua\",\"text\":\""
+    + &line.name
+    + "\"}],\"text\":\"\"}'}}";
+
+    if debug {
+      println!("{}", data);
+    }
+
+    socket.send(Message::Text("scopes default".into())).unwrap();
+
+    loop {
+      let msg = socket.read().expect("Error reading message");
+
+      if debug {
+        println!("Received: {}", msg);
+      }
+
+      if msg.to_text().expect("response should be text") == "auth" {
+        break;
+      }
+    }
+
+    socket
+      .send(Message::Text(format!("give {}", data)))
+      .unwrap();
+    let msg = socket.read().expect("Error reading message");
+    if debug {
+      println!("Received: {}", msg);
+    }
+  }
+}
+
+fn send_codeclient_place(code: Vec<CompiledLine>, config: Config) {
   let (mut socket, response) =
     connect(Url::parse("ws://localhost:31375").unwrap()).expect("Can't connect");
 

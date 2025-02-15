@@ -18,15 +18,18 @@ pub struct Sending {
 impl Default for Sending {
   fn default() -> Self {
     Sending {
-      api: SendApi::CodeClient,
+      api: SendApi::CodeClientGive,
     }
   }
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-#[serde(rename_all = "lowercase")]
 pub enum SendApi {
-  CodeClient,
+  #[serde(rename="codeclient-give")]
+  CodeClientGive,
+  #[serde(rename="codeclient-place")]
+  CodeClientPlace,
+  #[serde(rename="recode")]
   Recode,
 }
 
