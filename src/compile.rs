@@ -1029,7 +1029,7 @@ impl Serialize for ArgValueData {
       } => {
         let mut state = serializer.serialize_struct("MyEnum", 4)?;
         if default_value.is_some() {
-          state.serialize_field("defaultValue", default_value)?;
+          state.serialize_field("default_value", default_value)?;
         }
         state.serialize_field("name", name)?;
         state.serialize_field("optional", optional)?;

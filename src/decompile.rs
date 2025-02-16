@@ -90,17 +90,29 @@ impl Decompiler {
                 name.to_string()
               };
 
+              let mut is_normal_action = false;
+              if let Some(block) = &block.block {
+                is_normal_action = match block.as_str() {
+                  "player_action" => true,
+                  "entity_action" => true,
+                  "game_action" => true,
+                  "set_var" => true,
+                  _ => false,
+                };
+              }
+
               match scope.as_str() {
                 "unsaved" => global_vars.push(format!("game {var};")),
                 "saved" => global_vars.push(format!("save {var};")),
                 "local" => {
-                  if arg_index == 0 {
+                  if arg_index == 0 && is_normal_action && !vars.contains(&format!("local {var};"))
+                  {
                     direct_vars.push(format!("local {var};"));
                   }
                   vars.push(format!("local {var};"))
                 }
                 "line" => {
-                  if arg_index == 0 {
+                  if arg_index == 0 && is_normal_action && !vars.contains(&format!("line {var};")) {
                     direct_vars.push(format!("line {var};"));
                   }
                   vars.push(format!("line {var};"))
@@ -252,7 +264,7 @@ impl Decompiler {
             let is_plural = if plural { "*" } else { "" };
             let default = if let Some(default_val) = default_value {
               let end = match default_val.data {
-                FunctionDefaultItemData::Simple { name } => match arg.item.id.as_str() {
+                FunctionDefaultItemData::Simple { name } => match default_val.id.as_str() {
                   "comp" => format!("\"{name}\""),
                   "num" => format!("{name}"),
                   "txt" => format!("'{name}'"),
