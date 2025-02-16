@@ -1642,8 +1642,8 @@ impl Serialize for Location {
   {
     let mut state = serializer.serialize_struct("MyEnum", 5)?;
     state.serialize_field("x", &self.x)?;
-    state.serialize_field("z", &self.y)?;
-    state.serialize_field("y", &self.z)?;
+    state.serialize_field("y", &self.y)?;
+    state.serialize_field("z", &self.z)?;
     if self.pitch.is_none() {
       state.serialize_field("pitch", &0)?;
     } else {

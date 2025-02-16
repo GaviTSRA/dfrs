@@ -9,7 +9,6 @@ use crate::validate::{ValidateError, Validator};
 use clap::{Parser as _, Subcommand};
 use colored::Colorize;
 use lsp::run_lsp;
-use std::io::Write;
 use std::path::PathBuf;
 use std::time::Instant;
 use std::{cmp, fs};
@@ -88,6 +87,7 @@ fn compile_cmd(file: &PathBuf) {
     "Compiling".bright_black(),
     file.file_name().unwrap().to_string_lossy()
   );
+  let start = Instant::now();
 
   let mut config_file = file.clone();
   config_file.set_file_name("dfrs.toml");
@@ -446,10 +446,13 @@ fn compile_cmd(file: &PathBuf) {
   };
 
   let compiled = compile(validated, config.debug.compile);
+  let duration = start.elapsed().as_secs_f64();
   println!(
-    "{}  {}",
+    "{}  {} {} {}",
     "Compiled".green(),
-    file.file_name().unwrap().to_string_lossy()
+    file.file_name().unwrap().to_string_lossy(),
+    "in".bright_black(),
+    format!("{:.2}s", duration).bright_black()
   );
   send(compiled, config);
 }

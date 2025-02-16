@@ -47,18 +47,6 @@ impl<'a> Lexer<'a> {
     }
   }
 
-  fn rewind(&mut self) {
-    self.position.rewind();
-
-    if let Some(prev_char) = self.char_stack.pop() {
-      self.current_char = Some(prev_char);
-    } else {
-      self.current_char = None;
-    }
-
-    self.next_char_in_new_line = self.current_char.is_some() && self.current_char.unwrap() == '\n';
-  }
-
   fn make_number(&mut self) -> Result<TokenWithPos, LexerError> {
     let mut num_string: String = String::from("");
     let mut dot_count = 0;
@@ -312,10 +300,9 @@ impl<'a> Lexer<'a> {
           let token = match self.make_number() {
             Ok(res) => res,
             Err(_) => {
-              self.rewind();
+              self.position.rewind();
               let token = self.token(Token::Minus);
-              self.advance();
-              println!("{}", self.position);
+              self.position.advance();
               token
             }
           };

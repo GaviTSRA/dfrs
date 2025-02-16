@@ -67,6 +67,11 @@ enum PathError {
     found_type: ArgType,
     options: Vec<DefinedArgOption>,
   },
+  UnknownGameValue {
+    start_pos: Position,
+    end_pos: Position,
+    game_value: String,
+  },
 }
 
 pub struct Validator {
@@ -537,6 +542,15 @@ impl Validator {
             options: options.clone(),
             found_type: found_type.clone(),
           }),
+          PathError::UnknownGameValue {
+            game_value,
+            start_pos,
+            end_pos,
+          } => Err(ValidateError::UnknownGameValue {
+            game_value: game_value.clone(),
+            start_pos: start_pos.clone(),
+            end_pos: end_pos.clone(),
+          }),
         };
       }
     }
@@ -691,10 +705,55 @@ impl Validator {
             break;
           }
 
-          let current_arg = node_args.get(0).unwrap();
+          let mut current_arg = node_args.get(0).unwrap().clone();
+
+          if current_arg.arg_type == ArgType::EMPTY {
+            if option.optional {
+              *index += 1;
+              node_args.remove(0);
+              break;
+            }
+            missing = Some(
+              arg
+                .options
+                .iter()
+                .map(|option| return option.name.clone())
+                .collect(),
+            );
+          }
+
+          if let ArgValue::GameValue {
+            df_name,
+            dfrs_name,
+            selector,
+            selector_end_pos,
+          } = current_arg.value.clone()
+          {
+            let actual_game_value = self.game_values.get(dfrs_name.clone());
+            match actual_game_value {
+              Some(res) => {
+                current_arg.value = ArgValue::GameValue {
+                  df_name: Some(res.df_name.clone()),
+                  dfrs_name,
+                  selector,
+                  selector_end_pos,
+                };
+                current_arg.arg_type = res.value_type.clone();
+              }
+              None => {
+                return Err(PathError::UnknownGameValue {
+                  game_value: dfrs_name,
+                  start_pos: current_arg.start_pos,
+                  end_pos: current_arg.end_pos,
+                })
+              }
+            }
+          }
+
           if current_arg.arg_type == option.arg_type
             || current_arg.arg_type == ArgType::VARIABLE
             || option.arg_type == ArgType::ANY
+            || current_arg.arg_type == ArgType::GameValue
           {
             arg_complete = true;
             previous_plural = if option.plural {
@@ -702,9 +761,9 @@ impl Validator {
             } else {
               None
             };
-            let mut ok_arg = node_args.remove(0);
-            ok_arg.index = *index;
-            args.push(ok_arg);
+            node_args.remove(0);
+            current_arg.index = *index;
+            args.push(current_arg);
             *index += 1;
             break;
           }
@@ -712,9 +771,9 @@ impl Validator {
           if option_index + 1 == arg.options.len() {
             if let Some(plural_type) = &previous_plural {
               if plural_type == &current_arg.arg_type {
-                let mut ok_arg = node_args.remove(0);
-                ok_arg.index = *index;
-                args.push(ok_arg);
+                node_args.remove(0);
+                current_arg.index = *index;
+                args.push(current_arg);
                 break;
               }
             }
@@ -731,20 +790,6 @@ impl Validator {
         }
       }
 
-      if let Some(plural_type) = &previous_plural {
-        while node_args.len() > 0 {
-          let current_arg = node_args.get(0).unwrap();
-
-          if plural_type == &current_arg.arg_type {
-            let mut ok_arg = node_args.remove(0);
-            ok_arg.index = *index;
-            args.push(ok_arg);
-          } else {
-            break;
-          }
-        }
-      }
-
       if !arg_complete {
         if let Some(missing) = missing {
           return Err(PathError::MissingArgument {
@@ -756,6 +801,24 @@ impl Validator {
             found_type: wrong_type.0.clone(),
             options: wrong_type.1.clone(),
           });
+        }
+      }
+    }
+
+    if let Some(plural_type) = &previous_plural {
+      while node_args.len() > 0 {
+        let current_arg = node_args.get(0).unwrap();
+
+        if plural_type == &current_arg.arg_type
+          || plural_type == &ArgType::ANY
+          || current_arg.arg_type == ArgType::VARIABLE
+          || current_arg.arg_type == ArgType::GameValue
+        {
+          let mut ok_arg = node_args.remove(0);
+          ok_arg.index = *index;
+          args.push(ok_arg);
+        } else {
+          break;
         }
       }
     }

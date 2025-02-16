@@ -355,7 +355,7 @@ impl Decompiler {
       .replace("(", "_")
       .replace(")", "");
     if new_name != name {
-      self.add(&format!("fn {} = `{}`({}) {{", new_name, name, result));
+      self.add(&format!("fn {}: `{}`({}) {{", new_name, name, result));
     } else {
       self.add(&format!("fn {}({}) {{", new_name, result));
     }
@@ -430,13 +430,32 @@ impl Decompiler {
                 &format!(": `{var_name}`")
               };
 
-              let mut new_block = block.clone();
-              args.items.remove(0);
-              new_block.args = Some(args);
+              let mut is_normal_action = false;
+              if let Some(block) = &block.block {
+                is_normal_action = match block.as_str() {
+                  "player_action" => true,
+                  "entity_action" => true,
+                  "game_action" => true,
+                  "set_var" => true,
+                  _ => false,
+                };
+              }
+
+              if is_normal_action {
+                let mut new_block = block.clone();
+                args.items.remove(0);
+                new_block.args = Some(args);
+                return self.add(&format!(
+                  "{scope} {new_name}{var_assignment} = {prefix}{selector}.{}({});",
+                  name,
+                  self.decompile_params(new_block, action)
+                ));
+              }
+
               return self.add(&format!(
-                "{scope} {new_name}{var_assignment} = {prefix}{selector}.{}({});",
+                "{prefix}{selector}.{}({});",
                 name,
-                self.decompile_params(new_block, action)
+                self.decompile_params(block, action)
               ));
             }
           }
@@ -558,15 +577,22 @@ impl Decompiler {
         .get_df(&sub_action_name)
       {
         result.push_str(&format!("ifp {}(", action.dfrs_name));
-      }
-      if let Some(action) = &self.action_dump.entity_conditionals.get(&sub_action_name) {
+      } else if let Some(action) = &self
+        .action_dump
+        .entity_conditionals
+        .get_df(&sub_action_name)
+      {
         result.push_str(&format!("ife {}(", action.dfrs_name));
-      }
-      if let Some(action) = &self.action_dump.game_conditionals.get(&sub_action_name) {
+      } else if let Some(action) = &self.action_dump.game_conditionals.get_df(&sub_action_name) {
         result.push_str(&format!("ifg {}(", action.dfrs_name));
-      }
-      if let Some(action) = &self.action_dump.variable_conditionals.get(&sub_action_name) {
+      } else if let Some(action) = &self
+        .action_dump
+        .variable_conditionals
+        .get_df(&sub_action_name)
+      {
         result.push_str(&format!("ifv {}(", action.dfrs_name));
+      } else {
+        println!("ERR decompiling subaction {}", sub_action_name);
       }
     }
 
