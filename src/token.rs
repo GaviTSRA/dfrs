@@ -80,7 +80,6 @@ pub enum Token {
   Variable { value: String },
   Identifier { value: String },
   Keyword { value: Keyword },
-  Selector { value: Selector },
 }
 
 impl Display for Token {
@@ -109,7 +108,6 @@ impl Display for Token {
       Token::Variable { .. } => write!(f, "Variable"),
       Token::Identifier { .. } => write!(f, "Identifier"),
       Token::Keyword { value } => write!(f, "Keyword:{}", value),
-      Token::Selector { .. } => write!(f, "Selector"),
     }
   }
 }

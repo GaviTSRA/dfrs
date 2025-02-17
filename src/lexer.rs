@@ -1,4 +1,4 @@
-use crate::token::{Position, Token, TokenWithPos, KEYWORDS, SELECTORS};
+use crate::token::{Position, Token, TokenWithPos, KEYWORDS};
 
 #[derive(Debug, Clone)]
 pub enum LexerError {
@@ -226,15 +226,6 @@ impl<'a> Lexer<'a> {
     if let Some(keyword) = keyword {
       return Ok(TokenWithPos {
         token: Token::Keyword { value: keyword },
-        start_pos,
-        end_pos: self.position.clone(),
-      });
-    }
-
-    let selector = SELECTORS.get(&value).cloned();
-    if let Some(selector) = selector {
-      return Ok(TokenWithPos {
-        token: Token::Selector { value: selector },
         start_pos,
         end_pos: self.position.clone(),
       });
@@ -730,85 +721,6 @@ mod tests {
         "repeat",
         Token::Keyword {
           value: Keyword::Repeat,
-        },
-      ),
-    ];
-
-    for value in values {
-      println!("Testing token {:?} to be '{:?}'", value.0, value.1);
-      let result = Lexer::new(value.0).run().expect("Lexer failed");
-      let token = result.get(0).expect("Lexer did not return tokens");
-      assert_eq!(token.token, value.1);
-    }
-  }
-
-  #[test]
-  pub fn selectors() {
-    let values = vec![
-      (
-        "default",
-        Token::Selector {
-          value: Selector::Default,
-        },
-      ),
-      (
-        "selection",
-        Token::Selector {
-          value: Selector::Selection,
-        },
-      ),
-      (
-        "killer",
-        Token::Selector {
-          value: Selector::Killer,
-        },
-      ),
-      (
-        "damager",
-        Token::Selector {
-          value: Selector::Damager,
-        },
-      ),
-      (
-        "shooter",
-        Token::Selector {
-          value: Selector::Shooter,
-        },
-      ),
-      (
-        "victim",
-        Token::Selector {
-          value: Selector::Victim,
-        },
-      ),
-      (
-        "allPlayers",
-        Token::Selector {
-          value: Selector::AllPlayers,
-        },
-      ),
-      (
-        "projectile",
-        Token::Selector {
-          value: Selector::Projectile,
-        },
-      ),
-      (
-        "allEntities",
-        Token::Selector {
-          value: Selector::AllEntities,
-        },
-      ),
-      (
-        "allMobs",
-        Token::Selector {
-          value: Selector::AllMobs,
-        },
-      ),
-      (
-        "lastEntity",
-        Token::Selector {
-          value: Selector::LastEntity,
         },
       ),
     ];

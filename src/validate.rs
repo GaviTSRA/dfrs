@@ -774,6 +774,7 @@ impl Validator {
                 node_args.remove(0);
                 current_arg.index = *index;
                 args.push(current_arg);
+                *index += 1;
                 break;
               }
             }
@@ -816,6 +817,7 @@ impl Validator {
         {
           let mut ok_arg = node_args.remove(0);
           ok_arg.index = *index;
+          *index += 1;
           args.push(ok_arg);
         } else {
           break;

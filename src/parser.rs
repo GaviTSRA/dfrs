@@ -674,16 +674,25 @@ impl Parser {
         }
         token = self.advance_err()?;
         match token.token {
-          Token::Selector { value } => {
-            selector = value;
-            implicit_selector = false;
-            self.require_token(Token::Dot)?;
+          Token::Identifier { value } => {
+            if let Some(value) = SELECTORS.get(&value).cloned() {
+              selector = value;
+              implicit_selector = false;
+              self.require_token(Token::Dot)?;
+            } else {
+              return Err(ParseError::InvalidToken {
+                found: self.current_token.clone(),
+                expected: vec![Token::Identifier {
+                  value: "<selector>".to_string(),
+                }],
+              });
+            }
           }
           _ => {
             return Err(ParseError::InvalidToken {
               found: self.current_token.clone(),
-              expected: vec![Token::Selector {
-                value: Selector::AllPlayers,
+              expected: vec![Token::Identifier {
+                value: "<selector>".to_string(),
               }],
             })
           }
@@ -757,13 +766,15 @@ impl Parser {
       _ => {}
     }
 
-    match token.token {
-      Token::Selector { value } => {
-        selector = value;
-        selector_start_pos = Some(token.start_pos);
-        selector_end_pos = Some(token.end_pos);
-        self.require_token(Token::Colon)?;
-        token = self.advance_err()?;
+    match &token.token {
+      Token::Identifier { value } => {
+        if let Some(value) = SELECTORS.get(&value).cloned() {
+          selector = value;
+          selector_start_pos = Some(token.start_pos);
+          selector_end_pos = Some(token.end_pos);
+          self.require_token(Token::Colon)?;
+          token = self.advance_err()?;
+        }
       }
       _ => {}
     }
@@ -1225,17 +1236,19 @@ impl Parser {
         let mut selector_end_pos = token.start_pos.clone();
         let start_pos = token.start_pos.clone();
 
-        if let Token::Selector { value } = token.token.clone() {
-          selector = value;
-          token = self.advance_err()?;
-          if token.token != Token::Colon {
-            return Err(ParseError::InvalidToken {
-              found: Some(token),
-              expected: vec![Token::Colon],
-            });
+        if let Token::Identifier { value } = token.token.clone() {
+          if let Some(value) = SELECTORS.get(&value).cloned() {
+            selector = value;
+            token = self.advance_err()?;
+            if token.token != Token::Colon {
+              return Err(ParseError::InvalidToken {
+                found: Some(token),
+                expected: vec![Token::Colon],
+              });
+            }
+            selector_end_pos = token.end_pos;
+            token = self.advance_err()?;
           }
-          selector_end_pos = token.end_pos;
-          token = self.advance_err()?;
         }
 
         match token.token.clone() {
@@ -1260,8 +1273,8 @@ impl Parser {
                 Token::Identifier {
                   value: "<any>".into(),
                 },
-                Token::Selector {
-                  value: Selector::Default,
+                Token::Identifier {
+                  value: "<selector>".into(),
                 },
               ],
             })
@@ -1925,11 +1938,13 @@ impl Parser {
       _ => {}
     }
 
-    match token.token {
-      Token::Selector { value } => {
-        selector = value;
-        self.require_token(Token::Colon)?;
-        token = self.advance_err()?;
+    match &token.token {
+      Token::Identifier { value } => {
+        if let Some(value) = SELECTORS.get(&value).cloned() {
+          selector = value;
+          self.require_token(Token::Colon)?;
+          token = self.advance_err()?;
+        }
       }
       _ => {}
     }
