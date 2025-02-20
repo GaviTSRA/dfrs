@@ -116,7 +116,6 @@ pub fn get_action(action: &ADAction) -> Action {
       if let Some(next_arg) = &action.icon.arguments.get(index + 1) {
         if next_arg.arg_type != "" && next_arg.arg_type != "OR" {
           has_multiple_after_or = true;
-          println!("{}", action.name);
         }
       }
       if !is_or {
