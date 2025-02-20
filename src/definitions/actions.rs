@@ -71,7 +71,7 @@ pub fn get_action(action: &ADAction) -> Action {
 
   let mut is_or = false;
 
-  for arg in &action.icon.arguments {
+  for (index, arg) in action.icon.arguments.iter().enumerate() {
     let arg_type = match &arg.arg_type as &str {
       "NUMBER" => ArgType::NUMBER,
       "COMPONENT" => ArgType::TEXT,
@@ -110,8 +110,19 @@ pub fn get_action(action: &ADAction) -> Action {
       }
       _ => panic!("Unknown arg type: {}", arg.arg_type),
     };
+
     if is_or || current_options.is_empty() {
-      if current_branch_path.len() > 0 {
+      let mut has_multiple_after_or = false;
+      if let Some(next_arg) = &action.icon.arguments.get(index + 1) {
+        if next_arg.arg_type != "" && next_arg.arg_type != "OR" {
+          has_multiple_after_or = true;
+          println!("{}", action.name);
+        }
+      }
+      if !is_or {
+        has_multiple_after_or = false;
+      }
+      if current_branch_path.len() > 0 || has_multiple_after_or {
         current_branch_path.push(DefinedArg::new(current_options));
         current_branch.push(current_branch_path);
         current_branch_path = vec![];
