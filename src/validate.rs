@@ -179,7 +179,8 @@ impl Validator {
                 scope: match node.var_type {
                   VariableType::Line => "line".to_owned(),
                   VariableType::Local => "local".to_owned(),
-                  _ => unreachable!(),
+                  VariableType::Game => "unsaved".to_owned(),
+                  VariableType::Save => "saved".to_owned(),
                 },
               },
               start_pos: node.start_pos,

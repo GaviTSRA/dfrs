@@ -10,7 +10,6 @@ pub enum LexerError {
 }
 
 pub struct Lexer<'a> {
-  input: String,
   chars: std::str::Chars<'a>,
   char_stack: Vec<char>,
   position: Position,
@@ -21,7 +20,6 @@ pub struct Lexer<'a> {
 impl<'a> Lexer<'a> {
   pub fn new(input: &str) -> Lexer {
     Lexer {
-      input: input.to_owned(),
       current_char: None,
       chars: input.chars(),
       char_stack: Vec::new(),
@@ -375,7 +373,7 @@ impl<'a> Lexer<'a> {
 
 #[cfg(test)]
 mod tests {
-  use crate::token::{Keyword, Selector};
+  use crate::token::Keyword;
 
   use super::*;
 

@@ -142,11 +142,11 @@ impl Parser {
             processes.push(self.process()?);
           }
           Keyword::VarGame => {
-            let node = self.variable(VariableType::Game)?;
+            let node = self.variable(VariableType::Game, None)?;
             self.variables.push(node);
           }
           Keyword::VarSave => {
-            let node = self.variable(VariableType::Save)?;
+            let node = self.variable(VariableType::Save, None)?;
             self.variables.push(node);
           }
           _ => {
@@ -605,12 +605,12 @@ impl Parser {
           node = Expression::Conditional { node: res };
         }
         Keyword::VarLine => {
-          let res = self.variable(VariableType::Line)?;
+          let res = self.variable(VariableType::Line, None)?;
           end_pos = res.end_pos.clone();
           node = Expression::Variable { node: res }
         }
         Keyword::VarLocal => {
-          let res = self.variable(VariableType::Local)?;
+          let res = self.variable(VariableType::Local, None)?;
           end_pos = res.end_pos.clone();
           node = Expression::Variable { node: res }
         }
@@ -639,6 +639,29 @@ impl Parser {
           })
         }
       },
+      Token::Identifier { value } => {
+        if let Some((variable, scope)) = self.get_variable(value) {
+          let var_type = match scope.as_str() {
+            "line" => VariableType::Line,
+            "local" => VariableType::Local,
+            "unsaved" => VariableType::Game,
+            "saved" => VariableType::Save,
+            _ => unreachable!("unknown type {scope}"),
+          };
+
+          let res = self.variable(var_type, Some(variable))?;
+          end_pos = res.end_pos.clone();
+          node = Expression::Variable { node: res }
+        } else {
+          return Err(ParseError::InvalidToken {
+            found: self.current_token.clone(),
+            expected: vec![
+              Token::Keyword { value: Keyword::E },
+              Token::Keyword { value: Keyword::P },
+            ],
+          });
+        }
+      }
       _ => {
         return Err(ParseError::InvalidToken {
           found: self.current_token.clone(),
@@ -957,20 +980,28 @@ impl Parser {
     })
   }
 
-  fn variable(&mut self, var_type: VariableType) -> Result<VariableNode, ParseError> {
+  fn variable(
+    &mut self,
+    var_type: VariableType,
+    name: Option<String>,
+  ) -> Result<VariableNode, ParseError> {
     let start_pos = self.current_token.clone().unwrap().start_pos;
     let end_pos = start_pos.clone();
 
-    let token = self.advance_err()?;
-    let dfrs_name = match token.token {
-      Token::Identifier { value } => value,
-      _ => {
-        return Err(ParseError::InvalidToken {
-          found: self.current_token.clone(),
-          expected: vec![Token::Identifier {
-            value: "any".into(),
-          }],
-        })
+    let dfrs_name = if let Some(name) = name {
+      name
+    } else {
+      let token = self.advance_err()?;
+      match token.token {
+        Token::Identifier { value } => value,
+        _ => {
+          return Err(ParseError::InvalidToken {
+            found: self.current_token.clone(),
+            expected: vec![Token::Identifier {
+              value: "any".into(),
+            }],
+          })
+        }
       }
     };
 
