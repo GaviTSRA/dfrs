@@ -614,11 +614,6 @@ impl Parser {
           end_pos = res.end_pos.clone();
           node = Expression::Variable { node: res }
         }
-        Keyword::Call => {
-          let res = self.call()?;
-          end_pos = res.end_pos.clone();
-          node = Expression::Call { node: res }
-        }
         Keyword::Start => {
           let res = self.start()?;
           end_pos = res.end_pos.clone();
@@ -640,7 +635,7 @@ impl Parser {
         }
       },
       Token::Identifier { value } => {
-        if let Some((variable, scope)) = self.get_variable(value) {
+        if let Some((variable, scope)) = self.get_variable(value.clone()) {
           let var_type = match scope.as_str() {
             "line" => VariableType::Line,
             "local" => VariableType::Local,
@@ -653,13 +648,26 @@ impl Parser {
           end_pos = res.end_pos.clone();
           node = Expression::Variable { node: res }
         } else {
-          return Err(ParseError::InvalidToken {
-            found: self.current_token.clone(),
-            expected: vec![
-              Token::Keyword { value: Keyword::E },
-              Token::Keyword { value: Keyword::P },
-            ],
-          });
+          if let Some(token) = self.peak() {
+            if token.token == Token::OpenParen {
+              let res = self.call(value)?;
+              end_pos = res.end_pos.clone();
+              node = Expression::Call { node: res }
+            } else {
+              return Err(ParseError::InvalidToken {
+                found: self.current_token.clone(),
+                expected: vec![Token::OpenParen],
+              });
+            }
+          } else {
+            return Err(ParseError::InvalidToken {
+              found: self.current_token.clone(),
+              expected: vec![
+                Token::Keyword { value: Keyword::E },
+                Token::Keyword { value: Keyword::P },
+              ],
+            });
+          }
         }
       }
       _ => {
@@ -869,26 +877,10 @@ impl Parser {
     })
   }
 
-  fn call(&mut self) -> Result<CallNode, ParseError> {
+  fn call(&mut self, name: String) -> Result<CallNode, ParseError> {
     let start_pos = self.current_token.clone().unwrap().start_pos;
     let mut args = self.make_args()?;
 
-    if args.is_empty() {
-      return Err(ParseError::InvalidCall {
-        pos: start_pos,
-        msg: "Missing function name".into(),
-      });
-    }
-    let name_arg = args.remove(0);
-    let name = match name_arg.value {
-      ArgValue::Text { text } => text,
-      _ => {
-        return Err(ParseError::InvalidCall {
-          pos: start_pos,
-          msg: "Invalid function name param type".into(),
-        })
-      }
-    };
     for arg in args.iter_mut() {
       arg.index -= 1;
     }

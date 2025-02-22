@@ -152,8 +152,9 @@ repeat while(ifp isNear(Location(0, 0, 0), 1)) {
 Functions can also be called:
 
 ```
-call("functionName", arg1, arg2, ...);
+functionName(arg1, arg2, ...);
 ```
+If the function is defined in the same file, its parameters are validated.
 
 ## Starting processes
 

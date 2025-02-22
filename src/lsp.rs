@@ -563,6 +563,15 @@ fn compile_file(data: String, path: PathBuf) -> Result<(), CompileErr> {
           Some(end_pos),
           format!("Unknown action '{}'", name),
         )),
+        ValidateError::UnknownFunction {
+          name,
+          start_pos,
+          end_pos,
+        } => Err(CompileErr::new(
+          start_pos,
+          Some(end_pos),
+          format!("Unknown function '{}'", name),
+        )),
         ValidateError::MissingArgument {
           start_pos,
           end_pos,

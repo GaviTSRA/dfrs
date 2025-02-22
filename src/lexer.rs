@@ -704,12 +704,6 @@ mod tests {
         },
       ),
       (
-        "call",
-        Token::Keyword {
-          value: Keyword::Call,
-        },
-      ),
-      (
         "start",
         Token::Keyword {
           value: Keyword::Start,

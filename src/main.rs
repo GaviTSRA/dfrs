@@ -341,6 +341,18 @@ fn compile_cmd(file: &PathBuf) {
             Some(end_pos),
           );
         }
+        ValidateError::UnknownFunction {
+          name,
+          start_pos,
+          end_pos,
+        } => {
+          print_err(
+            format!("Unknown function '{}'", name),
+            data,
+            start_pos,
+            Some(end_pos),
+          );
+        }
         ValidateError::MissingArgument {
           options,
           start_pos,

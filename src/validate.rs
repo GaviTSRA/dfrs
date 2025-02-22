@@ -4,6 +4,7 @@ use crate::definitions::events::{EntityEvents, PlayerEvents};
 use crate::definitions::game_values::GameValues;
 use crate::definitions::{DefinedArgBranch, DefinedArgOption};
 use crate::node::{ExpressionNode, StartNode, VariableType};
+use crate::token::Type;
 use crate::{
   definitions::{action_dump::ActionDump, ArgType, DefinedArg},
   node::{
@@ -27,6 +28,11 @@ pub enum ValidateError {
     start_pos: Position,
     end_pos: Position,
     game_value: String,
+  },
+  UnknownFunction {
+    name: String,
+    start_pos: Position,
+    end_pos: Position,
   },
   MissingArgument {
     options: Vec<String>,
@@ -79,6 +85,8 @@ pub struct Validator {
   entity_events: EntityEvents,
   action_dump: ActionDump,
   game_values: GameValues,
+
+  functions: Vec<(String, Action)>,
 }
 
 impl Validator {
@@ -89,9 +97,64 @@ impl Validator {
       entity_events: EntityEvents::new(&action_dump),
       action_dump: ActionDump::new(&action_dump),
       game_values: GameValues::new(&action_dump),
+      functions: vec![],
     }
   }
-  pub fn validate(&self, mut node: FileNode) -> Result<FileNode, ValidateError> {
+
+  fn get_function(&self, name: &str) -> Option<Action> {
+    for (fn_name, action) in &self.functions {
+      if fn_name == name {
+        return Some(action.clone());
+      }
+    }
+    None
+  }
+
+  pub fn validate(&mut self, mut node: FileNode) -> Result<FileNode, ValidateError> {
+    let mut functions = vec![];
+
+    for function in node.functions.iter_mut() {
+      let mut args = vec![];
+
+      for param in &function.params {
+        let param_type = match param.param_type {
+          Type::Number => ArgType::NUMBER,
+          Type::String => ArgType::STRING,
+          Type::Text => ArgType::TEXT,
+          Type::Vector => ArgType::VECTOR,
+          Type::Location => ArgType::LOCATION,
+          Type::Particle => ArgType::PARTICLE,
+          Type::Potion => ArgType::POTION,
+          Type::Sound => ArgType::SOUND,
+          Type::Item => ArgType::ITEM,
+          Type::List => ArgType::VARIABLE,
+          Type::Dict => ArgType::VARIABLE,
+          Type::Variable => ArgType::VARIABLE,
+          Type::Any => ArgType::ANY,
+        };
+
+        args.push(DefinedArg::new(vec![DefinedArgOption::new(
+          param.name.clone(),
+          param_type,
+          param.optional,
+          param.multiple,
+        )]));
+      }
+
+      let action = Action::new(
+        format!("fn {}", function.dfrs_name),
+        &format!("fn {}", function.df_name),
+        vec![],
+        vec![DefinedArgBranch::new(vec![args])],
+        vec![],
+        false,
+      );
+
+      functions.push((function.dfrs_name.clone(), action));
+    }
+
+    self.functions = functions;
+
     for function in node.functions.iter_mut() {
       for expression in function.expressions.iter_mut() {
         self.validate_expression_node(expression)?;
@@ -358,20 +421,32 @@ impl Validator {
   }
 
   fn validate_call(&self, mut call_node: CallNode) -> Result<CallNode, ValidateError> {
-    // TODO proper validation
-    let mut args = vec![];
-    for arg in &call_node.args {
-      args.push(DefinedArg {
-        options: vec![DefinedArgOption::new("".into(), ArgType::ANY, false, false)],
-      })
-    }
-    let action = Action {
-      df_name: "internal".into(),
-      dfrs_name: "internal".into(),
-      aliases: vec![],
-      args: vec![DefinedArgBranch { paths: vec![args] }],
-      tags: vec![],
-      has_conditional_arg: false,
+    let action = if let Some(action) = self.get_function(&call_node.name) {
+      action
+    } else {
+      println!(
+        "WARN: Unknown function '{}' is not validated",
+        call_node.name
+      );
+      let mut args = vec![];
+      for arg in &call_node.args {
+        args.push(DefinedArg {
+          options: vec![DefinedArgOption::new("".into(), ArgType::ANY, false, false)],
+        })
+      }
+      Action {
+        df_name: "internal".into(),
+        dfrs_name: "internal".into(),
+        aliases: vec![],
+        args: vec![DefinedArgBranch { paths: vec![args] }],
+        tags: vec![],
+        has_conditional_arg: false,
+      }
+      // return Err(ValidateError::UnknownFunction {
+      //   name: call_node.name,
+      //   start_pos: call_node.start_pos,
+      //   end_pos: call_node.end_pos,
+      // });
     };
     call_node.args = self.validate_args(
       call_node.args,
