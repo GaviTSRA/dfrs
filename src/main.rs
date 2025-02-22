@@ -488,7 +488,12 @@ fn main() {
         println!(
           "{} {}",
           "Compiling project".bright_black(),
-          path.file_name().unwrap().to_string_lossy()
+          path
+            .canonicalize()
+            .unwrap()
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
         );
         for path in paths {
           let file = path.unwrap().path();
