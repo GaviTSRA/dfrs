@@ -424,10 +424,10 @@ impl Validator {
     let action = if let Some(action) = self.get_function(&call_node.name) {
       action
     } else {
-      println!(
-        "WARN: Unknown function '{}' is not validated",
-        call_node.name
-      );
+      // println!(
+      //   "WARN: Unknown function '{}' is not validated",
+      //   call_node.name
+      // );
       let mut args = vec![];
       for arg in &call_node.args {
         args.push(DefinedArg {

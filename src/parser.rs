@@ -1765,6 +1765,7 @@ impl Parser {
       }
     };
 
+    // TODO values dont properly compile if supported options are unset
     let mut x: Option<f32> = None;
     let mut y: Option<f32> = None;
     let mut z: Option<f32> = None;
