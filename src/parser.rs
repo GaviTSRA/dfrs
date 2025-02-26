@@ -1645,7 +1645,20 @@ impl Parser {
         })
       }
     };
-    if sound_params.len() > 3 {
+    let mut variant = None;
+    if &sound_params.len() >= &4 {
+      variant = match &sound_params[3].value {
+        ArgValue::String { string } => Some(string.clone()),
+        _ => {
+          return Err(ParseError::InvalidSound {
+            pos: self.current_token.clone().unwrap().start_pos,
+            msg: "Invalid variant".into(),
+          })
+        }
+      };
+    }
+
+    if sound_params.len() > 4 {
       return Err(ParseError::InvalidSound {
         pos: self.current_token.clone().unwrap().start_pos,
         msg: "Too many arguments".into(),
@@ -1654,6 +1667,7 @@ impl Parser {
     Ok(ArgValueWithPos {
       value: ArgValue::Sound {
         sound,
+        variant,
         volume,
         pitch,
       },

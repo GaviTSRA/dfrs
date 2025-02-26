@@ -290,10 +290,15 @@ impl Decompiler {
                 }
                 FunctionDefaultItemData::Sound {
                   sound,
+                  variant,
                   pitch,
                   volume,
                 } => {
-                  format!("Sound(\"{sound}\", {pitch}, {volume})")
+                  if let Some(variant) = variant {
+                    format!("Sound(\"{sound}\", {pitch}, {volume}, '{variant}')")
+                  } else {
+                    format!("Sound(\"{sound}\", {pitch}, {volume})")
+                  }
                 }
                 FunctionDefaultItemData::Potion {
                   potion,
@@ -662,10 +667,17 @@ impl Decompiler {
           }
           ArgValueData::Sound {
             sound,
+            variant,
             pitch,
             volume,
           } => {
-            result.push_str(&format!("Sound(\"{sound}\", {pitch}, {volume})"));
+            if let Some(variant) = variant {
+              result.push_str(&format!(
+                "Sound(\"{sound}\", {pitch}, {volume}, '{variant}')"
+              ));
+            } else {
+              result.push_str(&format!("Sound(\"{sound}\", {pitch}, {volume})"));
+            }
           }
           ArgValueData::Potion {
             potion,

@@ -174,6 +174,7 @@ pub enum ArgValue {
   },
   Sound {
     sound: String,
+    variant: Option<String>,
     volume: f32,
     pitch: f32,
   },

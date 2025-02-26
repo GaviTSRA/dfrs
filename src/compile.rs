@@ -157,10 +157,12 @@ fn function_node(function_node: FunctionNode) -> Result<String, serde_json::Erro
           ArgValueData::Vector { x, y, z } => FunctionDefaultItemData::Vector { x, y, z },
           ArgValueData::Sound {
             sound,
+            variant,
             volume,
             pitch,
           } => FunctionDefaultItemData::Sound {
             sound,
+            variant,
             volume,
             pitch,
           },
@@ -695,12 +697,14 @@ fn arg_val_from_arg(arg: crate::node::Arg, node_name: String, block: String) -> 
     }),
     ArgValue::Sound {
       sound,
+      variant,
       volume,
       pitch,
     } => Some(Arg {
       item: ArgItem {
         data: ArgValueData::Sound {
           sound,
+          variant,
           volume,
           pitch,
         },
@@ -871,6 +875,7 @@ pub enum ArgValueData {
   },
   Sound {
     sound: String,
+    variant: Option<String>,
     volume: f32,
     pitch: f32,
   },
@@ -924,6 +929,7 @@ pub enum FunctionDefaultItemData {
   },
   Sound {
     sound: String,
+    variant: Option<String>,
     volume: f32,
     pitch: f32,
   },
@@ -987,11 +993,15 @@ impl Serialize for ArgValueData {
       }
       ArgValueData::Sound {
         sound,
+        variant,
         volume,
         pitch,
       } => {
-        let mut state = serializer.serialize_struct("MyEnum", 3)?;
+        let mut state = serializer.serialize_struct("MyEnum", 4)?;
         state.serialize_field("sound", sound)?;
+        if let Some(variant) = variant {
+          state.serialize_field("variant", variant)?;
+        }
         state.serialize_field("vol", volume)?;
         state.serialize_field("pitch", pitch)?;
         state.end()
@@ -1072,6 +1082,7 @@ impl<'de> Deserialize<'de> for ArgValueData {
       Y,
       Z,
       Sound,
+      Variant,
       Vol,
       Pitch,
       Pot,
@@ -1115,6 +1126,7 @@ impl<'de> Deserialize<'de> for ArgValueData {
         let mut y = None;
         let mut z = None;
         let mut sound = None;
+        let mut variant = None;
         let mut volume = None;
         let mut pitch = None;
         let mut potion = None;
@@ -1204,6 +1216,12 @@ impl<'de> Deserialize<'de> for ArgValueData {
                 return Err(de::Error::duplicate_field("sound"));
               }
               sound = Some(map.next_value()?);
+            }
+            Field::Variant => {
+              if variant.is_some() {
+                return Err(de::Error::duplicate_field("variant"));
+              }
+              variant = Some(map.next_value()?);
             }
             Field::Vol => {
               if volume.is_some() {
@@ -1325,6 +1343,7 @@ impl<'de> Deserialize<'de> for ArgValueData {
         } else if let (Some(sound), Some(volume), Some(pitch)) = (sound, volume, pitch) {
           Ok(ArgValueData::Sound {
             sound,
+            variant,
             volume,
             pitch,
           })
@@ -1377,6 +1396,7 @@ impl<'de> Deserialize<'de> for FunctionDefaultItemData {
       Y,
       Z,
       Sound,
+      Variant,
       Vol,
       Pitch,
       Pot,
@@ -1408,6 +1428,7 @@ impl<'de> Deserialize<'de> for FunctionDefaultItemData {
         let mut y = None;
         let mut z = None;
         let mut sound = None;
+        let mut variant = None;
         let mut volume = None;
         let mut pitch = None;
         let mut potion = None;
@@ -1466,6 +1487,12 @@ impl<'de> Deserialize<'de> for FunctionDefaultItemData {
                 return Err(de::Error::duplicate_field("sound"));
               }
               sound = Some(map.next_value()?);
+            }
+            Field::Variant => {
+              if variant.is_some() {
+                return Err(de::Error::duplicate_field("variant"));
+              }
+              variant = Some(map.next_value()?);
             }
             Field::Vol => {
               if volume.is_some() {
@@ -1529,6 +1556,7 @@ impl<'de> Deserialize<'de> for FunctionDefaultItemData {
         } else if let (Some(sound), Some(volume), Some(pitch)) = (sound, volume, pitch) {
           Ok(FunctionDefaultItemData::Sound {
             sound,
+            variant,
             volume,
             pitch,
           })
@@ -1591,11 +1619,15 @@ impl Serialize for FunctionDefaultItemData {
       }
       FunctionDefaultItemData::Sound {
         sound,
+        variant,
         volume,
         pitch,
       } => {
-        let mut state = serializer.serialize_struct("MyEnum", 3)?;
+        let mut state = serializer.serialize_struct("MyEnum", 4)?;
         state.serialize_field("sound", sound)?;
+        if let Some(variant) = variant {
+          state.serialize_field("variant", variant)?;
+        }
         state.serialize_field("vol", volume)?;
         state.serialize_field("pitch", pitch)?;
         state.end()
