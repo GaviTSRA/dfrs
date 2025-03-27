@@ -347,6 +347,10 @@ impl<'a> Lexer<'a> {
           result.push(self.token(Token::Dollar));
           self.advance();
         }
+        '~' => {
+          result.push(self.token(Token::Tilde));
+          self.advance();
+        }
         '0'..='9' => result.push(self.make_number()?),
         '\'' => result.push(self.make_string()?),
         '"' => result.push(self.make_text()?),

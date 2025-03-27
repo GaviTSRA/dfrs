@@ -259,7 +259,7 @@ impl ActionDump {
       dfrs_name: action.dfrs_name.clone(),
       aliases: action.aliases.clone(),
       tags: action.tags.clone(),
-      has_conditional_arg: action.has_conditional_arg.clone(),
+      return_type: None,
     };
 
     ActionDump {

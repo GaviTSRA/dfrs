@@ -772,7 +772,7 @@ fn arg_val_from_arg(arg: crate::node::Arg, node_name: String, block: String) -> 
         slot: definition.unwrap().slot as i32,
       })
     }
-    ArgValue::Variable { name, scope } => Some(Arg {
+    ArgValue::Variable { name, scope, .. } => Some(Arg {
       item: ArgItem {
         data: ArgValueData::Variable { name, scope },
         id: String::from("var"),

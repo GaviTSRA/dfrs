@@ -139,7 +139,8 @@ pub struct Arg {
 pub struct VariableNode {
   pub dfrs_name: String,
   pub df_name: String,
-  pub var_type: VariableType,
+  pub var_variant: VariableVariant,
+  pub var_type: Option<ArgType>,
   pub action: Option<ActionNode>,
   pub start_pos: Position,
   pub end_pos: Position,
@@ -201,6 +202,7 @@ pub enum ArgValue {
   Variable {
     name: String,
     scope: String,
+    var_type: Option<ArgType>,
   },
   GameValue {
     df_name: Option<String>,
@@ -277,7 +279,7 @@ pub enum ConditionalType {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum VariableType {
+pub enum VariableVariant {
   Line,
   Local,
   Game,

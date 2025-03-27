@@ -7,9 +7,9 @@ pub struct Action {
   pub dfrs_name: String,
   pub df_name: String,
   pub aliases: Vec<String>,
-  pub has_conditional_arg: bool,
   pub args: Vec<DefinedArgBranch>,
   pub tags: Vec<DefinedTag>,
+  pub return_type: Option<ArgType>,
 }
 
 impl Action {
@@ -19,7 +19,7 @@ impl Action {
     aliases: Vec<String>,
     args: Vec<DefinedArgBranch>,
     tags: Vec<DefinedTag>,
-    has_conditional_arg: bool,
+    return_type: Option<ArgType>,
   ) -> Action {
     Action {
       dfrs_name,
@@ -27,7 +27,7 @@ impl Action {
       aliases,
       args,
       tags,
-      has_conditional_arg,
+      return_type,
     }
   }
 }
@@ -193,6 +193,26 @@ pub fn get_action(action: &ADAction) -> Action {
     tags.push(new_tag);
   }
 
+  let mut return_type = None;
+  if !action.icon.return_values.is_empty() {
+    let entry = &action.icon.return_values.get(0).unwrap();
+    return_type = Some(match entry.return_type.as_str() {
+      "NUMBER" => ArgType::NUMBER,
+      "COMPONENT" => ArgType::TEXT,
+      "TEXT" => ArgType::STRING,
+      "LOCATION" => ArgType::LOCATION,
+      "POTION" => ArgType::POTION,
+      "SOUND" => ArgType::SOUND,
+      "VECTOR" => ArgType::VECTOR,
+      "PARTICLE" => ArgType::PARTICLE,
+      "ITEM" => ArgType::ITEM,
+      "LIST" => ArgType::VARIABLE,
+      "DICT" => ArgType::VARIABLE,
+      "ANY_TYPE" => ArgType::ANY,
+      err => panic!("Unknown return type: {:?}", err),
+    });
+  }
+
   let name = to_dfrs_name(&action.name);
   Action::new(
     name,
@@ -200,6 +220,6 @@ pub fn get_action(action: &ADAction) -> Action {
     action.aliases.clone(),
     branches,
     tags,
-    action.sub_action_blocks.is_some() && !action.sub_action_blocks.clone().unwrap().is_empty(),
+    return_type,
   )
 }

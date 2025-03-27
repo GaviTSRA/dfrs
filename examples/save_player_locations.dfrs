@@ -1,10 +1,11 @@
 save playerLocations;
 
 @join {
-    line loc = v.getDictValue(loc, playerLocations, $name);
-    p.teleport(loc);
+  line loc = v.getDictValue(playerLocations, '%default');
+  p.teleport(loc);
+  p.playSound(loc);
 }
 
 @leave {
-    v.setDictValue(playerLocations, $name, $location);
+  v.setDictValue(playerLocations, '%default', $location);
 }

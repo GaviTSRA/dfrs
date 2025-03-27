@@ -3,7 +3,7 @@ use crate::definitions::actions::Action;
 use crate::definitions::events::{EntityEvents, PlayerEvents};
 use crate::definitions::game_values::GameValues;
 use crate::definitions::{DefinedArgBranch, DefinedArgOption};
-use crate::node::{ExpressionNode, StartNode, VariableType};
+use crate::node::{ExpressionNode, StartNode, VariableVariant};
 use crate::token::Type;
 use crate::{
   definitions::{action_dump::ActionDump, ArgType, DefinedArg},
@@ -13,6 +13,7 @@ use crate::{
   },
   token::Position,
 };
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub enum ValidateError {
@@ -87,6 +88,7 @@ pub struct Validator {
   game_values: GameValues,
 
   functions: Vec<(String, Action)>,
+  variable_types: HashMap<String, ArgType>,
 }
 
 impl Validator {
@@ -98,6 +100,7 @@ impl Validator {
       action_dump: ActionDump::new(&action_dump),
       game_values: GameValues::new(&action_dump),
       functions: vec![],
+      variable_types: HashMap::new(),
     }
   }
 
@@ -147,7 +150,7 @@ impl Validator {
         vec![],
         vec![DefinedArgBranch::new(vec![args])],
         vec![],
-        false,
+        None,
       );
 
       functions.push((function.dfrs_name.clone(), action));
@@ -201,7 +204,7 @@ impl Validator {
   }
 
   fn validate_expression_node(
-    &self,
+    &mut self,
     expression_node: &mut ExpressionNode,
   ) -> Result<(), ValidateError> {
     match expression_node.node.clone() {
@@ -239,12 +242,13 @@ impl Validator {
               index: -1,
               value: ArgValue::Variable {
                 name: node.df_name,
-                scope: match node.var_type {
-                  VariableType::Line => "line".to_owned(),
-                  VariableType::Local => "local".to_owned(),
-                  VariableType::Game => "unsaved".to_owned(),
-                  VariableType::Save => "saved".to_owned(),
+                scope: match node.var_variant {
+                  VariableVariant::Line => "line".to_owned(),
+                  VariableVariant::Local => "local".to_owned(),
+                  VariableVariant::Game => "unsaved".to_owned(),
+                  VariableVariant::Save => "saved".to_owned(),
                 },
+                var_type: node.var_type,
               },
               start_pos: node.start_pos,
               end_pos: node.end_pos,
@@ -259,7 +263,10 @@ impl Validator {
     Ok(())
   }
 
-  fn validate_action_node(&self, mut action_node: ActionNode) -> Result<ActionNode, ValidateError> {
+  fn validate_action_node(
+    &mut self,
+    mut action_node: ActionNode,
+  ) -> Result<ActionNode, ValidateError> {
     let mut action = match action_node.action_type {
       ActionType::Player => self.action_dump.player_actions.get(&action_node.name),
       ActionType::Entity => self.action_dump.entity_actions.get(&action_node.name),
@@ -310,7 +317,7 @@ impl Validator {
     }
 
     match action {
-      Some(res) => action_node = self.validate_action(action_node, res)?,
+      Some(res) => action_node = self.validate_action(action_node, &res.clone())?,
       None => {
         return Err(ValidateError::UnknownAction {
           name: action_node.name,
@@ -346,7 +353,7 @@ impl Validator {
   }
 
   fn validate_action(
-    &self,
+    &mut self,
     mut action_node: ActionNode,
     action: &Action,
   ) -> Result<ActionNode, ValidateError> {
@@ -361,7 +368,7 @@ impl Validator {
   }
 
   fn validate_conditional_node(
-    &self,
+    &mut self,
     mut conditional_node: ConditionalNode,
   ) -> Result<ConditionalNode, ValidateError> {
     let action = match conditional_node.conditional_type {
@@ -384,7 +391,7 @@ impl Validator {
     };
 
     match action {
-      Some(res) => conditional_node = self.validate_conditional(conditional_node, res)?,
+      Some(res) => conditional_node = self.validate_conditional(conditional_node, &res.clone())?,
       None => {
         return Err(ValidateError::UnknownAction {
           name: conditional_node.name,
@@ -406,7 +413,7 @@ impl Validator {
   }
 
   fn validate_conditional(
-    &self,
+    &mut self,
     mut conditional_node: ConditionalNode,
     action: &Action,
   ) -> Result<ConditionalNode, ValidateError> {
@@ -420,7 +427,7 @@ impl Validator {
     Ok(conditional_node)
   }
 
-  fn validate_call(&self, mut call_node: CallNode) -> Result<CallNode, ValidateError> {
+  fn validate_call(&mut self, mut call_node: CallNode) -> Result<CallNode, ValidateError> {
     let action = if let Some(action) = self.get_function(&call_node.name) {
       action
     } else {
@@ -440,7 +447,7 @@ impl Validator {
         aliases: vec![],
         args: vec![DefinedArgBranch { paths: vec![args] }],
         tags: vec![],
-        has_conditional_arg: false,
+        return_type: None,
       }
       // return Err(ValidateError::UnknownFunction {
       //   name: call_node.name,
@@ -457,17 +464,20 @@ impl Validator {
     Ok(call_node)
   }
 
-  fn validate_start(&self, mut start_node: StartNode) -> Result<StartNode, ValidateError> {
+  fn validate_start(&mut self, mut start_node: StartNode) -> Result<StartNode, ValidateError> {
     start_node.args = self.validate_args(
       start_node.args,
-      &self.action_dump.start_process_action,
+      &self.action_dump.start_process_action.clone(),
       start_node.start_pos.clone(),
       start_node.end_pos.clone(),
     )?;
     Ok(start_node)
   }
 
-  fn validate_repeat_node(&self, mut repeat_node: RepeatNode) -> Result<RepeatNode, ValidateError> {
+  fn validate_repeat_node(
+    &mut self,
+    mut repeat_node: RepeatNode,
+  ) -> Result<RepeatNode, ValidateError> {
     let mut action = self.action_dump.repeats.get(&repeat_node.name);
     let mut old_args = vec![];
     let mut old_name = "".into();
@@ -510,7 +520,7 @@ impl Validator {
     }
 
     match action {
-      Some(res) => repeat_node = self.validate_repeat(repeat_node, res)?,
+      Some(res) => repeat_node = self.validate_repeat(repeat_node, &res.clone())?,
       None => {
         return Err(ValidateError::UnknownAction {
           name: repeat_node.name,
@@ -549,7 +559,7 @@ impl Validator {
   }
 
   fn validate_repeat(
-    &self,
+    &mut self,
     mut repeat_node: RepeatNode,
     action: &Action,
   ) -> Result<RepeatNode, ValidateError> {
@@ -564,7 +574,7 @@ impl Validator {
   }
 
   fn validate_args(
-    &self,
+    &mut self,
     input_args: Vec<Arg>,
     action: &Action,
     start_pos: Position,
@@ -590,7 +600,13 @@ impl Validator {
       let mut errors = vec![];
 
       for (path_index, path) in branch.paths.iter().enumerate() {
-        let result = self.try_path(&mut path.clone(), &mut node_args, &mut args, &mut index);
+        let result = self.try_path(
+          &action.return_type,
+          &mut path.clone(),
+          &mut node_args,
+          &mut args,
+          &mut index,
+        );
         match result {
           Ok(()) => completed = true,
           Err(err) => {
@@ -751,7 +767,8 @@ impl Validator {
   }
 
   fn try_path(
-    &self,
+    &mut self,
+    action_return_type: &Option<ArgType>,
     path: &mut Vec<DefinedArg>,
     node_args: &mut Vec<Arg>,
     args: &mut Vec<Arg>,
@@ -826,10 +843,49 @@ impl Validator {
             }
           }
 
-          if current_arg.arg_type == option.arg_type
-            || current_arg.arg_type == ArgType::VARIABLE
+          let arg_type = match &current_arg.arg_type {
+            ArgType::VARIABLE => match &current_arg.value {
+              ArgValue::Variable { var_type, name, .. } => {
+                if current_arg.index == -1 || current_arg.index == 0 {
+                  match &action_return_type {
+                    Some(value) => {
+                      self.variable_types.insert(name.clone(), value.clone());
+                      if option.arg_type == ArgType::VARIABLE {
+                        &ArgType::VARIABLE
+                      } else {
+                        value
+                      }
+                    }
+                    None => {
+                      if self.variable_types.contains_key(name) {
+                        &self.variable_types.get(name).unwrap().clone()
+                      } else {
+                        match var_type {
+                          Some(var_type) => var_type,
+                          None => &ArgType::ANY,
+                        }
+                      }
+                    }
+                  }
+                } else {
+                  if self.variable_types.contains_key(name) {
+                    &self.variable_types.get(name).unwrap().clone()
+                  } else {
+                    match var_type {
+                      Some(var_type) => var_type,
+                      None => &ArgType::ANY,
+                    }
+                  }
+                }
+              }
+              _ => unreachable!(),
+            },
+            arg_type => arg_type,
+          };
+
+          if arg_type == &option.arg_type
             || option.arg_type == ArgType::ANY
-            || current_arg.arg_type == ArgType::GameValue
+            || arg_type == &ArgType::ANY
           {
             arg_complete = true;
             previous_plural = if option.plural {
@@ -846,7 +902,7 @@ impl Validator {
 
           if option_index + 1 == arg.options.len() {
             if let Some(plural_type) = &previous_plural {
-              if plural_type == &current_arg.arg_type {
+              if plural_type == arg_type {
                 node_args.remove(0);
                 current_arg.index = *index;
                 args.push(current_arg);
@@ -858,7 +914,7 @@ impl Validator {
               arg_complete = true;
               break;
             }
-            wrong_type = Some((current_arg.arg_type.clone(), arg.options.clone()));
+            wrong_type = Some((arg_type.clone(), arg.options.clone()));
           }
         }
 
@@ -886,11 +942,7 @@ impl Validator {
       while node_args.len() > 0 {
         let current_arg = node_args.get(0).unwrap();
 
-        if plural_type == &current_arg.arg_type
-          || plural_type == &ArgType::ANY
-          || current_arg.arg_type == ArgType::VARIABLE
-          || current_arg.arg_type == ArgType::GameValue
-        {
+        if plural_type == &current_arg.arg_type || plural_type == &ArgType::ANY {
           let mut ok_arg = node_args.remove(0);
           ok_arg.index = *index;
           *index += 1;
@@ -933,7 +985,7 @@ mod tests {
         plural,
       )]])],
       vec![],
-      false,
+      None,
     )
   }
 
@@ -948,13 +1000,13 @@ mod tests {
         get_single_arg(ArgType::TEXT, false, false),
       ]])],
       vec![],
-      false,
+      None,
     )
   }
 
   #[test]
   pub fn single_arg_valid() {
-    let validator: Validator = Validator::new();
+    let mut validator: Validator = Validator::new();
     let correct_arg = vec![Arg {
       arg_type: ArgType::NUMBER,
       value: ArgValue::Number { number: 1.0 },
@@ -984,7 +1036,7 @@ mod tests {
       end_pos: Position::new(0, 0),
     }];
 
-    let validator = Validator::new();
+    let mut validator = Validator::new();
     let result = validator.validate_args(
       incorrect_arg,
       &get_single_arg_action(false, false),
@@ -1019,7 +1071,7 @@ mod tests {
       },
     ];
 
-    let validator = Validator::new();
+    let mut validator = Validator::new();
     let result = validator.validate_args(
       too_many_args,
       &get_single_arg_action(false, false),
@@ -1037,7 +1089,7 @@ mod tests {
 
   #[test]
   pub fn single_arg_missing() {
-    let validator = Validator::new();
+    let mut validator = Validator::new();
     let result = validator.validate_args(
       vec![],
       &get_single_arg_action(false, false),
@@ -1055,7 +1107,7 @@ mod tests {
 
   #[test]
   pub fn single_arg_optional_missing() {
-    let validator = Validator::new();
+    let mut validator = Validator::new();
     let result = validator.validate_args(
       vec![],
       &get_single_arg_action(true, false),
@@ -1067,7 +1119,7 @@ mod tests {
 
   #[test]
   pub fn multi_arg_valid() {
-    let validator: Validator = Validator::new();
+    let mut validator: Validator = Validator::new();
     let correct_arg = vec![
       Arg {
         arg_type: ArgType::NUMBER,
@@ -1103,7 +1155,7 @@ mod tests {
 
   #[test]
   pub fn multi_arg_optional_valid() {
-    let validator: Validator = Validator::new();
+    let mut validator: Validator = Validator::new();
     let correct_arg = vec![
       Arg {
         arg_type: ArgType::NUMBER,
@@ -1139,7 +1191,7 @@ mod tests {
 
   #[test]
   pub fn multi_arg_optional_missing_valid() {
-    let validator: Validator = Validator::new();
+    let mut validator: Validator = Validator::new();
     let correct_arg = vec![
       Arg {
         arg_type: ArgType::NUMBER,
@@ -1168,7 +1220,7 @@ mod tests {
 
   #[test]
   pub fn multi_arg_optional_missing_invalid() {
-    let validator: Validator = Validator::new();
+    let mut validator: Validator = Validator::new();
     let correct_arg = vec![
       Arg {
         arg_type: ArgType::NUMBER,
@@ -1224,10 +1276,10 @@ mod tests {
         ],
       }]])],
       vec![],
-      false,
+      None,
     );
 
-    let validator: Validator = Validator::new();
+    let mut validator: Validator = Validator::new();
     let result = validator.validate_args(
       vec![Arg {
         arg_type: ArgType::NUMBER,
@@ -1298,10 +1350,10 @@ mod tests {
         }]]),
       ],
       vec![],
-      false,
+      None,
     );
 
-    let validator: Validator = Validator::new();
+    let mut validator: Validator = Validator::new();
     let result = validator.validate_args(
       vec![
         Arg {
@@ -1421,7 +1473,7 @@ mod tests {
       },
     ];
 
-    let validator = Validator::new();
+    let mut validator = Validator::new();
     let result = validator.validate_args(
       single_arg,
       &get_single_arg_action(false, true),
@@ -1495,7 +1547,7 @@ mod tests {
       },
     ];
 
-    let validator = Validator::new();
+    let mut validator = Validator::new();
     let result = validator.validate_args(
       single_arg,
       &get_triple_arg_action(false, true),
@@ -1538,10 +1590,10 @@ mod tests {
         }],
       ])],
       vec![],
-      false,
+      None,
     );
 
-    let validator = Validator::new();
+    let mut validator = Validator::new();
     let result = validator.validate_args(
       vec![Arg {
         arg_type: ArgType::NUMBER,

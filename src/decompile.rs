@@ -537,7 +537,7 @@ impl Decompiler {
       aliases: vec![],
       args: vec![DefinedArgBranch { paths: vec![args] }],
       tags: vec![],
-      has_conditional_arg: false,
+      return_type: None,
     };
     if block.args.is_some() && block.args.clone().unwrap().items.len() > 0 {
       self.add(&format!(

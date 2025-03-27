@@ -1,10 +1,11 @@
+use crate::definitions::ARG_TYPES;
 use crate::node::{ParticleCluster, ParticleData, StartNode};
 use crate::{
   definitions::ArgType,
   node::{
     ActionNode, ActionType, Arg, ArgValue, ArgValueWithPos, CallNode, ConditionalNode,
     ConditionalType, EventNode, Expression, ExpressionNode, FileNode, FunctionNode,
-    FunctionParamNode, ProcessNode, RepeatNode, VariableNode, VariableType,
+    FunctionParamNode, ProcessNode, RepeatNode, VariableNode, VariableVariant,
   },
   token::{Keyword, Position, Selector, Token, TokenWithPos, SELECTORS, TYPES},
 };
@@ -142,11 +143,11 @@ impl Parser {
             processes.push(self.process()?);
           }
           Keyword::VarGame => {
-            let node = self.variable(VariableType::Game, None)?;
+            let node = self.variable(VariableVariant::Game, None)?;
             self.variables.push(node);
           }
           Keyword::VarSave => {
-            let node = self.variable(VariableType::Save, None)?;
+            let node = self.variable(VariableVariant::Save, None)?;
             self.variables.push(node);
           }
           _ => {
@@ -184,7 +185,9 @@ impl Parser {
         .variables
         .clone()
         .into_iter()
-        .filter(|var| var.var_type == VariableType::Game || var.var_type == VariableType::Save)
+        .filter(|var| {
+          var.var_variant == VariableVariant::Game || var.var_variant == VariableVariant::Save
+        })
         .collect::<Vec<VariableNode>>();
     }
 
@@ -461,7 +464,8 @@ impl Parser {
         dfrs_name: param_name.clone(),
         df_name: param_name.clone(),
         action: None,
-        var_type: VariableType::Line,
+        var_variant: VariableVariant::Line,
+        var_type: None,
         start_pos: Position::new(0, 0),
         end_pos: Position::new(0, 0),
       });
@@ -605,12 +609,12 @@ impl Parser {
           node = Expression::Conditional { node: res };
         }
         Keyword::VarLine => {
-          let res = self.variable(VariableType::Line, None)?;
+          let res = self.variable(VariableVariant::Line, None)?;
           end_pos = res.end_pos.clone();
           node = Expression::Variable { node: res }
         }
         Keyword::VarLocal => {
-          let res = self.variable(VariableType::Local, None)?;
+          let res = self.variable(VariableVariant::Local, None)?;
           end_pos = res.end_pos.clone();
           node = Expression::Variable { node: res }
         }
@@ -635,16 +639,16 @@ impl Parser {
         }
       },
       Token::Identifier { value } => {
-        if let Some((variable, scope)) = self.get_variable(value.clone()) {
-          let var_type = match scope.as_str() {
-            "line" => VariableType::Line,
-            "local" => VariableType::Local,
-            "unsaved" => VariableType::Game,
-            "saved" => VariableType::Save,
+        if let Some((variable, scope, _var_type)) = self.get_variable(value.clone()) {
+          let var_variant = match scope.as_str() {
+            "line" => VariableVariant::Line,
+            "local" => VariableVariant::Local,
+            "unsaved" => VariableVariant::Game,
+            "saved" => VariableVariant::Save,
             _ => unreachable!("unknown type {scope}"),
           };
 
-          let res = self.variable(var_type, Some(variable))?;
+          let res = self.variable(var_variant, Some(variable))?;
           end_pos = res.end_pos.clone();
           node = Expression::Variable { node: res }
         } else {
@@ -974,11 +978,12 @@ impl Parser {
 
   fn variable(
     &mut self,
-    var_type: VariableType,
+    var_variant: VariableVariant,
     name: Option<String>,
   ) -> Result<VariableNode, ParseError> {
     let start_pos = self.current_token.clone().unwrap().start_pos;
     let end_pos = start_pos.clone();
+    let mut var_type = ArgType::ANY;
 
     let dfrs_name = if let Some(name) = name {
       name
@@ -997,11 +1002,11 @@ impl Parser {
       }
     };
 
-    let token = self.advance_err()?;
+    let mut token = self.advance_err()?;
     let mut df_name = dfrs_name.clone();
     match token.token {
-      Token::Colon => {
-        let token = self.advance_err()?;
+      Token::Tilde => {
+        token = self.advance_err()?;
         df_name = match token.token {
           Token::Variable { value } => value,
           _ => {
@@ -1013,45 +1018,51 @@ impl Parser {
             })
           }
         };
-        let token = self.advance_err()?;
-        match token.token {
-          Token::Equal => {}
-          Token::Semicolon => {
-            return {
-              let node = VariableNode {
-                dfrs_name: dfrs_name.clone(),
-                df_name,
-                var_type,
-                action: None,
-                start_pos,
-                end_pos,
-              };
-              self.variables.push(node.clone());
-              Ok(node)
+        token = self.advance_err()?;
+      }
+      _ => {}
+    }
+    match token.token {
+      Token::Colon => {
+        token = self.advance_err()?;
+        var_type = match token.token {
+          Token::Identifier { value } => {
+            if ARG_TYPES.contains_key(&value.clone()) {
+              ARG_TYPES.get(&value).unwrap().to_owned()
+            } else {
+              return Err(ParseError::InvalidType {
+                found: self.current_token.clone(),
+                start_pos: token.start_pos,
+              });
             }
           }
           _ => {
             return Err(ParseError::InvalidToken {
               found: self.current_token.clone(),
-              expected: vec![Token::Equal, Token::Semicolon],
+              expected: vec![Token::Identifier {
+                value: "type".into(),
+              }],
             })
           }
-        }
+        };
+        token = self.advance_err()?;
       }
+      _ => {}
+    }
+    match token.token {
       Token::Equal => {}
       Token::Semicolon => {
-        return {
-          let node = VariableNode {
-            dfrs_name: dfrs_name.clone(),
-            df_name,
-            var_type,
-            action: None,
-            start_pos,
-            end_pos,
-          };
-          self.variables.push(node.clone());
-          Ok(node)
-        }
+        let node = VariableNode {
+          dfrs_name: dfrs_name.clone(),
+          df_name,
+          var_variant,
+          var_type: Some(var_type),
+          action: None,
+          start_pos,
+          end_pos,
+        };
+        self.variables.push(node.clone());
+        return Ok(node);
       }
       _ => {
         return Err(ParseError::InvalidToken {
@@ -1089,7 +1100,8 @@ impl Parser {
       dfrs_name,
       df_name,
       action: Some(action),
-      var_type,
+      var_variant,
+      var_type: None,
       start_pos,
       end_pos,
     };
@@ -1144,9 +1156,13 @@ impl Parser {
             is_tag = true;
           }
           _ => {
-            if let Some((var, scope)) = self.get_variable(tag_name.clone()) {
+            if let Some((var, scope, var_type)) = self.get_variable(tag_name.clone()) {
               params.push(ArgValueWithPos {
-                value: ArgValue::Variable { name: var, scope },
+                value: ArgValue::Variable {
+                  name: var,
+                  scope,
+                  var_type,
+                },
                 start_pos: self.current_token.clone().unwrap().start_pos,
                 end_pos: self.current_token.clone().unwrap().end_pos,
               });
@@ -1431,7 +1447,7 @@ impl Parser {
         ArgValue::Vector { .. } => ArgType::VECTOR,
         ArgValue::Tag { .. } => ArgType::TAG,
         ArgValue::Variable { .. } => ArgType::VARIABLE,
-        ArgValue::GameValue { .. } => ArgType::GameValue,
+        ArgValue::GameValue { .. } => ArgType::ANY,
         ArgValue::Condition { .. } => ArgType::CONDITION,
       };
       args.push(Arg {
@@ -2014,16 +2030,20 @@ impl Parser {
     })
   }
 
-  fn get_variable(&self, value: String) -> Option<(String, String)> {
+  fn get_variable(&self, value: String) -> Option<(String, String, Option<ArgType>)> {
     for node in &self.variables {
       if node.dfrs_name == value {
-        let scope = match node.var_type {
-          VariableType::Line => "line",
-          VariableType::Local => "local",
-          VariableType::Game => "unsaved",
-          VariableType::Save => "saved",
+        let scope = match node.var_variant {
+          VariableVariant::Line => "line",
+          VariableVariant::Local => "local",
+          VariableVariant::Game => "unsaved",
+          VariableVariant::Save => "saved",
         };
-        return Some((node.df_name.clone(), scope.to_owned()));
+        return Some((
+          node.df_name.clone(),
+          scope.to_owned(),
+          node.var_type.clone(),
+        ));
       }
     }
 

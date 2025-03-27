@@ -1,3 +1,5 @@
+use phf::phf_map;
+
 pub mod action_dump;
 pub mod actions;
 pub mod events;
@@ -58,10 +60,21 @@ pub enum ArgType {
   ITEM,
   TAG,
   VARIABLE,
-  GameValue,
   CONDITION,
   ANY,
 }
+
+pub static ARG_TYPES: phf::Map<&'static str, ArgType> = phf_map! {
+    "string" => ArgType::STRING,
+    "text" => ArgType::TEXT,
+    "number" => ArgType::NUMBER,
+    "location" => ArgType::LOCATION,
+    "vector" => ArgType::VECTOR,
+    "sound" => ArgType::SOUND,
+    "particle" => ArgType::PARTICLE,
+    "potion" => ArgType::POTION,
+    "item" => ArgType::ITEM,
+};
 
 #[derive(Clone, Debug)]
 pub struct DefinedTag {
