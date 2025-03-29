@@ -89,6 +89,7 @@ pub struct Validator {
 
   functions: Vec<(String, Action)>,
   variable_types: HashMap<String, ArgType>,
+  variables_to_set: HashMap<String, ArgType>,
 }
 
 impl Validator {
@@ -101,6 +102,7 @@ impl Validator {
       game_values: GameValues::new(&action_dump),
       functions: vec![],
       variable_types: HashMap::new(),
+      variables_to_set: HashMap::new(),
     }
   }
 
@@ -763,6 +765,13 @@ impl Validator {
       }
     }
 
+    for (variable_name, variable_type) in &self.variables_to_set {
+      self
+        .variable_types
+        .insert(variable_name.clone(), variable_type.clone());
+    }
+    self.variables_to_set.clear();
+
     Ok(args)
   }
 
@@ -846,10 +855,10 @@ impl Validator {
           let arg_type = match &current_arg.arg_type {
             ArgType::VARIABLE => match &current_arg.value {
               ArgValue::Variable { var_type, name, .. } => {
-                if current_arg.index == -1 || current_arg.index == 0 {
+                if current_arg.index == -1 {
                   match &action_return_type {
                     Some(value) => {
-                      self.variable_types.insert(name.clone(), value.clone());
+                      self.variables_to_set.insert(name.clone(), value.clone());
                       if option.arg_type == ArgType::VARIABLE {
                         &ArgType::VARIABLE
                       } else {
@@ -857,7 +866,9 @@ impl Validator {
                       }
                     }
                     None => {
-                      if self.variable_types.contains_key(name) {
+                      if option.arg_type == ArgType::VARIABLE {
+                        &ArgType::VARIABLE
+                      } else if self.variable_types.contains_key(name) {
                         &self.variable_types.get(name).unwrap().clone()
                       } else {
                         match var_type {
@@ -878,6 +889,7 @@ impl Validator {
                   }
                 }
               }
+              ArgValue::GameValue { .. } => &ArgType::VARIABLE,
               _ => unreachable!(),
             },
             arg_type => arg_type,
@@ -941,8 +953,50 @@ impl Validator {
     if let Some(plural_type) = &previous_plural {
       while node_args.len() > 0 {
         let current_arg = node_args.get(0).unwrap();
+        let arg_type = match &current_arg.arg_type {
+          ArgType::VARIABLE => match &current_arg.value {
+            ArgValue::Variable { var_type, name, .. } => {
+              if current_arg.index == -1 {
+                match &action_return_type {
+                  Some(value) => {
+                    self.variables_to_set.insert(name.clone(), value.clone());
+                    if plural_type == &ArgType::VARIABLE {
+                      &ArgType::VARIABLE
+                    } else {
+                      value
+                    }
+                  }
+                  None => {
+                    if plural_type == &ArgType::VARIABLE {
+                      &ArgType::VARIABLE
+                    } else if self.variable_types.contains_key(name) {
+                      &self.variable_types.get(name).unwrap().clone()
+                    } else {
+                      match var_type {
+                        Some(var_type) => var_type,
+                        None => &ArgType::ANY,
+                      }
+                    }
+                  }
+                }
+              } else {
+                if self.variable_types.contains_key(name) {
+                  &self.variable_types.get(name).unwrap().clone()
+                } else {
+                  match var_type {
+                    Some(var_type) => var_type,
+                    None => &ArgType::ANY,
+                  }
+                }
+              }
+            }
+            ArgValue::GameValue { .. } => &ArgType::VARIABLE,
+            _ => unreachable!(),
+          },
+          arg_type => arg_type,
+        };
 
-        if plural_type == &current_arg.arg_type || plural_type == &ArgType::ANY {
+        if plural_type == arg_type || plural_type == &ArgType::ANY || arg_type == &ArgType::ANY {
           let mut ok_arg = node_args.remove(0);
           ok_arg.index = *index;
           *index += 1;

@@ -213,6 +213,18 @@ pub fn get_action(action: &ADAction) -> Action {
     });
   }
 
+  if return_type.is_none() && action.icon.arguments.len() > 0 {
+    match action.icon.arguments.get(0).unwrap().description.last() {
+      Some(desc) => {
+        if desc.ends_with("to set") {
+          // TODO improve this argtype
+          return_type = Some(ArgType::ANY);
+        }
+      }
+      None => {}
+    }
+  }
+
   let name = to_dfrs_name(&action.name);
   Action::new(
     name,
