@@ -1,7 +1,7 @@
 @join {
-    p:all.sendMessage("<green>+ %default");
+    p:allPlayers.sendMessage("<green>+ %default");
 }
 
 @leave {
-    p:all.sendMessage("<red>- %default");
+    p:allPlayers.sendMessage("<red>- %default");
 }

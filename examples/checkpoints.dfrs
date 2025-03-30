@@ -1,8 +1,8 @@
 save checkpoints;
 
 @swapHands {
-    ifv dictHasKey(checkpoints, $name) {
-        line loc = v.getDictValue(loc, checkpoints, $name);
+    ifv dictHasKey(checkpoints, '%default') {
+        line loc = v.getDictValue(loc, checkpoints, '%default');
         p.teleport(loc);
     }
 }

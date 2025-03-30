@@ -83,7 +83,7 @@ Game and entity actions can target different selectors:
 ```
 p:default.sendMessage("Hi");
 p:selection.sendMessage("Hi 1");
-e:all.remove();
+e:allEntities.remove();
 ```
 
 Tags can also be used:
@@ -216,7 +216,7 @@ Vector(1, 2, 3)
 Sound(name as string or text, volume, pitch)
 
 ```
-Sound("Cow Ambient", 1, 2) 
+Sound("Cow Ambient", 2, 1) 
 ```
 
 ## Potions
@@ -275,7 +275,7 @@ save levels;
 The way variables are named on DF can be overridden:
 
 ```
-line var: `%default data`;
+line var ~ `%default data`;
 p.sendMessage(var);
 ```
 
@@ -283,5 +283,5 @@ Variables can be directly assigned a value:
 
 ```
 line test = v.add(2, 2);
-local example: `example variable` = v.equal(Location(0, 0, 0));
+local example ~ `example variable` = v.equal(Location(0, 0, 0));
 ```
