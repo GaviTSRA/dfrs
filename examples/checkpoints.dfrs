@@ -2,15 +2,15 @@ save checkpoints;
 
 @swapHands {
     ifv dictHasKey(checkpoints, '%default') {
-        line loc = v.getDictValue(loc, checkpoints, '%default');
+        line loc = v.getDictValue(checkpoints, '%default');
         p.teleport(loc);
     }
 }
 
 @sneak {
-    line loc = v.shiftOnAxis(loc, $location, -1, coordinate="Y");
-    line material = v.getBlockType(material, loc, returnValueType="Block ID (oak_log)");
+    line loc = v.shiftOnAxis($location, -1, coordinate="Y");
+    line material = v.getBlockType(loc, returnValueType="Block ID (oak_log)");
     ifv equal(material, "dirt") {
-        v.setDictValue(checkpoints, $name, $location);
+        v.setDictValue(checkpoints, '%default', $location);
     }
 }

@@ -78,6 +78,20 @@ fn send_codeclient_give(code: Vec<CompiledLine>, debug: bool) {
     println!("Connected to server; {:?}", response)
   }
 
+  socket.send(Message::Text("scopes default".into())).unwrap();
+
+  loop {
+    let msg = socket.read().expect("Error reading message");
+
+    if debug {
+      println!("Received: {}", msg);
+    }
+
+    if msg.to_text().expect("response should be text") == "auth" {
+      break;
+    }
+  }
+
   for line in code {
     let data = "{\"Count\":1b, \"id\":\"minecraft:ender_chest\", \"components\":{\"minecraft:custom_data\":{PublicBukkitValues:{\"hypercube:codetemplatedata\":\'{\"author\":\"Compiled using dfrs\",\"name\":\""
       .to_owned()
@@ -92,27 +106,9 @@ fn send_codeclient_give(code: Vec<CompiledLine>, debug: bool) {
       println!("{}", data);
     }
 
-    socket.send(Message::Text("scopes default".into())).unwrap();
-
-    loop {
-      let msg = socket.read().expect("Error reading message");
-
-      if debug {
-        println!("Received: {}", msg);
-      }
-
-      if msg.to_text().expect("response should be text") == "auth" {
-        break;
-      }
-    }
-
     socket
       .send(Message::Text(format!("give {}", data)))
       .unwrap();
-    let msg = socket.read().expect("Error reading message");
-    if debug {
-      println!("Received: {}", msg);
-    }
   }
 }
 

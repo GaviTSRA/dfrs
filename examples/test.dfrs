@@ -2,4 +2,5 @@ fn test() {
   line block;
   line blockName = v.getItemType(block, returnValueType="Item Name (Golden Apple)");
   p:selection.setChatTag("<gold>☀<space>", blockName, "<space><gray>»<space>");
+  p.sesndMessage($name);
 }
