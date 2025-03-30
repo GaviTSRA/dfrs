@@ -4,7 +4,7 @@ use crate::definitions::events::{EntityEvents, PlayerEvents};
 use crate::definitions::game_values::GameValues;
 use crate::definitions::{DefinedArgBranch, DefinedArgOption};
 use crate::node::{ExpressionNode, StartNode, VariableVariant};
-use crate::token::Type;
+use crate::token::{Range, Type};
 use crate::{
   definitions::{action_dump::ActionDump, ArgType, DefinedArg},
   node::{
@@ -22,23 +22,19 @@ pub enum ValidateError {
   },
   UnknownAction {
     name: String,
-    start_pos: Position,
-    end_pos: Position,
+    range: Range,
   },
   UnknownGameValue {
-    start_pos: Position,
-    end_pos: Position,
     game_value: String,
+    range: Range,
   },
   UnknownFunction {
     name: String,
-    start_pos: Position,
-    end_pos: Position,
+    range: Range,
   },
   MissingArgument {
     options: Vec<String>,
-    start_pos: Position,
-    end_pos: Position,
+    range: Range,
   },
   WrongArgumentType {
     args: Vec<Arg>,
@@ -48,21 +44,18 @@ pub enum ValidateError {
   },
   TooManyArguments {
     name: String,
-    start_pos: Position,
-    end_pos: Position,
+    range: Range,
   },
   InvalidTagOption {
     tag_name: String,
     provided: String,
     options: Vec<String>,
-    start_pos: Position,
-    end_pos: Position,
+    range: Range,
   },
   UnknownTag {
     tag_name: String,
     available: Vec<String>,
-    start_pos: Position,
-    end_pos: Position,
+    range: Range,
   },
 }
 
@@ -75,9 +68,8 @@ enum PathError {
     options: Vec<DefinedArgOption>,
   },
   UnknownGameValue {
-    start_pos: Position,
-    end_pos: Position,
     game_value: String,
+    range: Range,
   },
 }
 
@@ -299,8 +291,7 @@ impl Validator {
             None => {
               return Err(ValidateError::UnknownAction {
                 name: action_node.name,
-                start_pos: action_node.start_pos,
-                end_pos: action_node.end_pos,
+                range: Range::new(action_node.start_pos, action_node.end_pos),
               })
             }
           };
@@ -323,8 +314,7 @@ impl Validator {
       None => {
         return Err(ValidateError::UnknownAction {
           name: action_node.name,
-          start_pos: action_node.start_pos,
-          end_pos: action_node.end_pos,
+          range: Range::new(action_node.start_pos, action_node.end_pos),
         })
       }
     };
@@ -397,8 +387,7 @@ impl Validator {
       None => {
         return Err(ValidateError::UnknownAction {
           name: conditional_node.name,
-          start_pos: conditional_node.start_pos,
-          end_pos: conditional_node.end_pos,
+          range: Range::new(conditional_node.start_pos, conditional_node.end_pos),
         })
       }
     };
@@ -502,8 +491,7 @@ impl Validator {
             None => {
               return Err(ValidateError::UnknownAction {
                 name: repeat_node.name,
-                start_pos: repeat_node.start_pos,
-                end_pos: repeat_node.end_pos,
+                range: Range::new(repeat_node.start_pos, repeat_node.end_pos),
               })
             }
           };
@@ -526,8 +514,7 @@ impl Validator {
       None => {
         return Err(ValidateError::UnknownAction {
           name: repeat_node.name,
-          start_pos: repeat_node.start_pos,
-          end_pos: repeat_node.end_pos,
+          range: Range::new(repeat_node.start_pos, repeat_node.end_pos),
         })
       }
     };
@@ -624,8 +611,7 @@ impl Validator {
         return match err {
           PathError::MissingArgument { options } => Err(ValidateError::MissingArgument {
             options: options.clone(),
-            start_pos,
-            end_pos,
+            range: Range::new(start_pos, end_pos),
           }),
           PathError::WrongArgumentType {
             found_type,
@@ -636,15 +622,12 @@ impl Validator {
             options: options.clone(),
             found_type: found_type.clone(),
           }),
-          PathError::UnknownGameValue {
-            game_value,
-            start_pos,
-            end_pos,
-          } => Err(ValidateError::UnknownGameValue {
-            game_value: game_value.clone(),
-            start_pos: start_pos.clone(),
-            end_pos: end_pos.clone(),
-          }),
+          PathError::UnknownGameValue { game_value, range } => {
+            Err(ValidateError::UnknownGameValue {
+              game_value: game_value.clone(),
+              range: range.clone(),
+            })
+          }
         };
       }
     }
@@ -654,8 +637,7 @@ impl Validator {
         if val.arg_type != ArgType::TAG {
           return Err(ValidateError::TooManyArguments {
             name: action.dfrs_name.clone(),
-            start_pos,
-            end_pos,
+            range: Range::new(start_pos, end_pos),
           });
         }
         tags.push(val)
@@ -683,8 +665,7 @@ impl Validator {
             return Err(ValidateError::UnknownTag {
               tag_name,
               available,
-              start_pos: given_tag.start_pos,
-              end_pos: name_end_pos,
+              range: Range::new(given_tag.start_pos, name_end_pos),
             });
           }
         }
@@ -710,8 +691,7 @@ impl Validator {
                   tag_name,
                   provided: format!("{err:?}"),
                   options: tag.options,
-                  start_pos: value_start_pos,
-                  end_pos: given_tag.end_pos,
+                  range: Range::new(value_start_pos, given_tag.end_pos),
                 })
               }
             };
@@ -736,8 +716,7 @@ impl Validator {
                   tag_name,
                   provided: actual,
                   options: tag.options,
-                  start_pos: value_start_pos,
-                  end_pos: given_tag.end_pos,
+                  range: Range::new(value_start_pos, given_tag.end_pos),
                 });
               }
             }
@@ -845,8 +824,7 @@ impl Validator {
               None => {
                 return Err(PathError::UnknownGameValue {
                   game_value: dfrs_name,
-                  start_pos: current_arg.start_pos,
-                  end_pos: current_arg.end_pos,
+                  range: Range::new(current_arg.start_pos, current_arg.end_pos),
                 })
               }
             }

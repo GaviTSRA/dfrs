@@ -1,5 +1,6 @@
 use crate::definitions::ARG_TYPES;
 use crate::node::{ParticleCluster, ParticleData, StartNode};
+use crate::token::Range;
 use crate::{
   definitions::ArgType,
   node::{
@@ -11,51 +12,51 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub enum ParseError {
+pub enum ParserError {
   InvalidToken {
-    found: Option<TokenWithPos>,
+    found: Option<Token>,
     expected: Vec<Token>,
+    range: Range,
   },
   UnknownVariable {
     found: String,
-    start_pos: Position,
-    end_pos: Position,
+    range: Range,
   },
   InvalidCall {
-    pos: Position,
     msg: String,
+    range: Range,
   },
   InvalidComplexNumber {
-    pos: Position,
     msg: String,
+    range: Range,
   },
   InvalidLocation {
-    pos: Position,
     msg: String,
+    range: Range,
   },
   InvalidVector {
-    pos: Position,
     msg: String,
+    range: Range,
   },
   InvalidSound {
-    pos: Position,
     msg: String,
+    range: Range,
   },
   InvalidPotion {
-    pos: Position,
     msg: String,
+    range: Range,
   },
   InvalidParticle {
-    pos: Position,
     msg: String,
+    range: Range,
   },
   InvalidItem {
-    pos: Position,
     msg: String,
+    range: Range,
   },
   InvalidType {
-    found: Option<TokenWithPos>,
-    start_pos: Position,
+    found: String,
+    range: Range,
   },
 }
 
@@ -97,35 +98,46 @@ impl Parser {
     self.current_token.clone()
   }
 
-  fn advance_err(&mut self) -> Result<TokenWithPos, ParseError> {
+  fn advance_err(&mut self) -> Result<TokenWithPos, ParserError> {
     let token = self.advance();
 
     if token.is_none() {
-      return Err(ParseError::InvalidToken {
+      let end = match self.tokens.last() {
+        Some(token) => token.range.end.clone(),
+        None => Position::new(0, 0),
+      };
+
+      return Err(ParserError::InvalidToken {
         found: None,
         expected: vec![],
+        range: Range::new(end.clone(), end),
       });
     }
 
     Ok(token.unwrap())
   }
 
-  fn require_token(&mut self, required_token: Token) -> Result<TokenWithPos, ParseError> {
+  fn invalid_token(token: TokenWithPos, expected: Vec<Token>) -> ParserError {
+    ParserError::InvalidToken {
+      found: Some(token.token),
+      expected,
+      range: token.range,
+    }
+  }
+
+  fn require_token(&mut self, required_token: Token) -> Result<TokenWithPos, ParserError> {
     let token = self.advance_err()?;
     if token.token == required_token {
       return Ok(token);
     }
-    Err(ParseError::InvalidToken {
-      found: Some(token),
-      expected: vec![required_token],
-    })
+    Err(Self::invalid_token(token, vec![required_token]))
   }
 
-  pub fn run(&mut self) -> Result<FileNode, ParseError> {
+  pub fn run(&mut self) -> Result<FileNode, ParserError> {
     self.file()
   }
 
-  fn file(&mut self) -> Result<FileNode, ParseError> {
+  fn file(&mut self) -> Result<FileNode, ParserError> {
     let mut token = self.advance();
     let mut events: Vec<EventNode> = vec![];
     let mut functions: Vec<FunctionNode> = vec![];
@@ -133,9 +145,10 @@ impl Parser {
     let start_pos = Position::new(1, 0);
 
     while token.is_some() {
-      match token.clone().unwrap().token {
+      let current = token.unwrap();
+      match current.token {
         Token::At => events.push(self.event()?),
-        Token::Keyword { value } => match value {
+        Token::Keyword { value } => match &value {
           Keyword::Function => {
             functions.push(self.function()?);
           }
@@ -151,21 +164,21 @@ impl Parser {
             self.variables.push(node);
           }
           _ => {
-            return Err(ParseError::InvalidToken {
-              found: self.current_token.clone(),
-              expected: vec![
+            return Err(Self::invalid_token(
+              self.current_token.clone().unwrap(),
+              vec![
                 Token::At,
                 Token::Keyword {
                   value: Keyword::Function,
                 },
               ],
-            })
+            ))
           }
         },
         _ => {
-          return Err(ParseError::InvalidToken {
-            found: self.current_token.clone(),
-            expected: vec![
+          return Err(Self::invalid_token(
+            current,
+            vec![
               Token::At,
               Token::Keyword {
                 value: Keyword::Function,
@@ -177,7 +190,7 @@ impl Parser {
                 value: Keyword::VarSave,
               },
             ],
-          })
+          ))
         }
       }
       token = self.advance();
@@ -205,9 +218,9 @@ impl Parser {
     })
   }
 
-  fn event(&mut self) -> Result<EventNode, ParseError> {
+  fn event(&mut self) -> Result<EventNode, ParserError> {
     let mut expressions: Vec<ExpressionNode> = vec![];
-    let start_pos = self.current_token.clone().unwrap().end_pos;
+    let start_pos = self.current_token.clone().unwrap().range.end;
     let mut cancelled = false;
 
     let name_token = self.advance_err()?;
@@ -215,12 +228,12 @@ impl Parser {
     let event = match name_token.token {
       Token::Identifier { value } => value,
       _ => {
-        return Err(ParseError::InvalidToken {
-          found: self.current_token.clone(),
-          expected: vec![Token::Identifier {
+        return Err(Self::invalid_token(
+          name_token,
+          vec![Token::Identifier {
             value: String::from("<any>"),
           }],
-        })
+        ))
       }
     };
 
@@ -232,10 +245,10 @@ impl Parser {
       }
       Token::OpenParenCurly => {}
       _ => {
-        return Err(ParseError::InvalidToken {
-          found: self.current_token.clone(),
-          expected: vec![Token::OpenParenCurly, Token::ExclamationMark],
-        })
+        return Err(Self::invalid_token(
+          token,
+          vec![Token::OpenParenCurly, Token::ExclamationMark],
+        ))
       }
     }
 
@@ -252,26 +265,26 @@ impl Parser {
       event,
       expressions,
       start_pos,
-      name_end_pos: name_token.end_pos,
-      end_pos: token.end_pos,
+      name_end_pos: name_token.range.end,
+      end_pos: token.range.end,
       cancelled,
     })
   }
 
-  fn function(&mut self) -> Result<FunctionNode, ParseError> {
+  fn function(&mut self) -> Result<FunctionNode, ParserError> {
     let mut expressions: Vec<ExpressionNode> = vec![];
-    let start_pos = self.current_token.clone().unwrap().end_pos;
+    let start_pos = self.current_token.clone().unwrap().range.end;
 
     let name_token = self.advance_err()?;
     let dfrs_name = match name_token.token {
       Token::Identifier { value } => value,
       _ => {
-        return Err(ParseError::InvalidToken {
-          found: self.current_token.clone(),
-          expected: vec![Token::Identifier {
+        return Err(Self::invalid_token(
+          name_token,
+          vec![Token::Identifier {
             value: String::from("<any>"),
           }],
-        })
+        ))
       }
     };
     let mut df_name = dfrs_name.clone();
@@ -286,22 +299,17 @@ impl Parser {
             df_name = value;
           }
           _ => {
-            return Err(ParseError::InvalidToken {
-              found: self.current_token.clone(),
-              expected: vec![Token::Variable {
+            return Err(Self::invalid_token(
+              token,
+              vec![Token::Variable {
                 value: "any".into(),
               }],
-            })
+            ))
           }
         }
         self.require_token(Token::OpenParen)?;
       }
-      _ => {
-        return Err(ParseError::InvalidToken {
-          found: self.current_token.clone(),
-          expected: vec![Token::OpenParen],
-        })
-      }
+      _ => return Err(Self::invalid_token(token, vec![Token::OpenParen])),
     }
 
     let mut params: Vec<FunctionParamNode> = vec![];
@@ -312,15 +320,15 @@ impl Parser {
         Token::Identifier { value } => value,
         Token::CloseParen => break,
         _ => {
-          return Err(ParseError::InvalidToken {
-            found: self.current_token.clone(),
-            expected: vec![
+          return Err(Self::invalid_token(
+            token,
+            vec![
               Token::Identifier {
                 value: "any".into(),
               },
               Token::CloseParen,
             ],
-          })
+          ))
         }
       };
 
@@ -332,19 +340,19 @@ impl Parser {
           if TYPES.contains_key(&value.clone()) {
             TYPES.get(&value).unwrap().to_owned()
           } else {
-            return Err(ParseError::InvalidType {
-              found: self.current_token.clone(),
-              start_pos: token.start_pos,
+            return Err(ParserError::InvalidType {
+              found: value,
+              range: token.range,
             });
           }
         }
         _ => {
-          return Err(ParseError::InvalidToken {
-            found: self.current_token.clone(),
-            expected: vec![Token::Identifier {
+          return Err(Self::invalid_token(
+            token,
+            vec![Token::Identifier {
               value: "type".into(),
             }],
-          })
+          ))
         }
       };
 
@@ -367,31 +375,31 @@ impl Parser {
             if !multiple {
               multiple = true;
             } else {
-              return Err(ParseError::InvalidToken {
-                found: self.current_token.clone(),
-                expected: vec![
+              return Err(Self::invalid_token(
+                token,
+                vec![
                   Token::Comma,
                   Token::CloseParen,
                   Token::Multiply,
                   Token::QuestionMark,
                   Token::Equal,
                 ],
-              });
+              ));
             }
           }
           Token::QuestionMark => {
             if !optional {
               optional = true;
             } else {
-              return Err(ParseError::InvalidToken {
-                found: self.current_token.clone(),
-                expected: vec![
+              return Err(Self::invalid_token(
+                token,
+                vec![
                   Token::Multiply,
                   Token::CloseParen,
                   Token::Comma,
                   Token::Equal,
                 ],
-              });
+              ));
             }
           }
           Token::Equal => {
@@ -399,38 +407,33 @@ impl Parser {
             default = Some(match token.token.clone() {
               Token::Number { value } => ArgValueWithPos {
                 value: ArgValue::Number { number: value },
-                start_pos: token.start_pos,
-                end_pos: token.end_pos,
+                start_pos: token.range.start,
+                end_pos: token.range.end,
               },
               Token::Text { value } => ArgValueWithPos {
                 value: ArgValue::Text { text: value },
-                start_pos: token.start_pos,
-                end_pos: token.end_pos,
+                start_pos: token.range.start,
+                end_pos: token.range.end,
               },
               Token::String { value } => ArgValueWithPos {
                 value: ArgValue::String { string: value },
-                start_pos: token.start_pos,
-                end_pos: token.end_pos,
+                start_pos: token.range.start,
+                end_pos: token.range.end,
               },
               Token::Identifier { value } => match value.as_str() {
                 "Location" => self.make_location()?,
                 "Vector" => self.make_vector()?,
                 "Sound" => self.make_sound()?,
                 "Potion" => self.make_potion()?,
-                _ => {
-                  return Err(ParseError::InvalidToken {
-                    found: self.current_token.clone(),
-                    expected: vec![],
-                  })
-                }
+                _ => return Err(Self::invalid_token(token, vec![])),
               },
               _ => {
-                return Err(ParseError::InvalidToken {
-                  found: self.current_token.clone(),
-                  expected: vec![Token::Identifier {
+                return Err(Self::invalid_token(
+                  token,
+                  vec![Token::Identifier {
                     value: "any".into(),
                   }],
-                })
+                ))
               }
             });
             let token = self.advance_err()?;
@@ -444,19 +447,14 @@ impl Parser {
                 break;
               }
               _ => {
-                return Err(ParseError::InvalidToken {
-                  found: self.current_token.clone(),
-                  expected: vec![Token::Comma, Token::CloseParen],
-                })
+                return Err(Self::invalid_token(
+                  token,
+                  vec![Token::Comma, Token::CloseParen],
+                ))
               }
             }
           }
-          _ => {
-            return Err(ParseError::InvalidToken {
-              found: self.current_token.clone(),
-              expected: vec![],
-            })
-          }
+          _ => return Err(Self::invalid_token(token, vec![])),
         }
       }
 
@@ -483,10 +481,10 @@ impl Parser {
         Token::Comma => {}
         Token::CloseParen => break,
         _ => {
-          return Err(ParseError::InvalidToken {
-            found: self.current_token.clone(),
-            expected: vec![Token::Comma, Token::CloseParen],
-          })
+          return Err(Self::invalid_token(
+            token,
+            vec![Token::Comma, Token::CloseParen],
+          ))
         }
       }
     }
@@ -507,26 +505,26 @@ impl Parser {
       dfrs_name,
       expressions,
       start_pos,
-      name_end_pos: name_token.end_pos,
-      end_pos: token.end_pos,
+      name_end_pos: name_token.range.end,
+      end_pos: token.range.end,
       params,
     })
   }
 
-  fn process(&mut self) -> Result<ProcessNode, ParseError> {
+  fn process(&mut self) -> Result<ProcessNode, ParserError> {
     let mut expressions: Vec<ExpressionNode> = vec![];
-    let start_pos = self.current_token.clone().unwrap().end_pos;
+    let start_pos = self.current_token.clone().unwrap().range.end;
 
     let name_token = self.advance_err()?;
     let name = match name_token.token {
       Token::Identifier { value } => value,
       _ => {
-        return Err(ParseError::InvalidToken {
-          found: self.current_token.clone(),
-          expected: vec![Token::Identifier {
+        return Err(Self::invalid_token(
+          name_token,
+          vec![Token::Identifier {
             value: String::from("<any>"),
           }],
-        })
+        ))
       }
     };
 
@@ -545,15 +543,15 @@ impl Parser {
       name,
       expressions,
       start_pos,
-      name_end_pos: name_token.end_pos,
-      end_pos: token.end_pos,
+      name_end_pos: name_token.range.end,
+      end_pos: token.range.end,
     })
   }
 
-  fn expression(&mut self) -> Result<ExpressionNode, ParseError> {
+  fn expression(&mut self) -> Result<ExpressionNode, ParserError> {
     let token = self.current_token.clone().unwrap();
     let node;
-    let start_pos = token.start_pos.clone();
+    let start_pos = token.range.start.clone();
     let end_pos;
 
     match token.token.clone() {
@@ -629,13 +627,13 @@ impl Parser {
           node = Expression::Repeat { node: res }
         }
         _ => {
-          return Err(ParseError::InvalidToken {
-            found: self.current_token.clone(),
-            expected: vec![
+          return Err(Self::invalid_token(
+            token,
+            vec![
               Token::Keyword { value: Keyword::E },
               Token::Keyword { value: Keyword::P },
             ],
-          })
+          ))
         }
       },
       Token::Identifier { value } => {
@@ -651,37 +649,32 @@ impl Parser {
           let res = self.variable(var_variant, Some(variable))?;
           end_pos = res.end_pos.clone();
           node = Expression::Variable { node: res }
-        } else {
-          if let Some(token) = self.peak() {
-            if token.token == Token::OpenParen {
-              let res = self.call(value)?;
-              end_pos = res.end_pos.clone();
-              node = Expression::Call { node: res }
-            } else {
-              return Err(ParseError::InvalidToken {
-                found: self.current_token.clone(),
-                expected: vec![Token::OpenParen],
-              });
-            }
+        } else if let Some(token) = self.peak() {
+          if token.token == Token::OpenParen {
+            let res = self.call(value)?;
+            end_pos = res.end_pos.clone();
+            node = Expression::Call { node: res }
           } else {
-            return Err(ParseError::InvalidToken {
-              found: self.current_token.clone(),
-              expected: vec![
-                Token::Keyword { value: Keyword::E },
-                Token::Keyword { value: Keyword::P },
-              ],
-            });
+            return Err(Self::invalid_token(token, vec![Token::OpenParen]));
           }
+        } else {
+          return Err(Self::invalid_token(
+            token,
+            vec![
+              Token::Keyword { value: Keyword::E },
+              Token::Keyword { value: Keyword::P },
+            ],
+          ));
         }
       }
       _ => {
-        return Err(ParseError::InvalidToken {
-          found: self.current_token.clone(),
-          expected: vec![
+        return Err(Self::invalid_token(
+          token,
+          vec![
             Token::Keyword { value: Keyword::E },
             Token::Keyword { value: Keyword::P },
           ],
-        })
+        ))
       }
     }
 
@@ -692,20 +685,17 @@ impl Parser {
     })
   }
 
-  fn action(&mut self, action_type: ActionType) -> Result<ActionNode, ParseError> {
+  fn action(&mut self, action_type: ActionType) -> Result<ActionNode, ParserError> {
     let mut selector = Selector::Default;
     let mut implicit_selector = true;
     let mut token = self.advance_err()?;
-    let mut start_pos = token.start_pos.clone();
+    let mut start_pos = token.range.start.clone();
     start_pos.col += 1;
 
     match token.token {
       Token::Colon => {
         if action_type == ActionType::Variable {
-          return Err(ParseError::InvalidToken {
-            found: self.current_token.clone(),
-            expected: vec![Token::Dot],
-          });
+          return Err(Self::invalid_token(token, vec![Token::Dot]));
         }
         token = self.advance_err()?;
         match token.token {
@@ -715,43 +705,38 @@ impl Parser {
               implicit_selector = false;
               self.require_token(Token::Dot)?;
             } else {
-              return Err(ParseError::InvalidToken {
-                found: self.current_token.clone(),
-                expected: vec![Token::Identifier {
+              return Err(Self::invalid_token(
+                self.current_token.clone().unwrap(),
+                vec![Token::Identifier {
                   value: "<selector>".to_string(),
                 }],
-              });
+              ));
             }
           }
           _ => {
-            return Err(ParseError::InvalidToken {
-              found: self.current_token.clone(),
-              expected: vec![Token::Identifier {
+            return Err(Self::invalid_token(
+              token,
+              vec![Token::Identifier {
                 value: "<selector>".to_string(),
               }],
-            })
+            ))
           }
         }
       }
       Token::Dot => {}
-      _ => {
-        return Err(ParseError::InvalidToken {
-          found: self.current_token.clone(),
-          expected: vec![],
-        })
-      }
+      _ => return Err(Self::invalid_token(token, vec![])),
     }
 
     token = self.advance_err()?;
     let name = match token.token {
       Token::Identifier { value } => value,
       _ => {
-        return Err(ParseError::InvalidToken {
-          found: self.current_token.clone(),
-          expected: vec![Token::Identifier {
+        return Err(Self::invalid_token(
+          token,
+          vec![Token::Identifier {
             value: String::from("<any>"),
           }],
-        })
+        ))
       }
     };
 
@@ -778,55 +763,49 @@ impl Parser {
       start_pos,
       selector_start_pos,
       selector_end_pos,
-      end_pos: token.end_pos,
+      end_pos: token.range.end,
     })
   }
 
   fn conditional(
     &mut self,
     conditional_type: ConditionalType,
-  ) -> Result<ConditionalNode, ParseError> {
+  ) -> Result<ConditionalNode, ParserError> {
     let mut token = self.advance_err()?;
     let mut selector = Selector::Default;
-    let start_pos = token.start_pos.clone();
+    let start_pos = token.range.start.clone();
     let mut selector_start_pos = None;
     let mut selector_end_pos = None;
     let mut inverted = false;
 
-    match token.token {
-      Token::ExclamationMark => {
-        inverted = true;
-        token = self.advance_err()?;
-      }
-      _ => {}
+    if token.token == Token::ExclamationMark {
+      inverted = true;
+      token = self.advance_err()?;
     }
 
-    match &token.token {
-      Token::Identifier { value } => {
-        if let Some(value) = SELECTORS.get(&value).cloned() {
-          selector = value;
-          selector_start_pos = Some(token.start_pos);
-          selector_end_pos = Some(token.end_pos);
-          self.require_token(Token::Colon)?;
-          token = self.advance_err()?;
-        }
+    if let Token::Identifier { value } = &token.token {
+      if let Some(value) = SELECTORS.get(&value).cloned() {
+        selector = value;
+        selector_start_pos = Some(token.range.start);
+        selector_end_pos = Some(token.range.end);
+        self.require_token(Token::Colon)?;
+        token = self.advance_err()?;
       }
-      _ => {}
     }
     let name = match token.token {
       Token::Identifier { value } => value,
       _ => {
-        return Err(ParseError::InvalidToken {
-          found: Some(token),
-          expected: vec![Token::Identifier {
+        return Err(Self::invalid_token(
+          token,
+          vec![Token::Identifier {
             value: "any".into(),
           }],
-        })
+        ))
       }
     };
 
     let args = self.make_args()?;
-    let end_pos = token.end_pos;
+    let end_pos = token.range.end;
 
     self.require_token(Token::OpenParenCurly)?;
     let mut expressions = vec![];
@@ -842,28 +821,23 @@ impl Parser {
     }
 
     let mut else_expressions = vec![];
-    match self.peak() {
-      Some(token) => match token.token {
-        Token::Keyword { value } => match value {
-          Keyword::Else => {
-            self.advance_err()?;
-            self.require_token(Token::OpenParenCurly)?;
-            loop {
-              let token = self.advance_err()?;
-              match token.token {
-                Token::CloseParenCurly => break,
-                _ => {
-                  let expression = self.expression()?;
-                  else_expressions.push(expression);
-                }
+    if let Some(token) = self.peak() {
+      if let Token::Keyword { value } = token.token {
+        if value == Keyword::Else {
+          self.advance_err()?;
+          self.require_token(Token::OpenParenCurly)?;
+          loop {
+            let token = self.advance_err()?;
+            match token.token {
+              Token::CloseParenCurly => break,
+              _ => {
+                let expression = self.expression()?;
+                else_expressions.push(expression);
               }
             }
           }
-          _ => {}
-        },
-        _ => {}
-      },
-      None => {}
+        }
+      }
     }
 
     Ok(ConditionalNode {
@@ -881,8 +855,8 @@ impl Parser {
     })
   }
 
-  fn call(&mut self, name: String) -> Result<CallNode, ParseError> {
-    let start_pos = self.current_token.clone().unwrap().start_pos;
+  fn call(&mut self, name: String) -> Result<CallNode, ParserError> {
+    let start_pos = self.current_token.clone().unwrap().range.start;
     let mut args = self.make_args()?;
 
     for arg in args.iter_mut() {
@@ -890,7 +864,7 @@ impl Parser {
     }
     self.require_token(Token::Semicolon)?;
 
-    let end_pos = self.current_token.clone().unwrap().end_pos;
+    let end_pos = self.current_token.clone().unwrap().range.end;
 
     Ok(CallNode {
       name,
@@ -900,13 +874,13 @@ impl Parser {
     })
   }
 
-  fn start(&mut self) -> Result<StartNode, ParseError> {
-    let start_pos = self.current_token.clone().unwrap().start_pos;
+  fn start(&mut self) -> Result<StartNode, ParserError> {
+    let range = self.current_token.clone().unwrap().range;
     let mut args = self.make_args()?;
 
     if args.is_empty() {
-      return Err(ParseError::InvalidCall {
-        pos: start_pos,
+      return Err(ParserError::InvalidCall {
+        range,
         msg: "Missing process name".into(),
       });
     }
@@ -914,8 +888,8 @@ impl Parser {
     let name = match name_arg.value {
       ArgValue::Text { text } => text,
       _ => {
-        return Err(ParseError::InvalidCall {
-          pos: start_pos,
+        return Err(ParserError::InvalidCall {
+          range,
           msg: "Invalid process name param type".into(),
         })
       }
@@ -925,34 +899,34 @@ impl Parser {
     }
     self.require_token(Token::Semicolon)?;
 
-    let end_pos = self.current_token.clone().unwrap().end_pos;
+    let end_pos = self.current_token.clone().unwrap().range.end;
 
     Ok(StartNode {
       name,
       args,
-      start_pos,
+      start_pos: range.start,
       end_pos,
     })
   }
 
-  fn repeat(&mut self) -> Result<RepeatNode, ParseError> {
+  fn repeat(&mut self) -> Result<RepeatNode, ParserError> {
     let mut token = self.advance_err()?;
-    let start_pos = token.start_pos.clone();
+    let start_pos = token.range.start.clone();
 
     let name = match token.token {
       Token::Identifier { value } => value,
       _ => {
-        return Err(ParseError::InvalidToken {
-          found: Some(token),
-          expected: vec![Token::Identifier {
+        return Err(Self::invalid_token(
+          token,
+          vec![Token::Identifier {
             value: "any".into(),
           }],
-        })
+        ))
       }
     };
 
     let args = self.make_args()?;
-    let end_pos = token.end_pos;
+    let end_pos = token.range.end;
 
     self.require_token(Token::OpenParenCurly)?;
     let mut expressions = vec![];
@@ -980,8 +954,8 @@ impl Parser {
     &mut self,
     var_variant: VariableVariant,
     name: Option<String>,
-  ) -> Result<VariableNode, ParseError> {
-    let start_pos = self.current_token.clone().unwrap().start_pos;
+  ) -> Result<VariableNode, ParserError> {
+    let start_pos = self.current_token.clone().unwrap().range.start;
     let end_pos = start_pos.clone();
     let mut var_type = ArgType::ANY;
 
@@ -992,62 +966,56 @@ impl Parser {
       match token.token {
         Token::Identifier { value } => value,
         _ => {
-          return Err(ParseError::InvalidToken {
-            found: self.current_token.clone(),
-            expected: vec![Token::Identifier {
+          return Err(Self::invalid_token(
+            token,
+            vec![Token::Identifier {
               value: "any".into(),
             }],
-          })
+          ))
         }
       }
     };
 
     let mut token = self.advance_err()?;
     let mut df_name = dfrs_name.clone();
-    match token.token {
-      Token::Tilde => {
-        token = self.advance_err()?;
-        df_name = match token.token {
-          Token::Variable { value } => value,
-          _ => {
-            return Err(ParseError::InvalidToken {
-              found: self.current_token.clone(),
-              expected: vec![Token::Variable {
-                value: "any".into(),
-              }],
-            })
-          }
-        };
-        token = self.advance_err()?;
-      }
-      _ => {}
+    if token.token == Token::Tilde {
+      token = self.advance_err()?;
+      df_name = match token.token {
+        Token::Variable { value } => value,
+        _ => {
+          return Err(Self::invalid_token(
+            token,
+            vec![Token::Variable {
+              value: "any".into(),
+            }],
+          ))
+        }
+      };
+      token = self.advance_err()?;
     }
-    match token.token {
-      Token::Colon => {
-        token = self.advance_err()?;
-        var_type = match token.token {
-          Token::Identifier { value } => {
-            if ARG_TYPES.contains_key(&value.clone()) {
-              ARG_TYPES.get(&value).unwrap().to_owned()
-            } else {
-              return Err(ParseError::InvalidType {
-                found: self.current_token.clone(),
-                start_pos: token.start_pos,
-              });
-            }
+    if token.token == Token::Colon {
+      token = self.advance_err()?;
+      var_type = match token.token {
+        Token::Identifier { value } => {
+          if ARG_TYPES.contains_key(&value.clone()) {
+            ARG_TYPES.get(&value).unwrap().to_owned()
+          } else {
+            return Err(ParserError::InvalidType {
+              found: value,
+              range: token.range,
+            });
           }
-          _ => {
-            return Err(ParseError::InvalidToken {
-              found: self.current_token.clone(),
-              expected: vec![Token::Identifier {
-                value: "type".into(),
-              }],
-            })
-          }
-        };
-        token = self.advance_err()?;
-      }
-      _ => {}
+        }
+        _ => {
+          return Err(Self::invalid_token(
+            token,
+            vec![Token::Identifier {
+              value: "type".into(),
+            }],
+          ))
+        }
+      };
+      token = self.advance_err()?;
     }
     match token.token {
       Token::Equal => {}
@@ -1065,10 +1033,10 @@ impl Parser {
         return Ok(node);
       }
       _ => {
-        return Err(ParseError::InvalidToken {
-          found: self.current_token.clone(),
-          expected: vec![Token::Equal, Token::Semicolon],
-        })
+        return Err(Self::invalid_token(
+          token,
+          vec![Token::Equal, Token::Semicolon],
+        ))
       }
     };
 
@@ -1082,17 +1050,17 @@ impl Parser {
         Keyword::C => self.action(ActionType::Control)?,
         Keyword::S => self.action(ActionType::Select)?,
         _ => {
-          return Err(ParseError::InvalidToken {
-            found: self.current_token.clone(),
-            expected: vec![Token::Keyword { value: Keyword::P }],
-          })
+          return Err(Self::invalid_token(
+            self.current_token.clone().unwrap(),
+            vec![Token::Keyword { value: Keyword::P }],
+          ))
         }
       },
       _ => {
-        return Err(ParseError::InvalidToken {
-          found: self.current_token.clone(),
-          expected: vec![Token::Keyword { value: Keyword::P }],
-        })
+        return Err(Self::invalid_token(
+          token,
+          vec![Token::Keyword { value: Keyword::P }],
+        ))
       }
     };
 
@@ -1109,17 +1077,8 @@ impl Parser {
     Ok(node)
   }
 
-  fn make_params(&mut self) -> Result<Vec<ArgValueWithPos>, ParseError> {
-    let token = self.advance_err()?;
-    match token.token {
-      Token::OpenParen => {}
-      _ => {
-        return Err(ParseError::InvalidToken {
-          found: self.current_token.clone(),
-          expected: vec![Token::OpenParen],
-        })
-      }
-    }
+  fn make_params(&mut self) -> Result<Vec<ArgValueWithPos>, ParserError> {
+    self.require_token(Token::OpenParen)?;
 
     let mut params: Vec<ArgValueWithPos> = vec![];
     let mut is_value = false;
@@ -1139,14 +1098,14 @@ impl Parser {
         match token.token {
           Token::Comma => {
             is_value = false;
-            comma_pos = self.current_token.clone().unwrap().start_pos;
+            comma_pos = self.current_token.clone().unwrap().range.start;
           }
           Token::CloseParen => break,
           _ => {
-            return Err(ParseError::InvalidToken {
-              found: self.current_token.clone(),
-              expected: vec![Token::Comma, Token::CloseParen],
-            })
+            return Err(Self::invalid_token(
+              token,
+              vec![Token::Comma, Token::CloseParen],
+            ))
           }
         }
       } else if could_be_tag {
@@ -1163,16 +1122,15 @@ impl Parser {
                   scope,
                   var_type,
                 },
-                start_pos: self.current_token.clone().unwrap().start_pos,
-                end_pos: self.current_token.clone().unwrap().end_pos,
+                start_pos: self.current_token.clone().unwrap().range.start,
+                end_pos: self.current_token.clone().unwrap().range.end,
               });
               is_value = true;
               self.token_index -= 1;
             } else {
-              return Err(ParseError::UnknownVariable {
+              return Err(ParserError::UnknownVariable {
                 found: tag_name.clone(),
-                start_pos: tag_start_pos,
-                end_pos: tag_end_pos,
+                range: Range::new(tag_start_pos, tag_end_pos),
               });
             }
           }
@@ -1188,10 +1146,10 @@ impl Parser {
                 value: data,
                 definition: None,
                 name_end_pos: tag_end_pos.clone(),
-                value_start_pos: token.start_pos.clone(),
+                value_start_pos: token.range.start.clone(),
               },
               start_pos: tag_start_pos.clone(),
-              end_pos: token.end_pos,
+              end_pos: token.range.end,
             });
             is_value = true;
           }
@@ -1203,10 +1161,10 @@ impl Parser {
                 value: data,
                 definition: None,
                 name_end_pos: tag_end_pos.clone(),
-                value_start_pos: token.start_pos,
+                value_start_pos: token.range.start,
               },
               start_pos: tag_start_pos.clone(),
-              end_pos: token.end_pos,
+              end_pos: token.range.end,
             });
             is_value = true;
           }
@@ -1218,10 +1176,10 @@ impl Parser {
                 value: data,
                 definition: None,
                 name_end_pos: tag_end_pos.clone(),
-                value_start_pos: token.start_pos,
+                value_start_pos: token.range.start,
               },
               start_pos: tag_start_pos.clone(),
-              end_pos: token.end_pos,
+              end_pos: token.range.end,
             });
             is_value = true;
           }
@@ -1235,17 +1193,17 @@ impl Parser {
                   value: data,
                   definition: None,
                   name_end_pos: tag_end_pos.clone(),
-                  value_start_pos: token.start_pos,
+                  value_start_pos: token.range.start,
                 },
                 start_pos: tag_start_pos.clone(),
-                end_pos: token.end_pos,
+                end_pos: token.range.end,
               });
               is_value = true;
             }
             _ => {
-              return Err(ParseError::InvalidToken {
-                found: Some(token),
-                expected: vec![
+              return Err(Self::invalid_token(
+                token,
+                vec![
                   Token::String {
                     value: "<any>".into(),
                   },
@@ -1253,13 +1211,13 @@ impl Parser {
                     value: "<any>".into(),
                   },
                 ],
-              })
+              ))
             }
           },
           _ => {
-            return Err(ParseError::InvalidToken {
-              found: Some(token),
-              expected: vec![
+            return Err(Self::invalid_token(
+              token,
+              vec![
                 Token::String {
                   value: "<any>".into(),
                 },
@@ -1267,25 +1225,22 @@ impl Parser {
                   value: "<any>".into(),
                 },
               ],
-            })
+            ))
           }
         }
       } else if is_game_value {
         let mut selector = Selector::Default;
-        let mut selector_end_pos = token.start_pos.clone();
-        let start_pos = token.start_pos.clone();
+        let mut selector_end_pos = token.range.start.clone();
+        let start_pos = token.range.start.clone();
 
         if let Token::Identifier { value } = token.token.clone() {
           if let Some(value) = SELECTORS.get(&value).cloned() {
             selector = value;
             token = self.advance_err()?;
             if token.token != Token::Colon {
-              return Err(ParseError::InvalidToken {
-                found: Some(token),
-                expected: vec![Token::Colon],
-              });
+              return Err(Self::invalid_token(token, vec![Token::Colon]));
             }
-            selector_end_pos = token.end_pos;
+            selector_end_pos = token.range.end;
             token = self.advance_err()?;
           }
         }
@@ -1300,15 +1255,15 @@ impl Parser {
                 selector_end_pos,
               },
               start_pos,
-              end_pos: token.end_pos.clone(),
+              end_pos: token.range.end.clone(),
             });
             is_value = true;
             is_game_value = false;
           }
           _ => {
-            return Err(ParseError::InvalidToken {
-              found: Some(token),
-              expected: vec![
+            return Err(Self::invalid_token(
+              token,
+              vec![
                 Token::Identifier {
                   value: "<any>".into(),
                 },
@@ -1316,7 +1271,7 @@ impl Parser {
                   value: "<selector>".into(),
                 },
               ],
-            })
+            ))
           }
         }
       } else {
@@ -1324,24 +1279,24 @@ impl Parser {
           Token::Number { value } => {
             params.push(ArgValueWithPos {
               value: ArgValue::Number { number: value },
-              start_pos: token.start_pos,
-              end_pos: token.end_pos,
+              start_pos: token.range.start,
+              end_pos: token.range.end,
             });
             is_value = true;
           }
           Token::Text { value } => {
             params.push(ArgValueWithPos {
               value: ArgValue::Text { text: value },
-              start_pos: token.start_pos,
-              end_pos: token.end_pos,
+              start_pos: token.range.start,
+              end_pos: token.range.end,
             });
             is_value = true;
           }
           Token::String { value } => {
             params.push(ArgValueWithPos {
               value: ArgValue::String { string: value },
-              start_pos: token.start_pos,
-              end_pos: token.end_pos,
+              start_pos: token.range.start,
+              end_pos: token.range.end,
             });
             is_value = true;
           }
@@ -1377,16 +1332,16 @@ impl Parser {
             "null" => {
               params.push(ArgValueWithPos {
                 value: ArgValue::Empty,
-                start_pos: self.current_token.clone().unwrap().start_pos,
-                end_pos: self.current_token.clone().unwrap().end_pos,
+                start_pos: self.current_token.clone().unwrap().range.start,
+                end_pos: self.current_token.clone().unwrap().range.end,
               });
               is_value = true;
             }
             _ => {
               could_be_tag = true;
               tag_name = value;
-              tag_start_pos = self.current_token.clone().unwrap().start_pos;
-              tag_end_pos = self.current_token.clone().unwrap().end_pos;
+              tag_start_pos = self.current_token.clone().unwrap().range.start;
+              tag_end_pos = self.current_token.clone().unwrap().range.end;
             }
           },
           Token::Dollar => is_game_value = true,
@@ -1396,40 +1351,26 @@ impl Parser {
               Keyword::IfE => self.conditional_arg(ConditionalType::Entity)?,
               Keyword::IfG => self.conditional_arg(ConditionalType::Game)?,
               Keyword::IfV => self.conditional_arg(ConditionalType::Variable)?,
-              _ => {
-                return Err(ParseError::InvalidToken {
-                  found: self.current_token.clone(),
-                  expected,
-                })
-              }
+              _ => return Err(Self::invalid_token(token, expected)),
             };
             params.push(arg);
             is_value = true;
           }
           Token::CloseParen => break,
-          _ => {
-            return Err(ParseError::InvalidToken {
-              found: self.current_token.clone(),
-              expected,
-            })
-          }
+          _ => return Err(Self::invalid_token(token, expected)),
         }
       }
     }
     if !params.is_empty() && !is_value {
-      return Err(ParseError::InvalidToken {
-        found: Some(TokenWithPos::new(
-          Token::Comma,
-          comma_pos.clone(),
-          comma_pos,
-        )),
+      return Err(Self::invalid_token(
+        TokenWithPos::new(Token::Comma, Range::new(comma_pos.clone(), comma_pos)),
         expected,
-      });
+      ));
     }
     Ok(params)
   }
 
-  fn make_args(&mut self) -> Result<Vec<Arg>, ParseError> {
+  fn make_args(&mut self) -> Result<Vec<Arg>, ParserError> {
     let params = self.make_params()?;
     let mut args = vec![];
     for (i, param) in params.into_iter().enumerate() {
@@ -1461,55 +1402,54 @@ impl Parser {
     Ok(args)
   }
 
-  fn make_complex_number(&mut self) -> Result<ArgValueWithPos, ParseError> {
-    let start_pos = self.current_token.clone().unwrap().start_pos;
+  fn make_complex_number(&mut self) -> Result<ArgValueWithPos, ParserError> {
     let params = self.make_params()?;
 
     if params.len() < 1 {
-      return Err(ParseError::InvalidComplexNumber {
-        pos: self.current_token.clone().unwrap().start_pos,
+      return Err(ParserError::InvalidComplexNumber {
         msg: "Not enough arguments".into(),
+        range: self.current_token.clone().unwrap().range,
       });
     }
     let number = match params[0].value.clone() {
       ArgValue::Text { text } => text,
       _ => {
-        return Err(ParseError::InvalidComplexNumber {
-          pos: self.current_token.clone().unwrap().start_pos,
+        return Err(ParserError::InvalidComplexNumber {
           msg: "Invalid value, should be text".into(),
+          range: self.current_token.clone().unwrap().range,
         })
       }
     };
     if params.len() > 1 {
-      return Err(ParseError::InvalidComplexNumber {
-        pos: self.current_token.clone().unwrap().start_pos,
+      return Err(ParserError::InvalidComplexNumber {
         msg: "Too many arguments".into(),
+        range: self.current_token.clone().unwrap().range,
       });
     }
     Ok(ArgValueWithPos {
       value: ArgValue::ComplexNumber { number },
-      start_pos,
-      end_pos: self.current_token.clone().unwrap().end_pos,
+      start_pos: self.current_token.clone().unwrap().range.start,
+      end_pos: self.current_token.clone().unwrap().range.end,
     })
   }
 
-  fn make_location(&mut self) -> Result<ArgValueWithPos, ParseError> {
+  fn make_location(&mut self) -> Result<ArgValueWithPos, ParserError> {
     let mut pitch = None;
     let mut yaw = None;
-    let start_pos = self.current_token.clone().unwrap().start_pos;
+    let start_pos = self.current_token.clone().unwrap().range.start;
     let loc_params = self.make_params()?;
 
     if loc_params.len() < 3 {
-      return Err(ParseError::InvalidLocation {
-        pos: self.current_token.clone().unwrap().start_pos,
+      return Err(ParserError::InvalidLocation {
+        range: self.current_token.clone().unwrap().range,
         msg: "Not enough arguments".into(),
       });
     }
     let x = match loc_params[0].value {
       ArgValue::Number { number } => number,
       _ => {
-        return Err(ParseError::InvalidLocation {
-          pos: self.current_token.clone().unwrap().start_pos,
+        return Err(ParserError::InvalidLocation {
+          range: self.current_token.clone().unwrap().range,
           msg: "Invalid x coordinate".into(),
         })
       }
@@ -1517,8 +1457,8 @@ impl Parser {
     let y = match loc_params[1].value {
       ArgValue::Number { number } => number,
       _ => {
-        return Err(ParseError::InvalidLocation {
-          pos: self.current_token.clone().unwrap().start_pos,
+        return Err(ParserError::InvalidLocation {
+          range: self.current_token.clone().unwrap().range,
           msg: "Invalid y coordinate".into(),
         })
       }
@@ -1526,8 +1466,8 @@ impl Parser {
     let z = match loc_params[2].value {
       ArgValue::Number { number } => number,
       _ => {
-        return Err(ParseError::InvalidLocation {
-          pos: self.current_token.clone().unwrap().start_pos,
+        return Err(ParserError::InvalidLocation {
+          range: self.current_token.clone().unwrap().range,
           msg: "Invalid z coordinate".into(),
         })
       }
@@ -1536,8 +1476,8 @@ impl Parser {
       match loc_params[3].value {
         ArgValue::Number { number } => pitch = Some(number),
         _ => {
-          return Err(ParseError::InvalidLocation {
-            pos: self.current_token.clone().unwrap().start_pos,
+          return Err(ParserError::InvalidLocation {
+            range: self.current_token.clone().unwrap().range,
             msg: "Invalid pitch".into(),
           })
         }
@@ -1547,16 +1487,16 @@ impl Parser {
       match loc_params[4].value {
         ArgValue::Number { number } => yaw = Some(number),
         _ => {
-          return Err(ParseError::InvalidLocation {
-            pos: self.current_token.clone().unwrap().start_pos,
+          return Err(ParserError::InvalidLocation {
+            range: self.current_token.clone().unwrap().range,
             msg: "Invalid yaw".into(),
           })
         }
       }
     }
     if loc_params.len() > 5 {
-      return Err(ParseError::InvalidLocation {
-        pos: self.current_token.clone().unwrap().start_pos,
+      return Err(ParserError::InvalidLocation {
+        range: self.current_token.clone().unwrap().range,
         msg: "Too many arguments".into(),
       });
     }
@@ -1569,25 +1509,25 @@ impl Parser {
         yaw,
       },
       start_pos,
-      end_pos: self.current_token.clone().unwrap().end_pos,
+      end_pos: self.current_token.clone().unwrap().range.end,
     })
   }
 
-  fn make_vector(&mut self) -> Result<ArgValueWithPos, ParseError> {
-    let start_pos = self.current_token.clone().unwrap().start_pos;
+  fn make_vector(&mut self) -> Result<ArgValueWithPos, ParserError> {
+    let start_pos = self.current_token.clone().unwrap().range.start;
     let vec_params = self.make_params()?;
 
     if vec_params.len() < 3 {
-      return Err(ParseError::InvalidVector {
-        pos: self.current_token.clone().unwrap().start_pos,
+      return Err(ParserError::InvalidVector {
+        range: self.current_token.clone().unwrap().range,
         msg: "Not enough arguments".into(),
       });
     }
     let x = match vec_params[0].value {
       ArgValue::Number { number } => number,
       _ => {
-        return Err(ParseError::InvalidVector {
-          pos: self.current_token.clone().unwrap().start_pos,
+        return Err(ParserError::InvalidVector {
+          range: self.current_token.clone().unwrap().range,
           msg: "Invalid x coordinate".into(),
         })
       }
@@ -1595,8 +1535,8 @@ impl Parser {
     let y = match vec_params[1].value {
       ArgValue::Number { number } => number,
       _ => {
-        return Err(ParseError::InvalidVector {
-          pos: self.current_token.clone().unwrap().start_pos,
+        return Err(ParserError::InvalidVector {
+          range: self.current_token.clone().unwrap().range,
           msg: "Invalid y coordinate".into(),
         })
       }
@@ -1604,32 +1544,32 @@ impl Parser {
     let z = match vec_params[2].value {
       ArgValue::Number { number } => number,
       _ => {
-        return Err(ParseError::InvalidVector {
-          pos: self.current_token.clone().unwrap().start_pos,
+        return Err(ParserError::InvalidVector {
+          range: self.current_token.clone().unwrap().range,
           msg: "Invalid z coordinate".into(),
         })
       }
     };
     if vec_params.len() > 3 {
-      return Err(ParseError::InvalidVector {
-        pos: self.current_token.clone().unwrap().start_pos,
+      return Err(ParserError::InvalidVector {
+        range: self.current_token.clone().unwrap().range,
         msg: "Too many arguments".into(),
       });
     }
     Ok(ArgValueWithPos {
       value: ArgValue::Vector { x, y, z },
       start_pos,
-      end_pos: self.current_token.clone().unwrap().end_pos,
+      end_pos: self.current_token.clone().unwrap().range.end,
     })
   }
 
-  fn make_sound(&mut self) -> Result<ArgValueWithPos, ParseError> {
-    let start_pos = self.current_token.clone().unwrap().start_pos;
+  fn make_sound(&mut self) -> Result<ArgValueWithPos, ParserError> {
+    let start_pos = self.current_token.clone().unwrap().range.start;
     let sound_params = self.make_params()?;
 
     if sound_params.len() < 3 {
-      return Err(ParseError::InvalidSound {
-        pos: self.current_token.clone().unwrap().start_pos,
+      return Err(ParserError::InvalidSound {
+        range: self.current_token.clone().unwrap().range,
         msg: "Not enough arguments".into(),
       });
     }
@@ -1637,8 +1577,8 @@ impl Parser {
       ArgValue::String { string } => string.clone(),
       ArgValue::Text { text } => text.clone(),
       _ => {
-        return Err(ParseError::InvalidSound {
-          pos: self.current_token.clone().unwrap().start_pos,
+        return Err(ParserError::InvalidSound {
+          range: self.current_token.clone().unwrap().range,
           msg: "Invalid sound type".into(),
         })
       }
@@ -1646,8 +1586,8 @@ impl Parser {
     let volume = match sound_params[1].value {
       ArgValue::Number { number } => number,
       _ => {
-        return Err(ParseError::InvalidSound {
-          pos: self.current_token.clone().unwrap().start_pos,
+        return Err(ParserError::InvalidSound {
+          range: self.current_token.clone().unwrap().range,
           msg: "Invalid volume".into(),
         })
       }
@@ -1655,8 +1595,8 @@ impl Parser {
     let pitch = match sound_params[2].value {
       ArgValue::Number { number } => number,
       _ => {
-        return Err(ParseError::InvalidSound {
-          pos: self.current_token.clone().unwrap().start_pos,
+        return Err(ParserError::InvalidSound {
+          range: self.current_token.clone().unwrap().range,
           msg: "Invalid pitch".into(),
         })
       }
@@ -1666,8 +1606,8 @@ impl Parser {
       variant = match &sound_params[3].value {
         ArgValue::String { string } => Some(string.clone()),
         _ => {
-          return Err(ParseError::InvalidSound {
-            pos: self.current_token.clone().unwrap().start_pos,
+          return Err(ParserError::InvalidSound {
+            range: self.current_token.clone().unwrap().range,
             msg: "Invalid variant".into(),
           })
         }
@@ -1675,8 +1615,8 @@ impl Parser {
     }
 
     if sound_params.len() > 4 {
-      return Err(ParseError::InvalidSound {
-        pos: self.current_token.clone().unwrap().start_pos,
+      return Err(ParserError::InvalidSound {
+        range: self.current_token.clone().unwrap().range,
         msg: "Too many arguments".into(),
       });
     }
@@ -1688,17 +1628,17 @@ impl Parser {
         pitch,
       },
       start_pos,
-      end_pos: self.current_token.clone().unwrap().end_pos,
+      end_pos: self.current_token.clone().unwrap().range.end,
     })
   }
 
-  fn make_potion(&mut self) -> Result<ArgValueWithPos, ParseError> {
-    let start_pos = self.current_token.clone().unwrap().start_pos;
+  fn make_potion(&mut self) -> Result<ArgValueWithPos, ParserError> {
+    let start_pos = self.current_token.clone().unwrap().range.start;
     let potion_params = self.make_params()?;
 
     if potion_params.len() < 3 {
-      return Err(ParseError::InvalidPotion {
-        pos: self.current_token.clone().unwrap().start_pos,
+      return Err(ParserError::InvalidPotion {
+        range: self.current_token.clone().unwrap().range,
         msg: "Not enough arguments".into(),
       });
     }
@@ -1706,8 +1646,8 @@ impl Parser {
       ArgValue::String { string } => string.clone(),
       ArgValue::Text { text } => text.clone(),
       _ => {
-        return Err(ParseError::InvalidPotion {
-          pos: self.current_token.clone().unwrap().start_pos,
+        return Err(ParserError::InvalidPotion {
+          range: self.current_token.clone().unwrap().range,
           msg: "Invalid potion type".into(),
         })
       }
@@ -1715,8 +1655,8 @@ impl Parser {
     let amplifier = match potion_params[1].value {
       ArgValue::Number { number } => number,
       _ => {
-        return Err(ParseError::InvalidPotion {
-          pos: self.current_token.clone().unwrap().start_pos,
+        return Err(ParserError::InvalidPotion {
+          range: self.current_token.clone().unwrap().range,
           msg: "Invalid amplifier".into(),
         })
       }
@@ -1724,15 +1664,15 @@ impl Parser {
     let duration = match potion_params[2].value {
       ArgValue::Number { number } => number,
       _ => {
-        return Err(ParseError::InvalidPotion {
-          pos: self.current_token.clone().unwrap().start_pos,
+        return Err(ParserError::InvalidPotion {
+          range: self.current_token.clone().unwrap().range,
           msg: "Invalid duration".into(),
         })
       }
     };
     if potion_params.len() > 3 {
-      return Err(ParseError::InvalidPotion {
-        pos: self.current_token.clone().unwrap().start_pos,
+      return Err(ParserError::InvalidPotion {
+        range: self.current_token.clone().unwrap().range,
         msg: "Too many arguments".into(),
       });
     }
@@ -1743,17 +1683,17 @@ impl Parser {
         duration,
       },
       start_pos,
-      end_pos: self.current_token.clone().unwrap().end_pos,
+      end_pos: self.current_token.clone().unwrap().range.end,
     })
   }
 
-  fn make_particle(&mut self) -> Result<ArgValueWithPos, ParseError> {
-    let start_pos = self.current_token.clone().unwrap().start_pos;
+  fn make_particle(&mut self) -> Result<ArgValueWithPos, ParserError> {
+    let start_pos = self.current_token.clone().unwrap().range.start;
     let mut particle_params = self.make_params()?;
 
     if particle_params.len() < 4 {
-      return Err(ParseError::InvalidParticle {
-        pos: self.current_token.clone().unwrap().start_pos,
+      return Err(ParserError::InvalidParticle {
+        range: self.current_token.clone().unwrap().range,
         msg: "Not enough arguments".into(),
       });
     }
@@ -1761,8 +1701,8 @@ impl Parser {
       ArgValue::String { string } => string.clone(),
       ArgValue::Text { text } => text.clone(),
       _ => {
-        return Err(ParseError::InvalidParticle {
-          pos: self.current_token.clone().unwrap().start_pos,
+        return Err(ParserError::InvalidParticle {
+          range: self.current_token.clone().unwrap().range,
           msg: "Invalid particle type".into(),
         })
       }
@@ -1770,8 +1710,8 @@ impl Parser {
     let amount = match particle_params.remove(0).value {
       ArgValue::Number { number } => number as i32,
       _ => {
-        return Err(ParseError::InvalidParticle {
-          pos: self.current_token.clone().unwrap().start_pos,
+        return Err(ParserError::InvalidParticle {
+          range: self.current_token.clone().unwrap().range,
           msg: "Invalid particle amount".into(),
         })
       }
@@ -1779,8 +1719,8 @@ impl Parser {
     let horizontal = match particle_params.remove(0).value {
       ArgValue::Number { number } => number,
       _ => {
-        return Err(ParseError::InvalidParticle {
-          pos: self.current_token.clone().unwrap().start_pos,
+        return Err(ParserError::InvalidParticle {
+          range: self.current_token.clone().unwrap().range,
           msg: "Invalid particle horizontal spread".into(),
         })
       }
@@ -1788,8 +1728,8 @@ impl Parser {
     let vertical = match particle_params.remove(0).value {
       ArgValue::Number { number } => number,
       _ => {
-        return Err(ParseError::InvalidParticle {
-          pos: self.current_token.clone().unwrap().start_pos,
+        return Err(ParserError::InvalidParticle {
+          range: self.current_token.clone().unwrap().range,
           msg: "Invalid particle vertical spread".into(),
         })
       }
@@ -1821,8 +1761,8 @@ impl Parser {
               z = Some(z2.clone());
             }
             _ => {
-              return Err(ParseError::InvalidParticle {
-                pos: self.current_token.clone().unwrap().start_pos,
+              return Err(ParserError::InvalidParticle {
+                range: self.current_token.clone().unwrap().range,
                 msg: "Expected motion to be vector".into(),
               })
             }
@@ -1830,8 +1770,8 @@ impl Parser {
           "motionVariation" => match value.as_ref() {
             ArgValue::Number { number } => motion_variation = Some(number.clone() as i32),
             _ => {
-              return Err(ParseError::InvalidParticle {
-                pos: self.current_token.clone().unwrap().start_pos,
+              return Err(ParserError::InvalidParticle {
+                range: self.current_token.clone().unwrap().range,
                 msg: "Expected motion variation to be number".into(),
               })
             }
@@ -1839,8 +1779,8 @@ impl Parser {
           "rgb" => match value.as_ref() {
             ArgValue::Number { number } => rgb = Some(number.clone() as i32),
             _ => {
-              return Err(ParseError::InvalidParticle {
-                pos: self.current_token.clone().unwrap().start_pos,
+              return Err(ParserError::InvalidParticle {
+                range: self.current_token.clone().unwrap().range,
                 msg: "Expected rgb to be number".into(),
               })
             }
@@ -1848,8 +1788,8 @@ impl Parser {
           "rgbFade" => match value.as_ref() {
             ArgValue::Number { number } => rgb_fade = Some(number.clone() as i32),
             _ => {
-              return Err(ParseError::InvalidParticle {
-                pos: self.current_token.clone().unwrap().start_pos,
+              return Err(ParserError::InvalidParticle {
+                range: self.current_token.clone().unwrap().range,
                 msg: "Expected rgb fade to be number".into(),
               })
             }
@@ -1857,8 +1797,8 @@ impl Parser {
           "colorVariation" => match value.as_ref() {
             ArgValue::Number { number } => color_variation = Some(number.clone() as i32),
             _ => {
-              return Err(ParseError::InvalidParticle {
-                pos: self.current_token.clone().unwrap().start_pos,
+              return Err(ParserError::InvalidParticle {
+                range: self.current_token.clone().unwrap().range,
                 msg: "Expected color variation to be number".into(),
               })
             }
@@ -1866,8 +1806,8 @@ impl Parser {
           "material" => match value.as_ref() {
             ArgValue::Text { text } => material = Some(text.clone()),
             _ => {
-              return Err(ParseError::InvalidParticle {
-                pos: self.current_token.clone().unwrap().start_pos,
+              return Err(ParserError::InvalidParticle {
+                range: self.current_token.clone().unwrap().range,
                 msg: "Expected material to be text".into(),
               })
             }
@@ -1875,8 +1815,8 @@ impl Parser {
           "size" => match value.as_ref() {
             ArgValue::Number { number } => size = Some(number.clone()),
             _ => {
-              return Err(ParseError::InvalidParticle {
-                pos: self.current_token.clone().unwrap().start_pos,
+              return Err(ParserError::InvalidParticle {
+                range: self.current_token.clone().unwrap().range,
                 msg: "Expected size to be number".into(),
               })
             }
@@ -1884,8 +1824,8 @@ impl Parser {
           "sizeVariation" => match value.as_ref() {
             ArgValue::Number { number } => size_variation = Some(number.clone() as i32),
             _ => {
-              return Err(ParseError::InvalidParticle {
-                pos: self.current_token.clone().unwrap().start_pos,
+              return Err(ParserError::InvalidParticle {
+                range: self.current_token.clone().unwrap().range,
                 msg: "Expected size variation to be number".into(),
               })
             }
@@ -1893,22 +1833,22 @@ impl Parser {
           "roll" => match value.as_ref() {
             ArgValue::Number { number } => roll = Some(number.clone()),
             _ => {
-              return Err(ParseError::InvalidParticle {
-                pos: self.current_token.clone().unwrap().start_pos,
+              return Err(ParserError::InvalidParticle {
+                range: self.current_token.clone().unwrap().range,
                 msg: "Expected roll to be number".into(),
               })
             }
           },
           _ => {
-            return Err(ParseError::InvalidParticle {
-              pos: self.current_token.clone().unwrap().start_pos,
+            return Err(ParserError::InvalidParticle {
+              range: self.current_token.clone().unwrap().range,
               msg: "Unknown tag".into(),
             })
           }
         },
         _ => {
-          return Err(ParseError::InvalidParticle {
-            pos: self.current_token.clone().unwrap().start_pos,
+          return Err(ParserError::InvalidParticle {
+            range: self.current_token.clone().unwrap().range,
             msg: "Too many arguments".into(),
           })
         }
@@ -1938,17 +1878,17 @@ impl Parser {
         },
       },
       start_pos,
-      end_pos: self.current_token.clone().unwrap().end_pos,
+      end_pos: self.current_token.clone().unwrap().range.end,
     })
   }
 
-  fn make_item(&mut self) -> Result<ArgValueWithPos, ParseError> {
-    let start_pos = self.current_token.clone().unwrap().start_pos;
+  fn make_item(&mut self) -> Result<ArgValueWithPos, ParserError> {
+    let start_pos = self.current_token.clone().unwrap().range.start;
     let item_params = self.make_params()?;
 
     if item_params.len() < 1 {
-      return Err(ParseError::InvalidItem {
-        pos: self.current_token.clone().unwrap().start_pos,
+      return Err(ParserError::InvalidItem {
+        range: self.current_token.clone().unwrap().range,
         msg: "Not enough arguments".into(),
       });
     }
@@ -1956,32 +1896,32 @@ impl Parser {
       ArgValue::String { string } => string.clone(),
       ArgValue::Text { text } => text.clone(),
       _ => {
-        return Err(ParseError::InvalidItem {
-          pos: self.current_token.clone().unwrap().start_pos,
+        return Err(ParserError::InvalidItem {
+          range: self.current_token.clone().unwrap().range,
           msg: "Invalid item arg type".into(),
         })
       }
     };
     if item_params.len() > 1 {
-      return Err(ParseError::InvalidItem {
-        pos: self.current_token.clone().unwrap().start_pos,
+      return Err(ParserError::InvalidItem {
+        range: self.current_token.clone().unwrap().range,
         msg: "Too many arguments".into(),
       });
     }
     Ok(ArgValueWithPos {
       value: ArgValue::Item { item },
       start_pos,
-      end_pos: self.current_token.clone().unwrap().end_pos,
+      end_pos: self.current_token.clone().unwrap().range.end,
     })
   }
 
   fn conditional_arg(
     &mut self,
     conditional_type: ConditionalType,
-  ) -> Result<ArgValueWithPos, ParseError> {
+  ) -> Result<ArgValueWithPos, ParserError> {
     let mut token = self.advance_err()?;
     let mut selector = Selector::Default;
-    let start_pos = token.start_pos.clone();
+    let start_pos = token.range.start.clone();
     let mut inverted = false;
 
     match token.token {
@@ -2005,17 +1945,17 @@ impl Parser {
     let name = match token.token {
       Token::Identifier { value } => value,
       _ => {
-        return Err(ParseError::InvalidToken {
-          found: Some(token),
-          expected: vec![Token::Identifier {
+        return Err(Self::invalid_token(
+          token,
+          vec![Token::Identifier {
             value: "any".into(),
           }],
-        })
+        ))
       }
     };
 
     let args = self.make_args()?;
-    let end_pos = token.end_pos;
+    let end_pos = token.range.end;
 
     Ok(ArgValueWithPos {
       value: ArgValue::Condition {

@@ -4,9 +4,10 @@ use crate::compile::compile;
 use crate::definitions::action_dump::{ActionDump, RawActionDump};
 use crate::definitions::events::{EntityEvents, PlayerEvents};
 use crate::definitions::game_values::GameValues;
-use crate::lexer::{Lexer, LexerError};
+use crate::errors::{format_lexer_error, format_parser_error, format_validator_error};
+use crate::lexer::Lexer;
 use crate::load_config;
-use crate::parser::{ParseError, Parser};
+use crate::parser::Parser;
 use crate::token::{Keyword, Token};
 use crate::validate::{ValidateError, Validator};
 use dashmap::DashMap;
@@ -172,7 +173,10 @@ impl Backend {
 
     let mut last_token: Option<crate::token::TokenWithPos> = None;
     for token in tokens {
-      if token.start_pos.line == line && token.start_pos.col <= col && token.end_pos.col >= col {
+      if token.range.start.line == line
+        && token.range.start.col <= col
+        && token.range.end.col >= col
+      {
         let mut is_event = false;
         let mut is_player_action = false;
         let mut is_entity_action = false;
@@ -412,28 +416,13 @@ fn compile_file(data: String, path: PathBuf) -> Result<(), CompileErr> {
 
   let res = match result {
     Ok(res) => res,
-    Err(err) => {
-      return match err {
-        LexerError::InvalidNumber { pos } => {
-          Err(CompileErr::new(pos, None, "Invalid number".to_owned()))
-        }
-        LexerError::InvalidToken { token, pos } => Err(CompileErr::new(
-          pos,
-          None,
-          format!("Invalid token '{token}'"),
-        )),
-        LexerError::UnterminatedString { pos } => {
-          Err(CompileErr::new(pos, None, "Unterminated string".to_owned()))
-        }
-        LexerError::UnterminatedText { pos } => {
-          Err(CompileErr::new(pos, None, "Unterminated text".to_owned()))
-        }
-        LexerError::UnterminatedVariable { pos } => Err(CompileErr::new(
-          pos,
-          None,
-          "Unterminated variable".to_owned(),
-        )),
-      }
+    Err(error) => {
+      let formatted = format_lexer_error(error);
+      return Err(CompileErr::new(
+        formatted.start,
+        formatted.end,
+        formatted.message,
+      ));
     }
   };
 
@@ -442,206 +431,26 @@ fn compile_file(data: String, path: PathBuf) -> Result<(), CompileErr> {
   let node;
   match res {
     Ok(res) => node = res,
-    Err(err) => {
-      match err {
-        ParseError::InvalidToken { found, expected } => {
-          if found.is_some() {
-            let found = found.unwrap();
-
-            let mut i = 0;
-            let mut expected_string = "".to_owned();
-            for token in expected.clone() {
-              expected_string.push_str(&format!("'{token}'"));
-              if i < expected.len() - 1 {
-                expected_string.push_str(", ");
-              }
-              i += 1;
-            }
-
-            return Err(CompileErr::new(
-              found.start_pos,
-              Some(found.end_pos),
-              format!(
-                "Invalid token '{}', expected: {expected_string}",
-                found.token
-              ),
-            ));
-          } else {
-            // println!("Invalid EOF, expected: {expected:?}");
-          }
-        }
-        ParseError::InvalidComplexNumber { pos, msg } => {
-          return Err(CompileErr::new(
-            pos,
-            None,
-            format!("Invalid number '{msg}'"),
-          ))
-        }
-        ParseError::InvalidLocation { pos, msg } => {
-          return Err(CompileErr::new(
-            pos,
-            None,
-            format!("Invalid location '{msg}'"),
-          ))
-        }
-        ParseError::InvalidVector { pos, msg } => {
-          return Err(CompileErr::new(
-            pos,
-            None,
-            format!("Invalid vector '{msg}'"),
-          ))
-        }
-        ParseError::InvalidSound { pos, msg } => {
-          return Err(CompileErr::new(pos, None, format!("Invalid sound '{msg}'")))
-        }
-        ParseError::InvalidPotion { pos, msg } => {
-          return Err(CompileErr::new(
-            pos,
-            None,
-            format!("Invalid potion '{msg}'"),
-          ))
-        }
-        ParseError::InvalidParticle { pos, msg } => {
-          return Err(CompileErr::new(
-            pos,
-            None,
-            format!("Invalid particle '{msg}'"),
-          ))
-        }
-        ParseError::InvalidItem { pos, msg } => {
-          return Err(CompileErr::new(pos, None, format!("Invalid item '{msg}'")))
-        }
-        ParseError::UnknownVariable {
-          found,
-          start_pos,
-          end_pos,
-        } => {
-          return Err(CompileErr::new(
-            start_pos,
-            Some(end_pos),
-            format!("Unknown variable '{}'", found),
-          ))
-        }
-        ParseError::InvalidType { found, start_pos } => {
-          return match found {
-            Some(found) => Err(CompileErr::new(
-              found.start_pos,
-              Some(found.end_pos),
-              format!("Unknown type: {}", found.token),
-            )),
-            None => Err(CompileErr::new(start_pos, None, "Missing type".into())),
-          }
-        }
-        ParseError::InvalidCall { pos, msg } => {
-          return Err(CompileErr::new(
-            pos,
-            None,
-            format!("Invalid function call '{msg}'"),
-          ))
-        }
-      }
-      return Ok(());
+    Err(error) => {
+      let formatted = format_parser_error(error);
+      return Err(CompileErr::new(
+        formatted.start,
+        formatted.end,
+        formatted.message,
+      ));
     }
   }
 
   let validated;
   match Validator::new().validate(node) {
     Ok(res) => validated = res,
-    Err(err) => {
-      return match err {
-        ValidateError::UnknownEvent { node } => Err(CompileErr::new(
-          node.start_pos,
-          Some(node.end_pos),
-          format!("Unknown event '{}'", node.event),
-        )),
-        ValidateError::UnknownAction {
-          name,
-          start_pos,
-          end_pos,
-        } => Err(CompileErr::new(
-          start_pos,
-          Some(end_pos),
-          format!("Unknown action '{}'", name),
-        )),
-        ValidateError::UnknownFunction {
-          name,
-          start_pos,
-          end_pos,
-        } => Err(CompileErr::new(
-          start_pos,
-          Some(end_pos),
-          format!("Unknown function '{}'", name),
-        )),
-        ValidateError::MissingArgument {
-          start_pos,
-          end_pos,
-          options,
-        } => Err(CompileErr::new(
-          start_pos,
-          Some(end_pos),
-          format!("Missing argument '{}'", options.join(",")),
-        )),
-        ValidateError::WrongArgumentType {
-          args,
-          index,
-          options,
-          found_type,
-        } => Err(CompileErr::new(
-          args.get(index as usize).unwrap().start_pos.clone(),
-          Some(args.get(index as usize).unwrap().end_pos.clone()),
-          format!(
-            "Wrong argument type for '{}', expected '{:?}' but found '{:?}'",
-            options.get(0).unwrap().name.clone(),
-            options.get(0).unwrap().arg_type.clone(),
-            found_type
-          ),
-        )),
-        ValidateError::TooManyArguments {
-          start_pos,
-          mut end_pos,
-          name,
-        } => {
-          end_pos.col += name.chars().count() as u32;
-          Err(CompileErr::new(
-            start_pos.clone(),
-            Some(start_pos),
-            format!("Too many arguments for action '{}'", name),
-          ))
-        }
-        ValidateError::InvalidTagOption {
-          tag_name,
-          provided,
-          options,
-          start_pos,
-          end_pos,
-        } => Err(CompileErr::new(
-          start_pos,
-          Some(end_pos),
-          format!(
-            "Invalid option '{}' for tag '{}', expected one of {:?}",
-            provided, tag_name, options
-          ),
-        )),
-        ValidateError::UnknownTag {
-          tag_name,
-          available,
-          start_pos,
-          end_pos,
-        } => Err(CompileErr::new(
-          start_pos,
-          Some(end_pos),
-          format!("Unknown tag '{}', found tags: {:?}", tag_name, available),
-        )),
-        ValidateError::UnknownGameValue {
-          game_value,
-          start_pos,
-          end_pos,
-        } => Err(CompileErr::new(
-          start_pos,
-          Some(end_pos),
-          format!("Unknown game value '{}'", game_value),
-        )),
-      }
+    Err(error) => {
+      let formatted = format_validator_error(error);
+      return Err(CompileErr::new(
+        formatted.start,
+        formatted.end,
+        formatted.message,
+      ));
     }
   }
 

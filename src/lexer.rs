@@ -1,12 +1,12 @@
-use crate::token::{Position, Token, TokenWithPos, KEYWORDS};
+use crate::token::{Position, Range, Token, TokenWithPos, KEYWORDS};
 
 #[derive(Debug, Clone)]
 pub enum LexerError {
-  InvalidNumber { pos: Position },
+  InvalidNumber { range: Range },
   InvalidToken { token: char, pos: Position },
-  UnterminatedString { pos: Position },
-  UnterminatedText { pos: Position },
-  UnterminatedVariable { pos: Position },
+  UnterminatedString { range: Range },
+  UnterminatedText { range: Range },
+  UnterminatedVariable { range: Range },
 }
 
 pub struct Lexer<'a> {
@@ -63,14 +63,14 @@ impl<'a> Lexer<'a> {
       if self.current_char.unwrap() == '.' {
         dot_count += 1
       }
-      if self.current_char.unwrap() == '-' {
-        if !num_string.is_empty() {
-          return Err(LexerError::InvalidNumber { pos: start_pos });
-        }
+      if self.current_char.unwrap() == '-' && !num_string.is_empty() {
+        return Err(LexerError::InvalidNumber {
+          range: Range::new(start_pos, self.position.clone()),
+        });
       }
       if dot_count > 1 {
         return Err(LexerError::InvalidNumber {
-          pos: self.position.clone(),
+          range: Range::new(start_pos, self.position.clone()),
         });
       }
       num_string.push_str(&self.current_char.unwrap().to_string());
@@ -78,18 +78,23 @@ impl<'a> Lexer<'a> {
     }
 
     if num_string.is_empty() || num_string == "-" {
-      return Err(LexerError::InvalidNumber { pos: start_pos });
+      return Err(LexerError::InvalidNumber {
+        range: Range::new(start_pos, self.position.clone()),
+      });
     }
 
     Ok(TokenWithPos {
       token: Token::Number {
         value: match num_string.parse::<f32>() {
           Ok(res) => res,
-          Err(_) => return Err(LexerError::InvalidNumber { pos: start_pos }),
+          Err(_) => {
+            return Err(LexerError::InvalidNumber {
+              range: Range::new(start_pos, self.position.clone()),
+            })
+          }
         },
       },
-      start_pos,
-      end_pos: self.position.clone(),
+      range: Range::new(start_pos, self.position.clone()),
     })
   }
 
@@ -102,7 +107,9 @@ impl<'a> Lexer<'a> {
     loop {
       self.advance();
       if self.current_char.is_none() {
-        return Err(LexerError::UnterminatedString { pos: start_pos });
+        return Err(LexerError::UnterminatedString {
+          range: Range::new(start_pos, self.position.clone()),
+        });
       }
 
       is_escaped = escape;
@@ -124,8 +131,7 @@ impl<'a> Lexer<'a> {
 
     Ok(TokenWithPos {
       token: Token::String { value: string },
-      start_pos,
-      end_pos: self.position.clone(),
+      range: Range::new(start_pos, self.position.clone()),
     })
   }
 
@@ -138,7 +144,9 @@ impl<'a> Lexer<'a> {
     loop {
       self.advance();
       if self.current_char.is_none() {
-        return Err(LexerError::UnterminatedText { pos: start_pos });
+        return Err(LexerError::UnterminatedText {
+          range: Range::new(start_pos, self.position.clone()),
+        });
       }
 
       is_escaped = escape;
@@ -160,8 +168,7 @@ impl<'a> Lexer<'a> {
 
     Ok(TokenWithPos {
       token: Token::Text { value: string },
-      start_pos,
-      end_pos: self.position.clone(),
+      range: Range::new(start_pos, self.position.clone()),
     })
   }
 
@@ -174,7 +181,9 @@ impl<'a> Lexer<'a> {
     loop {
       self.advance();
       if self.current_char.is_none() {
-        return Err(LexerError::UnterminatedVariable { pos: start_pos });
+        return Err(LexerError::UnterminatedVariable {
+          range: Range::new(start_pos, self.position.clone()),
+        });
       }
 
       is_escaped = escape;
@@ -196,8 +205,7 @@ impl<'a> Lexer<'a> {
 
     Ok(TokenWithPos {
       token: Token::Variable { value: string },
-      start_pos,
-      end_pos: self.position.clone(),
+      range: Range::new(start_pos, self.position.clone()),
     })
   }
 
@@ -224,15 +232,13 @@ impl<'a> Lexer<'a> {
     if let Some(keyword) = keyword {
       return Ok(TokenWithPos {
         token: Token::Keyword { value: keyword },
-        start_pos,
-        end_pos: self.position.clone(),
+        range: Range::new(start_pos, self.position.clone()),
       });
     }
 
     Ok(TokenWithPos {
       token: Token::Identifier { value },
-      start_pos,
-      end_pos: self.position.clone(),
+      range: Range::new(start_pos, self.position.clone()),
     })
   }
 
@@ -371,7 +377,10 @@ impl<'a> Lexer<'a> {
   }
 
   fn token(&self, token: Token) -> TokenWithPos {
-    TokenWithPos::new(token, self.position.clone(), self.position.clone())
+    TokenWithPos::new(
+      token,
+      Range::new(self.position.clone(), self.position.clone()),
+    )
   }
 }
 
@@ -381,9 +390,18 @@ mod tests {
 
   use super::*;
 
+  fn test(values: Vec<(&str, Token)>) {
+    for value in values {
+      println!("Testing token {:?} to be '{:?}'", value.0, value.1);
+      let result = Lexer::new(value.0).run().expect("Lexer failed");
+      let token = result.first().expect("Lexer did not return tokens");
+      assert_eq!(token.token, value.1);
+    }
+  }
+
   #[test]
   pub fn basic_tokens() {
-    let values = vec![
+    test(vec![
       ("+", Token::Plus),
       ("-", Token::Minus),
       ("*", Token::Multiply),
@@ -397,18 +415,12 @@ mod tests {
       (";", Token::Semicolon),
       ("?", Token::QuestionMark),
       ("$", Token::Dollar),
+      ("~", Token::Tilde),
       ("(", Token::OpenParen),
       (")", Token::CloseParen),
       ("{", Token::OpenParenCurly),
       ("}", Token::CloseParenCurly),
-    ];
-
-    for value in values {
-      println!("Testing token {:?} to be '{:?}'", value.0, value.1);
-      let result = Lexer::new(value.0).run().expect("Lexer failed");
-      let token = result.get(0).expect("Lexer did not return tokens");
-      assert_eq!(token.token, value.1);
-    }
+    ]);
   }
 
   #[test]
@@ -448,19 +460,12 @@ mod tests {
 
   #[test]
   pub fn comments() {
-    let values = vec![("//abc\n+", Token::Plus), ("+ //abc", Token::Plus)];
-
-    for value in values {
-      println!("Testing token {:?} to be '{:?}'", value.0, value.1);
-      let result = Lexer::new(value.0).run().expect("Lexer failed");
-      let token = result.get(0).expect("Lexer did not return tokens");
-      assert_eq!(token.token, value.1);
-    }
+    test(vec![("//abc\n+", Token::Plus), ("+ //abc", Token::Plus)]);
   }
 
   #[test]
   pub fn numbers() {
-    let values = vec![
+    test(vec![
       ("1", Token::Number { value: 1.0 }),
       ("254", Token::Number { value: 254.0 }),
       ("0.2", Token::Number { value: 0.2 }),
@@ -471,14 +476,7 @@ mod tests {
       ("-1", Token::Number { value: -1.0 }),
       ("-153", Token::Number { value: -153.0 }),
       ("-92.45", Token::Number { value: -92.45 }),
-    ];
-
-    for value in values {
-      println!("Testing token {:?} to be '{:?}'", value.0, value.1);
-      let result = Lexer::new(value.0).run().expect("Lexer failed");
-      let token = result.get(0).expect("Lexer did not return tokens");
-      assert_eq!(token.token, value.1);
-    }
+    ]);
   }
 
   #[test]
@@ -493,7 +491,7 @@ mod tests {
 
   #[test]
   pub fn strings() {
-    let values = vec![
+    test(vec![
       (
         "'abc'",
         Token::String {
@@ -524,14 +522,7 @@ mod tests {
           value: "abc'abc".to_string(),
         },
       ),
-    ];
-
-    for value in values {
-      println!("Testing token {:?} to be '{:?}'", value.0, value.1);
-      let result = Lexer::new(value.0).run().expect("Lexer failed");
-      let token = result.get(0).expect("Lexer did not return tokens");
-      assert_eq!(token.token, value.1);
-    }
+    ]);
   }
 
   #[test]
@@ -542,7 +533,7 @@ mod tests {
 
   #[test]
   pub fn text() {
-    let values = vec![
+    test(vec![
       (
         "\"abc\"",
         Token::Text {
@@ -573,14 +564,7 @@ mod tests {
           value: "abc\"abc".to_string(),
         },
       ),
-    ];
-
-    for value in values {
-      println!("Testing token {:?} to be '{:?}'", value.0, value.1);
-      let result = Lexer::new(value.0).run().expect("Lexer failed");
-      let token = result.get(0).expect("Lexer did not return tokens");
-      assert_eq!(token.token, value.1);
-    }
+    ]);
   }
 
   #[test]
@@ -591,7 +575,7 @@ mod tests {
 
   #[test]
   pub fn variables() {
-    let values = vec![
+    test(vec![
       (
         "`abc`",
         Token::Variable {
@@ -616,14 +600,7 @@ mod tests {
           value: "abc`abc".to_string(),
         },
       ),
-    ];
-
-    for value in values {
-      println!("Testing token {:?} to be '{:?}'", value.0, value.1);
-      let result = Lexer::new(value.0).run().expect("Lexer failed");
-      let token = result.get(0).expect("Lexer did not return tokens");
-      assert_eq!(token.token, value.1);
-    }
+    ]);
   }
 
   #[test]
@@ -634,7 +611,7 @@ mod tests {
 
   #[test]
   pub fn keywords() {
-    let values = vec![
+    test(vec![
       ("p", Token::Keyword { value: Keyword::P }),
       ("e", Token::Keyword { value: Keyword::E }),
       ("g", Token::Keyword { value: Keyword::G }),
@@ -719,19 +696,12 @@ mod tests {
           value: Keyword::Repeat,
         },
       ),
-    ];
-
-    for value in values {
-      println!("Testing token {:?} to be '{:?}'", value.0, value.1);
-      let result = Lexer::new(value.0).run().expect("Lexer failed");
-      let token = result.get(0).expect("Lexer did not return tokens");
-      assert_eq!(token.token, value.1);
-    }
+    ]);
   }
 
   #[test]
   pub fn identifiers() {
-    let values = vec![
+    test(vec![
       (
         "test",
         Token::Identifier {
@@ -744,14 +714,7 @@ mod tests {
           value: "test_2".to_string(),
         },
       ),
-    ];
-
-    for value in values {
-      println!("Testing token {:?} to be '{:?}'", value.0, value.1);
-      let result = Lexer::new(value.0).run().expect("Lexer failed");
-      let token = result.get(0).expect("Lexer did not return tokens");
-      assert_eq!(token.token, value.1);
-    }
+    ]);
   }
 
   #[test]
@@ -762,29 +725,38 @@ mod tests {
     assert_eq!(
       result,
       vec![
-        TokenWithPos::new(Token::Plus, Position::new(1, 1), Position::new(1, 1)),
-        TokenWithPos::new(Token::Minus, Position::new(1, 4), Position::new(1, 4)),
-        TokenWithPos::new(Token::Multiply, Position::new(2, 1), Position::new(2, 1)),
-        TokenWithPos::new(Token::Divide, Position::new(2, 2), Position::new(2, 2)),
+        TokenWithPos::new(
+          Token::Plus,
+          Range::new(Position::new(1, 1), Position::new(1, 1))
+        ),
+        TokenWithPos::new(
+          Token::Minus,
+          Range::new(Position::new(1, 4), Position::new(1, 4))
+        ),
+        TokenWithPos::new(
+          Token::Multiply,
+          Range::new(Position::new(2, 1), Position::new(2, 1))
+        ),
+        TokenWithPos::new(
+          Token::Divide,
+          Range::new(Position::new(2, 2), Position::new(2, 2))
+        ),
         TokenWithPos::new(
           Token::String {
             value: "abc".to_owned()
           },
-          Position::new(3, 1),
-          Position::new(3, 6)
+          Range::new(Position::new(3, 1), Position::new(3, 6))
         ),
         TokenWithPos::new(
           Token::Variable {
             value: "test".to_owned()
           },
-          Position::new(3, 6),
-          Position::new(3, 12)
+          Range::new(Position::new(3, 6), Position::new(3, 12))
         ),
         TokenWithPos::new(
           Token::Number { value: 123.0 },
-          Position::new(4, 1),
-          Position::new(4, 4)
-        ),
+          Range::new(Position::new(4, 1), Position::new(4, 4))
+        )
       ]
     );
   }

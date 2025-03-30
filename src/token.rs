@@ -20,7 +20,7 @@ impl Position {
 
   pub fn rewind(&mut self) {
     self.col -= 1;
-    if self.col <= 0 {
+    if self.col == 0 {
       self.col = 1;
       self.line -= 1;
     }
@@ -39,19 +39,32 @@ impl Display for Position {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct Range {
+  pub start: Position,
+  pub end: Position,
+}
+
+impl Range {
+  pub fn new(start: Position, end: Position) -> Range {
+    Range { start, end }
+  }
+}
+
+impl Display for Range {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{} - {}", self.start, self.end)
+  }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct TokenWithPos {
   pub token: Token,
-  pub start_pos: Position,
-  pub end_pos: Position,
+  pub range: Range,
 }
 
 impl TokenWithPos {
-  pub fn new(token: Token, start_pos: Position, end_pos: Position) -> TokenWithPos {
-    TokenWithPos {
-      token,
-      start_pos,
-      end_pos,
-    }
+  pub fn new(token: Token, range: Range) -> TokenWithPos {
+    TokenWithPos { token, range }
   }
 }
 
