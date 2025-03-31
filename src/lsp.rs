@@ -9,7 +9,7 @@ use crate::lexer::Lexer;
 use crate::load_config;
 use crate::parser::Parser;
 use crate::token::{Keyword, Token};
-use crate::validate::{ValidateError, Validator};
+use crate::validate::Validator;
 use dashmap::DashMap;
 use ropey::Rope;
 use tower_lsp::lsp_types::*;

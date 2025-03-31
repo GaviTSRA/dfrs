@@ -110,7 +110,7 @@ pub fn format_validator_error(error: ValidateError) -> FormattedError {
   match error {
     ValidateError::UnknownEvent { node } => FormattedError::new(
       format!("Unknown event '{}'", node.event),
-      Range::new(node.start_pos, node.name_end_pos),
+      Range::new(node.range.start, node.name_end_pos),
     ),
     ValidateError::UnknownAction { name, range } => {
       FormattedError::new(format!("Unknown action '{}'", name), range)
@@ -152,13 +152,7 @@ pub fn format_validator_error(error: ValidateError) -> FormattedError {
           option.name, option.arg_type, found_type
         )
       };
-      FormattedError::new(
-        message,
-        Range::new(
-          args.get(index as usize).unwrap().start_pos.clone(),
-          args.get(index as usize).unwrap().end_pos.clone(),
-        ),
-      )
+      FormattedError::new(message, args.get(index as usize).unwrap().clone().range)
     }
     ValidateError::TooManyArguments { name, range } => {
       FormattedError::new(format!("Too many arguments for action '{}'", name), range)

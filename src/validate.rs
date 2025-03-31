@@ -244,8 +244,7 @@ impl Validator {
                 },
                 var_type: node.var_type,
               },
-              start_pos: node.start_pos,
-              end_pos: node.end_pos,
+              range: node.range,
             },
           );
           expression_node.node = Expression::Action {
@@ -291,7 +290,7 @@ impl Validator {
             None => {
               return Err(ValidateError::UnknownAction {
                 name: action_node.name,
-                range: Range::new(action_node.start_pos, action_node.end_pos),
+                range: action_node.range,
               })
             }
           };
@@ -314,7 +313,7 @@ impl Validator {
       None => {
         return Err(ValidateError::UnknownAction {
           name: action_node.name,
-          range: Range::new(action_node.start_pos, action_node.end_pos),
+          range: action_node.range,
         })
       }
     };
@@ -353,8 +352,8 @@ impl Validator {
     action_node.args = self.validate_args(
       action_node.args,
       action,
-      action_node.start_pos.clone(),
-      action_node.end_pos.clone(),
+      action_node.range.start.clone(),
+      action_node.range.end.clone(),
     )?;
     Ok(action_node)
   }
@@ -387,7 +386,7 @@ impl Validator {
       None => {
         return Err(ValidateError::UnknownAction {
           name: conditional_node.name,
-          range: Range::new(conditional_node.start_pos, conditional_node.end_pos),
+          range: conditional_node.range,
         })
       }
     };
@@ -412,8 +411,8 @@ impl Validator {
     conditional_node.args = self.validate_args(
       conditional_node.args,
       action,
-      conditional_node.start_pos.clone(),
-      conditional_node.end_pos.clone(),
+      conditional_node.range.start.clone(),
+      conditional_node.range.end.clone(),
     )?;
     Ok(conditional_node)
   }
@@ -449,8 +448,8 @@ impl Validator {
     call_node.args = self.validate_args(
       call_node.args,
       &action,
-      call_node.start_pos.clone(),
-      call_node.end_pos.clone(),
+      call_node.range.start.clone(),
+      call_node.range.end.clone(),
     )?;
     Ok(call_node)
   }
@@ -459,8 +458,8 @@ impl Validator {
     start_node.args = self.validate_args(
       start_node.args,
       &self.action_dump.start_process_action.clone(),
-      start_node.start_pos.clone(),
-      start_node.end_pos.clone(),
+      start_node.range.start.clone(),
+      start_node.range.end.clone(),
     )?;
     Ok(start_node)
   }
@@ -491,7 +490,7 @@ impl Validator {
             None => {
               return Err(ValidateError::UnknownAction {
                 name: repeat_node.name,
-                range: Range::new(repeat_node.start_pos, repeat_node.end_pos),
+                range: repeat_node.range,
               })
             }
           };
@@ -514,7 +513,7 @@ impl Validator {
       None => {
         return Err(ValidateError::UnknownAction {
           name: repeat_node.name,
-          range: Range::new(repeat_node.start_pos, repeat_node.end_pos),
+          range: repeat_node.range,
         })
       }
     };
@@ -556,8 +555,8 @@ impl Validator {
     repeat_node.args = self.validate_args(
       repeat_node.args,
       action,
-      repeat_node.start_pos.clone(),
-      repeat_node.end_pos.clone(),
+      repeat_node.range.start.clone(),
+      repeat_node.range.end.clone(),
     )?;
     Ok(repeat_node)
   }
@@ -665,7 +664,7 @@ impl Validator {
             return Err(ValidateError::UnknownTag {
               tag_name,
               available,
-              range: Range::new(given_tag.start_pos, name_end_pos),
+              range: Range::new(given_tag.range.start, name_end_pos),
             });
           }
         }
@@ -691,7 +690,7 @@ impl Validator {
                   tag_name,
                   provided: format!("{err:?}"),
                   options: tag.options,
-                  range: Range::new(value_start_pos, given_tag.end_pos),
+                  range: Range::new(value_start_pos, given_tag.range.end),
                 })
               }
             };
@@ -708,15 +707,14 @@ impl Validator {
                     value_start_pos,
                   },
                   index: tag.slot as i32,
-                  start_pos: given_tag.start_pos,
-                  end_pos: given_tag.end_pos,
+                  range: given_tag.range,
                 });
               } else {
                 return Err(ValidateError::InvalidTagOption {
                   tag_name,
                   provided: actual,
                   options: tag.options,
-                  range: Range::new(value_start_pos, given_tag.end_pos),
+                  range: Range::new(value_start_pos, given_tag.range.end),
                 });
               }
             }
@@ -738,8 +736,7 @@ impl Validator {
             value_start_pos: Position::new(1, 1),
           },
           index: tag.slot as i32,
-          start_pos: Position::new(1, 1),
-          end_pos: Position::new(1, 1),
+          range: Range::new(Position::new(1, 1), Position::new(1, 1)),
         });
       }
     }
@@ -824,7 +821,7 @@ impl Validator {
               None => {
                 return Err(PathError::UnknownGameValue {
                   game_value: dfrs_name,
-                  range: Range::new(current_arg.start_pos, current_arg.end_pos),
+                  range: current_arg.range,
                 })
               }
             }
@@ -856,14 +853,12 @@ impl Validator {
                       }
                     }
                   }
+                } else if self.variable_types.contains_key(name) {
+                  &self.variable_types.get(name).unwrap().clone()
                 } else {
-                  if self.variable_types.contains_key(name) {
-                    &self.variable_types.get(name).unwrap().clone()
-                  } else {
-                    match var_type {
-                      Some(var_type) => var_type,
-                      None => &ArgType::ANY,
-                    }
+                  match var_type {
+                    Some(var_type) => var_type,
+                    None => &ArgType::ANY,
                   }
                 }
               }
@@ -957,14 +952,12 @@ impl Validator {
                     }
                   }
                 }
+              } else if self.variable_types.contains_key(name) {
+                &self.variable_types.get(name).unwrap().clone()
               } else {
-                if self.variable_types.contains_key(name) {
-                  &self.variable_types.get(name).unwrap().clone()
-                } else {
-                  match var_type {
-                    Some(var_type) => var_type,
-                    None => &ArgType::ANY,
-                  }
+                match var_type {
+                  Some(var_type) => var_type,
+                  None => &ArgType::ANY,
                 }
               }
             }
@@ -1043,8 +1036,7 @@ mod tests {
       arg_type: ArgType::NUMBER,
       value: ArgValue::Number { number: 1.0 },
       index: 0,
-      start_pos: Position::new(0, 0),
-      end_pos: Position::new(0, 0),
+      range: Range::new(Position::new(0, 0), Position::new(0, 0)),
     }];
 
     let result = validator.validate_args(
@@ -1064,8 +1056,7 @@ mod tests {
         text: "".to_owned(),
       },
       index: 0,
-      start_pos: Position::new(0, 0),
-      end_pos: Position::new(0, 0),
+      range: Range::new(Position::new(0, 0), Position::new(0, 0)),
     }];
 
     let mut validator = Validator::new();
@@ -1091,15 +1082,13 @@ mod tests {
         arg_type: ArgType::NUMBER,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       },
       Arg {
         arg_type: ArgType::NUMBER,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       },
     ];
 
@@ -1157,22 +1146,19 @@ mod tests {
         arg_type: ArgType::NUMBER,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       },
       Arg {
         arg_type: ArgType::NUMBER,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       },
       Arg {
         arg_type: ArgType::TEXT,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       },
     ];
 
@@ -1193,22 +1179,19 @@ mod tests {
         arg_type: ArgType::NUMBER,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       },
       Arg {
         arg_type: ArgType::NUMBER,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       },
       Arg {
         arg_type: ArgType::TEXT,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       },
     ];
 
@@ -1229,15 +1212,13 @@ mod tests {
         arg_type: ArgType::NUMBER,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       },
       Arg {
         arg_type: ArgType::TEXT,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       },
     ];
 
@@ -1258,15 +1239,13 @@ mod tests {
         arg_type: ArgType::NUMBER,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       },
       Arg {
         arg_type: ArgType::NUMBER,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       },
     ];
 
@@ -1317,8 +1296,7 @@ mod tests {
         arg_type: ArgType::NUMBER,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       }],
       &action,
       Position::new(0, 0),
@@ -1331,8 +1309,7 @@ mod tests {
         arg_type: ArgType::TEXT,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       }],
       &action,
       Position::new(0, 0),
@@ -1392,15 +1369,13 @@ mod tests {
           arg_type: ArgType::NUMBER,
           value: ArgValue::Number { number: 1.0 },
           index: 0,
-          start_pos: Position::new(0, 0),
-          end_pos: Position::new(0, 0),
+          range: Range::new(Position::new(0, 0), Position::new(0, 0)),
         },
         Arg {
           arg_type: ArgType::NUMBER,
           value: ArgValue::Number { number: 1.0 },
           index: 0,
-          start_pos: Position::new(0, 0),
-          end_pos: Position::new(0, 0),
+          range: Range::new(Position::new(0, 0), Position::new(0, 0)),
         },
       ],
       &action,
@@ -1415,15 +1390,13 @@ mod tests {
           arg_type: ArgType::TEXT,
           value: ArgValue::Number { number: 1.0 },
           index: 0,
-          start_pos: Position::new(0, 0),
-          end_pos: Position::new(0, 0),
+          range: Range::new(Position::new(0, 0), Position::new(0, 0)),
         },
         Arg {
           arg_type: ArgType::NUMBER,
           value: ArgValue::Number { number: 1.0 },
           index: 0,
-          start_pos: Position::new(0, 0),
-          end_pos: Position::new(0, 0),
+          range: Range::new(Position::new(0, 0), Position::new(0, 0)),
         },
       ],
       &action,
@@ -1438,15 +1411,13 @@ mod tests {
           arg_type: ArgType::TEXT,
           value: ArgValue::Number { number: 1.0 },
           index: 0,
-          start_pos: Position::new(0, 0),
-          end_pos: Position::new(0, 0),
+          range: Range::new(Position::new(0, 0), Position::new(0, 0)),
         },
         Arg {
           arg_type: ArgType::TEXT,
           value: ArgValue::Number { number: 1.0 },
           index: 0,
-          start_pos: Position::new(0, 0),
-          end_pos: Position::new(0, 0),
+          range: Range::new(Position::new(0, 0), Position::new(0, 0)),
         },
       ],
       &action,
@@ -1461,15 +1432,13 @@ mod tests {
           arg_type: ArgType::NUMBER,
           value: ArgValue::Number { number: 1.0 },
           index: 0,
-          start_pos: Position::new(0, 0),
-          end_pos: Position::new(0, 0),
+          range: Range::new(Position::new(0, 0), Position::new(0, 0)),
         },
         Arg {
           arg_type: ArgType::TEXT,
           value: ArgValue::Number { number: 1.0 },
           index: 0,
-          start_pos: Position::new(0, 0),
-          end_pos: Position::new(0, 0),
+          range: Range::new(Position::new(0, 0), Position::new(0, 0)),
         },
       ],
       &action,
@@ -1485,23 +1454,20 @@ mod tests {
       arg_type: ArgType::NUMBER,
       value: ArgValue::Number { number: 1.0 },
       index: 0,
-      start_pos: Position::new(0, 0),
-      end_pos: Position::new(0, 0),
+      range: Range::new(Position::new(0, 0), Position::new(0, 0)),
     }];
     let multi_arg = vec![
       Arg {
         arg_type: ArgType::NUMBER,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       },
       Arg {
         arg_type: ArgType::NUMBER,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       },
     ];
 
@@ -1530,22 +1496,19 @@ mod tests {
         arg_type: ArgType::NUMBER,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       },
       Arg {
         arg_type: ArgType::NUMBER,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       },
       Arg {
         arg_type: ArgType::TEXT,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       },
     ];
     let multi_arg = vec![
@@ -1553,29 +1516,25 @@ mod tests {
         arg_type: ArgType::NUMBER,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       },
       Arg {
         arg_type: ArgType::NUMBER,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       },
       Arg {
         arg_type: ArgType::NUMBER,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       },
       Arg {
         arg_type: ArgType::TEXT,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       },
     ];
 
@@ -1631,8 +1590,7 @@ mod tests {
         arg_type: ArgType::NUMBER,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       }],
       &action,
       Position::new(0, 0),
@@ -1645,8 +1603,7 @@ mod tests {
         arg_type: ArgType::TEXT,
         value: ArgValue::Number { number: 1.0 },
         index: 0,
-        start_pos: Position::new(0, 0),
-        end_pos: Position::new(0, 0),
+        range: Range::new(Position::new(0, 0), Position::new(0, 0)),
       }],
       &action,
       Position::new(0, 0),

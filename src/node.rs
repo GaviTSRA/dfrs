@@ -1,3 +1,4 @@
+use crate::token::Range;
 use crate::{
   definitions::{ArgType, DefinedTag},
   token::{Position, Selector, Type},
@@ -13,8 +14,7 @@ pub struct FileNode {
   pub events: Vec<EventNode>,
   pub functions: Vec<FunctionNode>,
   pub processes: Vec<ProcessNode>,
-  pub start_pos: Position,
-  pub end_pos: Position,
+  pub range: Range,
 }
 
 #[derive(Clone, Debug)]
@@ -22,9 +22,8 @@ pub struct EventNode {
   pub event_type: Option<ActionType>,
   pub event: String,
   pub expressions: Vec<ExpressionNode>,
-  pub start_pos: Position,
+  pub range: Range,
   pub name_end_pos: Position,
-  pub end_pos: Position,
   pub cancelled: bool,
 }
 
@@ -34,18 +33,16 @@ pub struct FunctionNode {
   pub dfrs_name: String,
   pub params: Vec<FunctionParamNode>,
   pub expressions: Vec<ExpressionNode>,
-  pub start_pos: Position,
+  pub range: Range,
   pub name_end_pos: Position,
-  pub end_pos: Position,
 }
 
 #[derive(Clone, Debug)]
 pub struct ProcessNode {
   pub name: String,
   pub expressions: Vec<ExpressionNode>,
-  pub start_pos: Position,
+  pub range: Range,
   pub name_end_pos: Position,
-  pub end_pos: Position,
 }
 
 #[derive(Clone, Debug)]
@@ -60,8 +57,7 @@ pub struct FunctionParamNode {
 #[derive(Clone, Debug)]
 pub struct ExpressionNode {
   pub node: Expression,
-  pub start_pos: Position,
-  pub end_pos: Position,
+  pub range: Range,
 }
 
 #[derive(Clone, Debug)]
@@ -80,10 +76,8 @@ pub struct ActionNode {
   pub selector: Selector,
   pub name: String,
   pub args: Vec<Arg>,
-  pub start_pos: Position,
-  pub selector_start_pos: Position,
-  pub selector_end_pos: Position,
-  pub end_pos: Position,
+  pub range: Range,
+  pub selector_range: Range,
 }
 
 #[derive(Clone, Debug)]
@@ -92,10 +86,8 @@ pub struct ConditionalNode {
   pub selector: Selector,
   pub name: String,
   pub args: Vec<Arg>,
-  pub start_pos: Position,
-  pub selector_start_pos: Option<Position>,
-  pub selector_end_pos: Option<Position>,
-  pub end_pos: Position,
+  pub range: Range,
+  pub selector_range: Option<Range>,
   pub expressions: Vec<ExpressionNode>,
   pub else_expressions: Vec<ExpressionNode>,
   pub inverted: bool,
@@ -105,25 +97,22 @@ pub struct ConditionalNode {
 pub struct CallNode {
   pub name: String,
   pub args: Vec<Arg>,
-  pub start_pos: Position,
-  pub end_pos: Position,
+  pub range: Range,
 }
 
 #[derive(Clone, Debug)]
 pub struct StartNode {
   pub name: String,
   pub args: Vec<Arg>,
-  pub start_pos: Position,
-  pub end_pos: Position,
+  pub range: Range,
 }
 
 #[derive(Clone, Debug)]
 pub struct RepeatNode {
   pub name: String,
   pub args: Vec<Arg>,
-  pub start_pos: Position,
-  pub end_pos: Position,
   pub expressions: Vec<ExpressionNode>,
+  pub range: Range,
 }
 
 #[derive(Clone, Debug)]
@@ -131,8 +120,7 @@ pub struct Arg {
   pub value: ArgValue,
   pub index: i32,
   pub arg_type: ArgType,
-  pub start_pos: Position,
-  pub end_pos: Position,
+  pub range: Range,
 }
 
 #[derive(Clone, Debug)]
@@ -142,8 +130,7 @@ pub struct VariableNode {
   pub var_variant: VariableVariant,
   pub var_type: Option<ArgType>,
   pub action: Option<ActionNode>,
-  pub start_pos: Position,
-  pub end_pos: Position,
+  pub range: Range,
 }
 
 #[derive(Clone, Debug)]
@@ -256,8 +243,7 @@ pub struct ParticleData {
 #[derive(Clone, Debug)]
 pub struct ArgValueWithPos {
   pub value: ArgValue,
-  pub start_pos: Position,
-  pub end_pos: Position,
+  pub range: Range,
 }
 
 #[derive(Clone, Debug, PartialEq)]
