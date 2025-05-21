@@ -11,6 +11,7 @@ pub trait Node {
 
 #[derive(Clone, Debug)]
 pub struct FileNode {
+  pub uses: Vec<UseNode>,
   pub events: Vec<EventNode>,
   pub functions: Vec<FunctionNode>,
   pub processes: Vec<ProcessNode>,
@@ -113,6 +114,11 @@ pub struct RepeatNode {
   pub args: Vec<Arg>,
   pub expressions: Vec<ExpressionNode>,
   pub range: Range,
+}
+
+#[derive(Clone, Debug)]
+pub struct UseNode {
+  pub file: String,
 }
 
 #[derive(Clone, Debug)]

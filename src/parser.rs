@@ -1,5 +1,5 @@
 use crate::definitions::ARG_TYPES;
-use crate::node::{ParticleCluster, ParticleData, StartNode};
+use crate::node::{ParticleCluster, ParticleData, StartNode, UseNode};
 use crate::token::Range;
 use crate::{
   definitions::ArgType,
@@ -56,6 +56,9 @@ pub enum ParserError {
   },
   InvalidType {
     found: String,
+    range: Range,
+  },
+  InvalidUse {
     range: Range,
   },
 }
@@ -155,6 +158,7 @@ impl Parser {
 
   fn file(&mut self) -> Result<FileNode, ParserError> {
     let mut token = self.advance();
+    let mut uses: Vec<UseNode> = vec![];
     let mut events: Vec<EventNode> = vec![];
     let mut functions: Vec<FunctionNode> = vec![];
     let mut processes: Vec<ProcessNode> = vec![];
@@ -178,6 +182,10 @@ impl Parser {
           Keyword::VarSave => {
             let node = self.variable(VariableVariant::Save, None)?;
             self.variables.push(node);
+          }
+          Keyword::Use => {
+            let node = self.use_statement()?;
+            uses.push(node);
           }
           _ => {
             return Err(Self::invalid_token(
@@ -226,6 +234,7 @@ impl Parser {
       start_pos.clone()
     };
     Ok(FileNode {
+      uses,
       events,
       functions,
       processes,
@@ -1008,6 +1017,16 @@ impl Parser {
     };
     self.variables.push(node.clone());
     Ok(node)
+  }
+
+  fn use_statement(&mut self) -> Result<UseNode, ParserError> {
+    let token = self.advance_err()?;
+    let res = match token.token {
+      Token::Text { value } => UseNode { file: value },
+      _ => return Err(ParserError::InvalidUse { range: token.range }),
+    };
+    self.require_token(Token::Semicolon)?;
+    Ok(res)
   }
 
   fn make_params(&mut self) -> Result<Vec<ArgValueWithPos>, ParserError> {

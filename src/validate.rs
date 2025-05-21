@@ -3,7 +3,9 @@ use crate::definitions::actions::Action;
 use crate::definitions::events::{EntityEvents, PlayerEvents};
 use crate::definitions::game_values::GameValues;
 use crate::definitions::{DefinedArgBranch, DefinedArgOption};
-use crate::node::{ExpressionNode, StartNode, VariableVariant};
+use crate::lexer::Lexer;
+use crate::node::{ExpressionNode, FunctionNode, StartNode, VariableVariant};
+use crate::parser::Parser;
 use crate::token::{Range, Type};
 use crate::{
   definitions::{action_dump::ActionDump, ArgType, DefinedArg},
@@ -14,6 +16,7 @@ use crate::{
   token::Position,
 };
 use std::collections::HashMap;
+use std::fs;
 
 #[derive(Debug)]
 pub enum ValidateError {
@@ -84,6 +87,12 @@ pub struct Validator {
   variables_to_set: HashMap<String, ArgType>,
 }
 
+impl Default for Validator {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl Validator {
   pub fn new() -> Validator {
     let action_dump = RawActionDump::load();
@@ -110,43 +119,43 @@ impl Validator {
   pub fn validate(&mut self, mut node: FileNode) -> Result<FileNode, ValidateError> {
     let mut functions = vec![];
 
-    for function in node.functions.iter_mut() {
-      let mut args = vec![];
+    for use_statement in node.uses.iter_mut() {
+      let data = fs::read_to_string(use_statement.file.clone()).expect("could not open file");
+      let input = &data.clone();
 
-      for param in &function.params {
-        let param_type = match param.param_type {
-          Type::Number => ArgType::NUMBER,
-          Type::String => ArgType::STRING,
-          Type::Text => ArgType::TEXT,
-          Type::Vector => ArgType::VECTOR,
-          Type::Location => ArgType::LOCATION,
-          Type::Particle => ArgType::PARTICLE,
-          Type::Potion => ArgType::POTION,
-          Type::Sound => ArgType::SOUND,
-          Type::Item => ArgType::ITEM,
-          Type::List => ArgType::VARIABLE,
-          Type::Dict => ArgType::VARIABLE,
-          Type::Variable => ArgType::VARIABLE,
-          Type::Any => ArgType::ANY,
-        };
+      let mut lexer = Lexer::new(input);
+      let result = lexer.run();
+      let res = match result {
+        Ok(res) => res,
+        Err(error) => {
+          continue;
+        }
+      };
 
-        args.push(DefinedArg::new(vec![DefinedArgOption::new(
-          param.name.clone(),
-          param_type,
-          param.optional,
-          param.multiple,
-        )]));
+      let mut parser = Parser::new(res);
+      let res = parser.run();
+      let node = match res {
+        Ok(res) => res,
+        Err(error) => {
+          continue;
+        }
+      };
+
+      let validated = match Validator::new().validate(node) {
+        Ok(res) => res,
+        Err(error) => {
+          continue;
+        }
+      };
+
+      for function in validated.functions.iter() {
+        let action = self.get_function_node_action(function);
+        functions.push((function.dfrs_name.clone(), action));
       }
+    }
 
-      let action = Action::new(
-        format!("fn {}", function.dfrs_name),
-        &format!("fn {}", function.df_name),
-        vec![],
-        vec![DefinedArgBranch::new(vec![args])],
-        vec![],
-        None,
-      );
-
+    for function in node.functions.iter() {
+      let action = self.get_function_node_action(function);
       functions.push((function.dfrs_name.clone(), action));
     }
 
@@ -195,6 +204,44 @@ impl Validator {
     }
 
     Ok(node)
+  }
+
+  fn get_function_node_action(&self, function: &FunctionNode) -> Action {
+    let mut args = vec![];
+
+    for param in &function.params {
+      let param_type = match param.param_type {
+        Type::Number => ArgType::NUMBER,
+        Type::String => ArgType::STRING,
+        Type::Text => ArgType::TEXT,
+        Type::Vector => ArgType::VECTOR,
+        Type::Location => ArgType::LOCATION,
+        Type::Particle => ArgType::PARTICLE,
+        Type::Potion => ArgType::POTION,
+        Type::Sound => ArgType::SOUND,
+        Type::Item => ArgType::ITEM,
+        Type::List => ArgType::VARIABLE,
+        Type::Dict => ArgType::VARIABLE,
+        Type::Variable => ArgType::VARIABLE,
+        Type::Any => ArgType::ANY,
+      };
+
+      args.push(DefinedArg::new(vec![DefinedArgOption::new(
+        param.name.clone(),
+        param_type,
+        param.optional,
+        param.multiple,
+      )]));
+    }
+
+    Action::new(
+      format!("fn {}", function.dfrs_name),
+      &format!("fn {}", function.df_name),
+      vec![],
+      vec![DefinedArgBranch::new(vec![args])],
+      vec![],
+      None,
+    )
   }
 
   fn validate_expression_node(
@@ -421,29 +468,10 @@ impl Validator {
     let action = if let Some(action) = self.get_function(&call_node.name) {
       action
     } else {
-      // println!(
-      //   "WARN: Unknown function '{}' is not validated",
-      //   call_node.name
-      // );
-      let mut args = vec![];
-      for arg in &call_node.args {
-        args.push(DefinedArg {
-          options: vec![DefinedArgOption::new("".into(), ArgType::ANY, false, false)],
-        })
-      }
-      Action {
-        df_name: "internal".into(),
-        dfrs_name: "internal".into(),
-        aliases: vec![],
-        args: vec![DefinedArgBranch { paths: vec![args] }],
-        tags: vec![],
-        return_type: None,
-      }
-      // return Err(ValidateError::UnknownFunction {
-      //   name: call_node.name,
-      //   start_pos: call_node.start_pos,
-      //   end_pos: call_node.end_pos,
-      // });
+      return Err(ValidateError::UnknownFunction {
+        name: call_node.name,
+        range: call_node.range,
+      });
     };
     call_node.args = self.validate_args(
       call_node.args,

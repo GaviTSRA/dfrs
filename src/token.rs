@@ -148,6 +148,7 @@ pub enum Keyword {
   Process,
   Start,
   Repeat,
+  Use,
 }
 
 impl Display for Keyword {
@@ -172,6 +173,7 @@ impl Display for Keyword {
       Keyword::Process => write!(f, "process"),
       Keyword::Start => write!(f, "start"),
       Keyword::Repeat => write!(f, "repeat"),
+      Keyword::Use => write!(f, "use"),
     }
   }
 }
@@ -196,6 +198,7 @@ pub static KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
     "proc" => Keyword::Process,
     "start" => Keyword::Start,
     "repeat" => Keyword::Repeat,
+    "use" => Keyword::Use,
 };
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]

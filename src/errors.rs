@@ -103,6 +103,9 @@ pub fn format_parser_error(error: ParserError) -> FormattedError {
     ParserError::InvalidType { found, range } => {
       FormattedError::new(format!("Unknown type: {}", found), range)
     }
+    ParserError::InvalidUse { range } => {
+      FormattedError::new("Invalid use statement".to_string(), range)
+    }
   }
 }
 
