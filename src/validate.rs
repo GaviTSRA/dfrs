@@ -17,6 +17,7 @@ use crate::{
 };
 use std::collections::HashMap;
 use std::fs;
+use std::io::Error;
 
 #[derive(Debug)]
 pub enum ValidateError {
@@ -58,6 +59,14 @@ pub enum ValidateError {
   UnknownTag {
     tag_name: String,
     available: Vec<String>,
+    range: Range,
+  },
+  UsedFileNotFound {
+    file: String,
+    range: Range,
+  },
+  UsedFileHasError {
+    file: String,
     range: Range,
   },
 }
@@ -120,7 +129,15 @@ impl Validator {
     let mut functions = vec![];
 
     for use_statement in node.uses.iter_mut() {
-      let data = fs::read_to_string(use_statement.file.clone()).expect("could not open file");
+      let data = match fs::read_to_string(use_statement.file.clone()) {
+        Ok(res) => res,
+        Err(err) => {
+          return Err(ValidateError::UsedFileNotFound {
+            range: use_statement.range.clone(),
+            file: use_statement.file.clone(),
+          });
+        }
+      };
       let input = &data.clone();
 
       let mut lexer = Lexer::new(input);
@@ -128,7 +145,10 @@ impl Validator {
       let res = match result {
         Ok(res) => res,
         Err(error) => {
-          continue;
+          return Err(ValidateError::UsedFileHasError {
+            range: use_statement.range.clone(),
+            file: use_statement.file.clone(),
+          });
         }
       };
 
@@ -137,14 +157,20 @@ impl Validator {
       let node = match res {
         Ok(res) => res,
         Err(error) => {
-          continue;
+          return Err(ValidateError::UsedFileHasError {
+            range: use_statement.range.clone(),
+            file: use_statement.file.clone(),
+          });
         }
       };
 
       let validated = match Validator::new().validate(node) {
         Ok(res) => res,
         Err(error) => {
-          continue;
+          return Err(ValidateError::UsedFileHasError {
+            range: use_statement.range.clone(),
+            file: use_statement.file.clone(),
+          });
         }
       };
 

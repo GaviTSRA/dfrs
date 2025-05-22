@@ -1022,7 +1022,10 @@ impl Parser {
   fn use_statement(&mut self) -> Result<UseNode, ParserError> {
     let token = self.advance_err()?;
     let res = match token.token {
-      Token::Text { value } => UseNode { file: value },
+      Token::Text { value } => UseNode {
+        file: value,
+        range: token.range,
+      },
       _ => return Err(ParserError::InvalidUse { range: token.range }),
     };
     self.require_token(Token::Semicolon)?;

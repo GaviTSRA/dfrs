@@ -119,6 +119,7 @@ pub struct RepeatNode {
 #[derive(Clone, Debug)]
 pub struct UseNode {
   pub file: String,
+  pub range: Range,
 }
 
 #[derive(Clone, Debug)]

@@ -149,7 +149,7 @@ pub fn format_validator_error(error: ValidateError) -> FormattedError {
           option_texts.join(""),
         )
       } else {
-        let option = options.get(0).unwrap().clone();
+        let option = options.first().unwrap().clone();
         format!(
           "Wrong argument type for '{}', expected '{:?}' but found '{:?}'",
           option.name, option.arg_type, found_type
@@ -182,6 +182,12 @@ pub fn format_validator_error(error: ValidateError) -> FormattedError {
     ),
     ValidateError::UnknownGameValue { game_value, range } => {
       FormattedError::new(format!("Unknown game_value '{game_value}'"), range)
+    }
+    ValidateError::UsedFileNotFound { file, range } => {
+      FormattedError::new(format!("Used file '{file}' not found"), range)
+    }
+    ValidateError::UsedFileHasError { file, range } => {
+      FormattedError::new(format!("Used file '{file}' has errors"), range)
     }
   }
 }
