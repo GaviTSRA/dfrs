@@ -538,6 +538,7 @@ impl Decompiler {
       args: vec![DefinedArgBranch { paths: vec![args] }],
       tags: vec![],
       return_type: None,
+      description: "".into(),
     };
     if block.args.is_some() && block.args.clone().unwrap().items.len() > 0 {
       self.add(&format!(

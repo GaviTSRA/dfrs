@@ -10,6 +10,7 @@ pub struct Action {
   pub args: Vec<DefinedArgBranch>,
   pub tags: Vec<DefinedTag>,
   pub return_type: Option<ArgType>,
+  pub description: String,
 }
 
 impl Action {
@@ -20,6 +21,7 @@ impl Action {
     args: Vec<DefinedArgBranch>,
     tags: Vec<DefinedTag>,
     return_type: Option<ArgType>,
+    description: String,
   ) -> Action {
     Action {
       dfrs_name,
@@ -28,6 +30,7 @@ impl Action {
       args,
       tags,
       return_type,
+      description,
     }
   }
 }
@@ -226,6 +229,80 @@ pub fn get_action(action: &ADAction) -> Action {
   }
 
   let name = to_dfrs_name(&action.name);
+
+  // TODO better arg/return types, include worksWith, example, requiredRank, requireTokens, requireRankAndTokens
+  let mut description = String::new();
+  description.push_str(&format!("### {name}  \n"));
+  description.push_str(&format!("{}  \n", action.icon.description.join(" ")));
+  if !action.icon.additional_info.is_empty() {
+    for info in &action.icon.additional_info {
+      description.push_str(&format!("{}  \n", info.join(" ")));
+    }
+  }
+  if !action.icon.arguments.is_empty() {
+    description.push_str(&format!("  ***  \n"));
+    description.push_str(&format!(
+      "### Arguments:  \n{}  \n",
+      action
+        .icon
+        .arguments
+        .iter()
+        .map(|arg| if arg.arg_type == "OR" {
+          "OR".to_owned()
+        } else if arg.arg_type == "" {
+          "  \n".to_owned()
+        } else {
+          format!(
+            "{} - {}{}{}",
+            arg.description.join(" "),
+            arg.arg_type,
+            if arg.plural { "*" } else { "" },
+            if arg.optional { "?" } else { "" }
+          )
+        })
+        .collect::<Vec<String>>()
+        .join("  \n")
+    ));
+  }
+  if !action.tags.is_empty() {
+    description.push_str(&format!("  ***  \n"));
+    description.push_str(&format!(
+      "### Tags:  \n{}  \n",
+      action
+        .tags
+        .iter()
+        .map(|tag| format!(
+          "**{}**  \n{}  \n",
+          tag.name,
+          tag
+            .options
+            .iter()
+            .map(|option| format!(
+              "- {} {}{}",
+              option.name,
+              if option.name == tag.default_option {
+                "_(default)_ "
+              } else {
+                ""
+              },
+              if option.icon.description.is_empty() {
+                "".into()
+              } else {
+                format!("- {}", option.icon.description.join(" "))
+              }
+            ))
+            .collect::<Vec<String>>()
+            .join("  \n"),
+        ))
+        .collect::<Vec<String>>()
+        .join("  \n")
+    ));
+  }
+  if let Some(returns) = &return_type {
+    description.push_str(&format!("  ***  \n"));
+    description.push_str(&format!("#### Returns:  \n{returns:?}"));
+  }
+
   Action::new(
     name,
     &action.name,
@@ -233,5 +310,6 @@ pub fn get_action(action: &ADAction) -> Action {
     branches,
     tags,
     return_type,
+    description,
   )
 }

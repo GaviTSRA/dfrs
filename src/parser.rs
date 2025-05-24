@@ -714,6 +714,7 @@ impl Parser {
     }
 
     let name = self.make_name(None)?;
+    let end_pos = self.current_token.clone().unwrap().range.end;
 
     let args = self.make_args()?;
 
@@ -735,8 +736,9 @@ impl Parser {
       selector,
       name,
       args,
-      range: Range::new(start_pos, token.range.end),
+      range: Range::new(start_pos, end_pos),
       selector_range: Range::new(selector_start_pos, selector_end_pos),
+      action: None,
     })
   }
 

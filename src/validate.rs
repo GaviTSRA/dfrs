@@ -257,6 +257,7 @@ impl Validator {
       vec![DefinedArgBranch::new(vec![args])],
       vec![],
       None,
+      "".into(),
     )
   }
 
@@ -418,6 +419,7 @@ impl Validator {
       action_node.range.start.clone(),
       action_node.range.end.clone(),
     )?;
+    action_node.action = Some(action.clone());
     Ok(action_node)
   }
 
@@ -1055,6 +1057,7 @@ mod tests {
       )]])],
       vec![],
       None,
+      "".into(),
     )
   }
 
@@ -1070,6 +1073,7 @@ mod tests {
       ]])],
       vec![],
       None,
+      "".into(),
     )
   }
 
@@ -1332,6 +1336,7 @@ mod tests {
       }]])],
       vec![],
       None,
+      "".into(),
     );
 
     let mut validator: Validator = Validator::new();
@@ -1404,6 +1409,7 @@ mod tests {
       ],
       vec![],
       None,
+      "".into(),
     );
 
     let mut validator: Validator = Validator::new();
@@ -1626,6 +1632,7 @@ mod tests {
       ])],
       vec![],
       None,
+      "".into(),
     );
 
     let mut validator = Validator::new();

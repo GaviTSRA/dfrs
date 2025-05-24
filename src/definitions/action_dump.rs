@@ -260,6 +260,7 @@ impl ActionDump {
       aliases: action.aliases.clone(),
       tags: action.tags.clone(),
       return_type: None,
+      description: "".into(),
     };
 
     ActionDump {

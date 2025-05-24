@@ -1,3 +1,4 @@
+use crate::definitions::actions::Action;
 use crate::token::Range;
 use crate::{
   definitions::{ArgType, DefinedTag},
@@ -79,6 +80,7 @@ pub struct ActionNode {
   pub args: Vec<Arg>,
   pub range: Range,
   pub selector_range: Range,
+  pub action: Option<Action>,
 }
 
 #[derive(Clone, Debug)]

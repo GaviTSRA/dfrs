@@ -7,6 +7,7 @@ use crate::definitions::game_values::GameValues;
 use crate::errors::{format_lexer_error, format_parser_error, format_validator_error};
 use crate::lexer::Lexer;
 use crate::load_config;
+use crate::node::Expression;
 use crate::parser::Parser;
 use crate::token::{Keyword, Token};
 use crate::validate::Validator;
@@ -37,19 +38,20 @@ impl LanguageServer for Backend {
         text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
         completion_provider: Some(CompletionOptions {
           resolve_provider: Some(false),
-          trigger_characters: Some(vec![".".to_string()]),
+          trigger_characters: Some(vec![".".into(), "$".into()]),
           work_done_progress_options: Default::default(),
           all_commit_characters: None,
           ..Default::default()
         }),
         diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
           identifier: Some("dfrs-lsp".to_owned()),
-          inter_file_dependencies: false,
+          inter_file_dependencies: true,
           workspace_diagnostics: false,
           work_done_progress_options: WorkDoneProgressOptions {
             work_done_progress: None,
           },
         })),
+        hover_provider: Some(HoverProviderCapability::Simple(true)),
         ..ServerCapabilities::default()
       },
       ..Default::default()
@@ -84,6 +86,70 @@ impl LanguageServer for Backend {
         language_id: "dfrs".into(),
       })
       .await
+  }
+
+  async fn hover(&self, params: HoverParams) -> tower_lsp::jsonrpc::Result<Option<Hover>> {
+    let uri = params
+      .text_document_position_params
+      .text_document
+      .uri
+      .clone();
+    let rope = self.document_map.get(&uri.to_string()).unwrap();
+    let data = rope.to_string();
+    let line = params.text_document_position_params.position.line + 1;
+    let col = params.text_document_position_params.position.character;
+
+    let mut lexer = Lexer::new(&data);
+    let result = lexer.run();
+
+    let res = match result {
+      Ok(res) => res,
+      Err(error) => {
+        return Ok(None);
+      }
+    };
+
+    let mut parser = Parser::new(res);
+    let res = parser.run();
+    let node = match res {
+      Ok(res) => res,
+      Err(_) => {
+        return Ok(None);
+      }
+    };
+
+    let validated = match Validator::new().validate(node) {
+      Ok(res) => res,
+      Err(_) => {
+        return Ok(None);
+      }
+    };
+
+    for event in validated.events {
+      for expression in event.expressions {
+        match expression.node {
+          Expression::Action { node } => {
+            if node.range.start.line == line
+              && node.range.start.col <= col
+              && node.range.end.col >= col
+            {
+              if let Some(action) = node.action {
+                return Ok(Some(Hover {
+                  contents: HoverContents::Markup(MarkupContent {
+                    kind: MarkupKind::Markdown,
+                    value: action.description,
+                  }),
+                  range: None,
+                }));
+              }
+            }
+          }
+          _ => {}
+        }
+      }
+    }
+
+    Ok(None)
   }
 
   async fn completion(
