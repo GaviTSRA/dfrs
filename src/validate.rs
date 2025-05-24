@@ -154,7 +154,7 @@ impl Validator {
 
       let mut parser = Parser::new(res);
       let res = parser.run();
-      let node = match res {
+      let used_node = match res {
         Ok(res) => res,
         Err(error) => {
           return Err(ValidateError::UsedFileHasError {
@@ -164,17 +164,7 @@ impl Validator {
         }
       };
 
-      let validated = match Validator::new().validate(node) {
-        Ok(res) => res,
-        Err(error) => {
-          return Err(ValidateError::UsedFileHasError {
-            range: use_statement.range.clone(),
-            file: use_statement.file.clone(),
-          });
-        }
-      };
-
-      for function in validated.functions.iter() {
+      for function in used_node.functions.iter() {
         let action = self.get_function_node_action(function);
         functions.push((function.dfrs_name.clone(), action));
       }
