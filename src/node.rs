@@ -102,6 +102,7 @@ pub struct CallNode {
   pub name: String,
   pub args: Vec<Arg>,
   pub range: Range,
+  pub is_unsafe_call: bool,
 }
 
 #[derive(Clone, Debug)]

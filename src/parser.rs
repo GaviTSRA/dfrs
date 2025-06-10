@@ -638,7 +638,7 @@ impl Parser {
           node = Expression::Variable { node: res }
         } else if let Some(token) = self.peak() {
           if token.token == Token::OpenParen {
-            let res = self.call(value)?;
+            let res = self.call(value, false)?;
             end_pos = res.range.end.clone();
             node = Expression::Call { node: res }
           } else {
@@ -654,6 +654,26 @@ impl Parser {
           ));
         }
       }
+      Token::String { value } => {
+        if let Some(token) = self.peak() {
+          if token.token == Token::OpenParen {
+            let res = self.call(value, true)?;
+            end_pos = res.range.end.clone();
+            node = Expression::Call { node: res }
+          } else {
+            return Err(Self::invalid_token(token, vec![Token::OpenParen]));
+          }
+        } else {
+          return Err(Self::invalid_token(
+            token,
+            vec![
+              Token::Keyword { value: Keyword::E },
+              Token::Keyword { value: Keyword::P },
+            ],
+          ));
+        }
+      }
+
       _ => {
         return Err(Self::invalid_token(
           token,
@@ -826,7 +846,7 @@ impl Parser {
     })
   }
 
-  fn call(&mut self, name: String) -> Result<CallNode, ParserError> {
+  fn call(&mut self, name: String, is_unsafe_call: bool) -> Result<CallNode, ParserError> {
     let start_pos = self.current_token.clone().unwrap().range.start;
     let mut args = self.make_args()?;
 
@@ -841,6 +861,7 @@ impl Parser {
       name,
       args,
       range: Range::new(start_pos, end_pos),
+      is_unsafe_call,
     })
   }
 

@@ -484,6 +484,10 @@ impl Validator {
   }
 
   fn validate_call(&mut self, mut call_node: CallNode) -> Result<CallNode, ValidateError> {
+    if call_node.is_unsafe_call {
+      return Ok(call_node);
+    }
+
     let action = if let Some(action) = self.get_function(&call_node.name) {
       action
     } else {
