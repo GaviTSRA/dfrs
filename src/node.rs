@@ -94,6 +94,7 @@ pub struct ConditionalNode {
   pub expressions: Vec<ExpressionNode>,
   pub else_expressions: Vec<ExpressionNode>,
   pub inverted: bool,
+  pub action: Option<Action>,
 }
 
 #[derive(Clone, Debug)]
@@ -116,6 +117,7 @@ pub struct RepeatNode {
   pub args: Vec<Arg>,
   pub expressions: Vec<ExpressionNode>,
   pub range: Range,
+  pub action: Option<Action>,
 }
 
 #[derive(Clone, Debug)]

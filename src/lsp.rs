@@ -7,7 +7,7 @@ use crate::definitions::game_values::GameValues;
 use crate::errors::{format_lexer_error, format_parser_error, format_validator_error};
 use crate::lexer::Lexer;
 use crate::load_config;
-use crate::node::Expression;
+use crate::node::{Expression, ExpressionNode};
 use crate::parser::Parser;
 use crate::token::{Keyword, Token};
 use crate::validate::Validator;
@@ -125,27 +125,26 @@ impl LanguageServer for Backend {
       }
     };
 
+    // TODO hover doesnt work if indented
+
     for event in validated.events {
-      for expression in event.expressions {
-        match expression.node {
-          Expression::Action { node } => {
-            if node.range.start.line == line
-              && node.range.start.col <= col
-              && node.range.end.col >= col
-            {
-              if let Some(action) = node.action {
-                return Ok(Some(Hover {
-                  contents: HoverContents::Markup(MarkupContent {
-                    kind: MarkupKind::Markdown,
-                    value: action.description,
-                  }),
-                  range: None,
-                }));
-              }
-            }
-          }
-          _ => {}
-        }
+      match self.check_for_hover(event.expressions, line, col) {
+        Some(res) => return Ok(Some(res)),
+        None => {}
+      }
+    }
+
+    for event in validated.functions {
+      match self.check_for_hover(event.expressions, line, col) {
+        Some(res) => return Ok(Some(res)),
+        None => {}
+      }
+    }
+
+    for event in validated.processes {
+      match self.check_for_hover(event.expressions, line, col) {
+        Some(res) => return Ok(Some(res)),
+        None => {}
       }
     }
 
@@ -215,6 +214,87 @@ impl Backend {
     self
       .document_map
       .insert(params.uri.to_string(), rope.clone());
+  }
+
+  fn check_for_hover(
+    &self,
+    expressions: Vec<ExpressionNode>,
+    line: u32,
+    col: u32,
+  ) -> Option<Hover> {
+    for expression in expressions {
+      match expression.node {
+        Expression::Action { node } => {
+          if node.range.start.line == line
+            && node.range.start.col <= col
+            && node.range.end.col >= col
+          {
+            if let Some(action) = node.action {
+              return Some(Hover {
+                contents: HoverContents::Markup(MarkupContent {
+                  kind: MarkupKind::Markdown,
+                  value: action.description,
+                }),
+                range: None,
+              });
+            }
+          }
+        }
+        Expression::Call { node } => {
+          // TODO
+        }
+        Expression::Conditional { node } => {
+          if node.range.start.line == line
+            && node.range.start.col <= col
+            && node.range.end.col >= col
+          {
+            if let Some(action) = node.action {
+              return Some(Hover {
+                contents: HoverContents::Markup(MarkupContent {
+                  kind: MarkupKind::Markdown,
+                  value: action.description,
+                }),
+                range: None,
+              });
+            }
+          }
+
+          if let Some(res) = self.check_for_hover(node.expressions, line, col) {
+            return Some(res);
+          }
+          if let Some(res) = self.check_for_hover(node.else_expressions, line, col) {
+            return Some(res);
+          }
+        }
+        Expression::Start { node } => {
+          // TODO
+        }
+        Expression::Variable { node } => {
+          // TODO
+        }
+        Expression::Repeat { node } => {
+          if node.range.start.line == line
+            && node.range.start.col <= col
+            && node.range.end.col >= col
+          {
+            if let Some(action) = node.action {
+              return Some(Hover {
+                contents: HoverContents::Markup(MarkupContent {
+                  kind: MarkupKind::Markdown,
+                  value: action.description,
+                }),
+                range: None,
+              });
+            }
+          }
+
+          if let Some(res) = self.check_for_hover(node.expressions, line, col) {
+            return Some(res);
+          }
+        }
+      }
+    }
+    None
   }
 
   async fn get_completions(

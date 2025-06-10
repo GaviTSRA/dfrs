@@ -479,6 +479,7 @@ impl Validator {
       conditional_node.range.start.clone(),
       conditional_node.range.end.clone(),
     )?;
+    conditional_node.action = Some(action.clone());
     Ok(conditional_node)
   }
 
@@ -604,6 +605,7 @@ impl Validator {
       repeat_node.range.start.clone(),
       repeat_node.range.end.clone(),
     )?;
+    repeat_node.action = Some(action.clone());
     Ok(repeat_node)
   }
 

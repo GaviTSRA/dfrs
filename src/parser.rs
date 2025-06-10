@@ -822,6 +822,7 @@ impl Parser {
       expressions,
       else_expressions,
       inverted,
+      action: None,
     })
   }
 
@@ -904,6 +905,7 @@ impl Parser {
       args,
       range: Range::new(start_pos, end_pos),
       expressions,
+      action: None,
     })
   }
 
