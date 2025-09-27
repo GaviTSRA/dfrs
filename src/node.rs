@@ -195,8 +195,8 @@ pub enum ArgValue {
     tag: String,
     value: Box<ArgValue>,
     definition: Option<DefinedTag>,
-    name_end_pos: Position,
-    value_start_pos: Position,
+    name_range: Range,
+    value_range: Range,
   },
   Variable {
     name: String,

@@ -17,56 +17,11 @@ pub fn send(code: Vec<CompiledLine>, config: Config) {
     crate::config::SendApi::CodeClientPlace => {
       send_codeclient_place(code, config);
     }
-    crate::config::SendApi::Recode => {
+    crate::config::SendApi::Print => {
       for line in code {
-        send_recode(line.code, line.name, config.debug.connection);
+        println!("{}", compress(line.code))
       }
     }
-  }
-}
-
-fn send_recode(code: String, name: String, debug: bool) {
-  println!("WARN: Recode API is deprecated");
-  let data = ("{\"type\": \"template\", \"source\": \"df.rs\", \"data\": \"{\\\"name\\\": \\\""
-    .to_owned()
-    + &name
-    + " \\\",\\\"data\\\":\\\""
-    + &compress(code)
-    + "\\\"}\"}\n")
-    .to_owned();
-
-  if debug {
-    println!("{}", data);
-  }
-
-  let server_address = "127.0.0.1:31372";
-  match TcpStream::connect(server_address) {
-    Ok(mut stream) => {
-      if debug {
-        println!("Connected to server!");
-      }
-      match stream.write_all(data.as_bytes()) {
-        Ok(_) => {
-          if debug {
-            println!("Data sent successfully!");
-            let mut buffer = [0; 2048];
-            match stream.read(&mut buffer) {
-              Ok(bytes_read) => {
-                if bytes_read > 0 {
-                  let response = String::from_utf8_lossy(&buffer[..bytes_read]);
-                  println!("Server response: {:?}", response);
-                } else {
-                  println!("No data received from the server.");
-                }
-              }
-              Err(err) => eprintln!("Error reading from server: {}", err),
-            }
-          }
-        }
-        Err(err) => eprintln!("Error sending data to server: {}", err),
-      }
-    }
-    Err(err) => eprintln!("Failed to connect to server: {}", err),
   }
 }
 

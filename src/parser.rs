@@ -1121,14 +1121,14 @@ impl Parser {
         is_tag = false;
         match token.token.clone() {
           Token::String { value } => {
-            let data = Box::new(ArgValue::Text { text: value });
+            let data = Box::new(ArgValue::String { string: value });
             params.push(ArgValueWithPos {
               value: ArgValue::Tag {
                 tag: tag_name.clone(),
                 value: data,
                 definition: None,
-                name_end_pos: tag_end_pos.clone(),
-                value_start_pos: token.range.start.clone(),
+                name_range: Range::new(tag_start_pos.clone(), tag_end_pos.clone()),
+                value_range: token.range.clone(),
               },
               range: Range::new(tag_start_pos.clone(), token.range.end),
             });
@@ -1141,8 +1141,8 @@ impl Parser {
                 tag: tag_name.clone(),
                 value: data,
                 definition: None,
-                name_end_pos: tag_end_pos.clone(),
-                value_start_pos: token.range.start,
+                name_range: Range::new(tag_start_pos.clone(), tag_end_pos.clone()),
+                value_range: token.range.clone(),
               },
               range: Range::new(tag_start_pos.clone(), token.range.end),
             });
@@ -1155,8 +1155,8 @@ impl Parser {
                 tag: tag_name.clone(),
                 value: data,
                 definition: None,
-                name_end_pos: tag_end_pos.clone(),
-                value_start_pos: token.range.start,
+                name_range: Range::new(tag_start_pos.clone(), tag_end_pos.clone()),
+                value_range: token.range.clone(),
               },
               range: Range::new(tag_start_pos.clone(), token.range.end),
             });
@@ -1171,8 +1171,8 @@ impl Parser {
                   tag: tag_name.clone(),
                   value: data,
                   definition: None,
-                  name_end_pos: tag_end_pos.clone(),
-                  value_start_pos: token.range.start,
+                  name_range: Range::new(tag_start_pos.clone(), tag_end_pos.clone()),
+                  value_range: token.range.clone(),
                 },
                 range: Range::new(tag_start_pos.clone(), token.range.end),
               });
@@ -1861,6 +1861,9 @@ impl Parser {
     let item = match &item_params[0].value {
       ArgValue::String { string } => string.clone(),
       ArgValue::Text { text } => text.clone(),
+      ArgValue::Tag { .. } => {
+        return self.make_complex_item(start_pos, item_params);
+      }
       _ => {
         return Err(ParserError::InvalidItem {
           range: self.current_token.clone().unwrap().range,
@@ -1874,6 +1877,69 @@ impl Parser {
         msg: "Too many arguments".into(),
       });
     }
+    Ok(ArgValueWithPos {
+      value: ArgValue::Item { item },
+      range: Range::new(start_pos, self.current_token.clone().unwrap().range.end),
+    })
+  }
+
+  fn make_complex_item(
+    &self,
+    start_pos: Position,
+    params: Vec<ArgValueWithPos>,
+  ) -> Result<ArgValueWithPos, ParserError> {
+    let mut id: Option<String> = None;
+
+    for param in params {
+      println!("{:?}", param.value);
+      match param.value {
+        ArgValue::Tag {
+          tag,
+          value,
+          name_range,
+          value_range,
+          ..
+        } => match tag.as_str() {
+          "id" => match *value {
+            ArgValue::String { string } => id = Some(string),
+            _ => {
+              return Err(ParserError::InvalidItem {
+                msg: "Invalid id type".into(),
+                range: value_range,
+              })
+            }
+          },
+          _ => {
+            return Err(ParserError::InvalidItem {
+              msg: "Unknown item property".into(),
+              range: name_range,
+            })
+          }
+        },
+        _ => {
+          return Err(ParserError::InvalidItem {
+            msg: "Unexpected value".into(),
+            range: self.current_token.clone().unwrap().range,
+          })
+        }
+      }
+    }
+
+    if id.is_none() {
+      return Err(ParserError::InvalidItem {
+        msg: "Missing id property".into(),
+        range: Range::new(start_pos, self.current_token.clone().unwrap().range.end),
+      });
+    }
+
+    let item = format!(
+      "{{
+        id:\"{}\", count:1,
+        components:{{}}
+      }}",
+      id.unwrap()
+    );
+
     Ok(ArgValueWithPos {
       value: ArgValue::Item { item },
       range: Range::new(start_pos, self.current_token.clone().unwrap().range.end),

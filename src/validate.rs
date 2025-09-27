@@ -699,10 +699,8 @@ impl Validator {
       match given_tag.value {
         ArgValue::Tag {
           tag: tag_name,
-          value: _,
-          definition: _,
-          name_end_pos,
-          value_start_pos: _,
+          name_range,
+          ..
         } => {
           let mut found = false;
           let mut available = vec![];
@@ -716,7 +714,7 @@ impl Validator {
             return Err(ValidateError::UnknownTag {
               tag_name,
               available,
-              range: Range::new(given_tag.range.start, name_end_pos),
+              range: Range::new(given_tag.range.start, name_range.end),
             });
           }
         }
@@ -731,8 +729,8 @@ impl Validator {
           ArgValue::Tag {
             tag: tag_name,
             value,
-            name_end_pos,
-            value_start_pos,
+            name_range,
+            value_range,
             ..
           } => {
             let actual = match value.clone().as_ref() {
@@ -742,7 +740,7 @@ impl Validator {
                   tag_name,
                   provided: format!("{err:?}"),
                   options: tag.options,
-                  range: Range::new(value_start_pos, given_tag.range.end),
+                  range: Range::new(value_range.start, given_tag.range.end),
                 })
               }
             };
@@ -755,8 +753,8 @@ impl Validator {
                     tag: tag.df_name.clone(),
                     value,
                     definition: Some(tag.clone()),
-                    name_end_pos,
-                    value_start_pos,
+                    name_range,
+                    value_range,
                   },
                   index: tag.slot as i32,
                   range: given_tag.range,
@@ -766,7 +764,7 @@ impl Validator {
                   tag_name,
                   provided: actual,
                   options: tag.options,
-                  range: Range::new(value_start_pos, given_tag.range.end),
+                  range: Range::new(value_range.start, given_tag.range.end),
                 });
               }
             }
@@ -784,8 +782,8 @@ impl Validator {
             tag: tag.df_name.clone(),
             value: data,
             definition: Some(tag.clone()),
-            name_end_pos: Position::new(1, 1),
-            value_start_pos: Position::new(1, 1),
+            name_range: Range::new(Position::new(1, 1), Position::new(1, 1)),
+            value_range: Range::new(Position::new(1, 1), Position::new(1, 1)),
           },
           index: tag.slot as i32,
           range: Range::new(Position::new(1, 1), Position::new(1, 1)),

@@ -1,5 +1,5 @@
 [sending]
-api = "codeclient-place"
+api = "print"
 
 [debug]
 tokens=false

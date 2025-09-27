@@ -25,12 +25,12 @@ impl Default for Sending {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub enum SendApi {
-  #[serde(rename="codeclient-give")]
+  #[serde(rename = "codeclient-give")]
   CodeClientGive,
-  #[serde(rename="codeclient-place")]
+  #[serde(rename = "codeclient-place")]
   CodeClientPlace,
-  #[serde(rename="recode")]
-  Recode,
+  #[serde(rename = "print")]
+  Print,
 }
 
 #[derive(Deserialize, Serialize, Debug, Default)]

@@ -1,3 +1,5 @@
 @join {
-  p.actionBar();
+  p.giveItems(Item(
+    id='minecraft:dirt'
+  ));
 }
