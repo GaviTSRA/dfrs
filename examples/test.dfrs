@@ -1,5 +1,7 @@
-@join {
+fn test1234() {
   p.giveItems(Item(
-    id='minecraft:dirt'
+    id='minecraft:dirt',
+    count=2,
+    other='\"minecraft:custom_name\":\'{\"extra\":[{\"bold\":false,\"color\":\"gold\",\"italic\":false,\"obfuscated\":false,\"strikethrough\":false,\"text\":\"⇒ Send Ships\",\"underlined\":false}],\"text\":\"\"}\''
   ));
 }

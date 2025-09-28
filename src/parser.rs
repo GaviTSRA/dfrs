@@ -1889,9 +1889,11 @@ impl Parser {
     params: Vec<ArgValueWithPos>,
   ) -> Result<ArgValueWithPos, ParserError> {
     let mut id: Option<String> = None;
+    let mut count: f32 = 1.0;
+    let mut components: Vec<String> = vec![];
+    let mut other: Option<String> = None;
 
     for param in params {
-      println!("{:?}", param.value);
       match param.value {
         ArgValue::Tag {
           tag,
@@ -1905,6 +1907,24 @@ impl Parser {
             _ => {
               return Err(ParserError::InvalidItem {
                 msg: "Invalid id type".into(),
+                range: value_range,
+              })
+            }
+          },
+          "count" => match *value {
+            ArgValue::Number { number } => count = number,
+            _ => {
+              return Err(ParserError::InvalidItem {
+                msg: "Invalid count type".into(),
+                range: value_range,
+              })
+            }
+          },
+          "other" => match *value {
+            ArgValue::String { string } => other = Some(string),
+            _ => {
+              return Err(ParserError::InvalidItem {
+                msg: "Invalid other type".into(),
                 range: value_range,
               })
             }
@@ -1932,13 +1952,21 @@ impl Parser {
       });
     }
 
+    let mut component_data = components.join(",");
+    if let Some(other) = other {
+      if component_data.len() > 0 {
+        component_data.push(',');
+      }
+      component_data.push_str(other.as_str());
+    }
+
     let item = format!(
-      "{{
-        id:\"{}\", count:1,
-        components:{{}}
-      }}",
-      id.unwrap()
+      "{{id:\"{}\",count:{count},components:{{{}}}}}",
+      id.unwrap(),
+      component_data
     );
+
+    println!("{item}");
 
     Ok(ArgValueWithPos {
       value: ArgValue::Item { item },

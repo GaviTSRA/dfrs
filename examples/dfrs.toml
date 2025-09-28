@@ -1,8 +1,8 @@
 [sending]
-api = "print"
+api = "codeclient-place"
 
 [debug]
 tokens=false
 nodes=false
 compile=false
-connection=false
+connection=true

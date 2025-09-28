@@ -87,6 +87,9 @@ fn send_codeclient_place(code: Vec<CompiledLine>, config: Config) {
     }
 
     if msg.to_text().expect("response should be text") == "auth" {
+      if config.debug.connection {
+        println!("Authed!");
+      }
       break;
     }
   }
@@ -99,6 +102,9 @@ fn send_codeclient_place(code: Vec<CompiledLine>, config: Config) {
       .unwrap();
   }
   socket.send(Message::Text("place go".into())).unwrap();
+  if config.debug.connection {
+    println!("Data sent");
+  }
 
   loop {
     let msg = socket.read().expect("Error reading message");
