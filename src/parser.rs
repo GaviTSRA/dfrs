@@ -1,4 +1,5 @@
 use crate::definitions::ARG_TYPES;
+use crate::minimessage::parse_minimessage;
 use crate::node::{ParticleCluster, ParticleData, StartNode, UseNode};
 use crate::token::Range;
 use crate::{
@@ -1920,6 +1921,18 @@ impl Parser {
               })
             }
           },
+          "name" => match *value {
+            ArgValue::Text { text } => components.push(format!(
+              "\"minecraft:custom_name\":{}",
+              parse_minimessage(&text)
+            )),
+            _ => {
+              return Err(ParserError::InvalidItem {
+                msg: "Invalid name type".into(),
+                range: value_range,
+              })
+            }
+          },
           "other" => match *value {
             ArgValue::String { string } => other = Some(string),
             _ => {
@@ -1960,13 +1973,13 @@ impl Parser {
       component_data.push_str(other.as_str());
     }
 
+    // DF_NBT here is required for for it to function correctly
+    // Without it, the custom_name component is not being parsed
     let item = format!(
-      "{{id:\"{}\",count:{count},components:{{{}}}}}",
+      "{{DF_NBT:3955,id:\"{}\",count:{count},components:{{{}}}}}",
       id.unwrap(),
       component_data
     );
-
-    println!("{item}");
 
     Ok(ArgValueWithPos {
       value: ArgValue::Item { item },

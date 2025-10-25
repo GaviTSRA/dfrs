@@ -24,6 +24,7 @@ pub mod definitions;
 pub mod errors;
 pub mod lexer;
 mod lsp;
+mod minimessage;
 pub mod node;
 pub mod parser;
 pub mod send;
