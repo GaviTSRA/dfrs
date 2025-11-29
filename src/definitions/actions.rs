@@ -95,6 +95,7 @@ pub fn get_action(action: &ADAction) -> Action {
       "VEHICLE" => ArgType::ITEM,
       "ENTITY_TYPE" => ArgType::ITEM,
       "ANY_TYPE" => ArgType::ANY,
+      "BYTE" => ArgType::STRING, // TODO
       "NONE" => ArgType::EMPTY,
       "OR" => {
         is_or = true;

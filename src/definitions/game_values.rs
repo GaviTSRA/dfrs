@@ -27,6 +27,7 @@ impl GameValues {
         "VECTOR" => ArgType::VECTOR,
         "ITEM" => ArgType::ITEM,
         "LIST" => ArgType::VARIABLE,
+        "SPAWN_EGG" => ArgType::ITEM,
         val => panic!("Unknown game value type: {val}"),
       };
 
