@@ -62,6 +62,7 @@ pub enum ArgType {
   VARIABLE,
   CONDITION,
   ANY,
+  DfrsOnly,
 }
 
 pub static ARG_TYPES: phf::Map<&'static str, ArgType> = phf_map! {

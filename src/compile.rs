@@ -793,6 +793,7 @@ fn arg_val_from_arg(arg: crate::node::Arg, node_name: String, block: String) -> 
     ArgValue::Condition { .. } => {
       unreachable!();
     }
+    ArgValue::Dict { .. } => panic!("Used dfrs-only value as arg"),
   };
   arg
 }

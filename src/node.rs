@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::definitions::actions::Action;
 use crate::token::Range;
 use crate::{
@@ -215,6 +217,10 @@ pub enum ArgValue {
     selector: Selector,
     conditional_type: ConditionalType,
     inverted: bool,
+  },
+  // DFRS only
+  Dict {
+    value: HashMap<String, ArgValue>,
   },
 }
 

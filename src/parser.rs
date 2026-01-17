@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::definitions::ARG_TYPES;
 use crate::minimessage::parse_minimessage;
 use crate::node::{ParticleCluster, ParticleData, StartNode, UseNode};
@@ -1193,6 +1195,75 @@ impl Parser {
               ))
             }
           },
+          Token::OpenParenCurly => {
+            let mut values: HashMap<String, ArgValue> = HashMap::new();
+            let value_start_pos = token.range.start.clone();
+
+            loop {
+              let token = self.advance_err()?;
+              let key = match token.token {
+                Token::Identifier { value } => value,
+                _ => {
+                  return Err(Self::invalid_token(
+                    token,
+                    vec![Token::Identifier {
+                      value: "<any>".into(),
+                    }],
+                  ))
+                }
+              };
+
+              let token = self.advance_err()?;
+              match token.token {
+                Token::Colon => {}
+                _ => return Err(Self::invalid_token(token, vec![Token::Colon])),
+              };
+
+              let token = self.advance_err()?;
+              let value = match token.token {
+                Token::String { value } => ArgValue::String { string: value },
+                Token::Number { value } => ArgValue::Number { number: value },
+                _ => {
+                  return Err(Self::invalid_token(
+                    token,
+                    vec![
+                      Token::String {
+                        value: "<any>".into(),
+                      },
+                      Token::Number { value: 0.0 },
+                    ],
+                  ))
+                }
+              };
+
+              values.insert(key, value);
+
+              let token = self.advance_err()?;
+              match token.token {
+                Token::CloseParenCurly => break,
+                Token::Comma => {}
+                _ => {
+                  return Err(Self::invalid_token(
+                    token,
+                    vec![Token::Comma, Token::CloseParenCurly],
+                  ))
+                }
+              }
+            }
+
+            let data = Box::new(ArgValue::Dict { value: values });
+            params.push(ArgValueWithPos {
+              value: ArgValue::Tag {
+                tag: tag_name.clone(),
+                value: data,
+                definition: None,
+                name_range: Range::new(tag_start_pos.clone(), tag_end_pos.clone()),
+                value_range: Range::new(value_start_pos.clone(), token.range.end.clone()),
+              },
+              range: Range::new(tag_start_pos.clone(), token.range.end),
+            });
+            is_value = true;
+          }
           _ => {
             return Err(Self::invalid_token(
               token,
@@ -1364,6 +1435,7 @@ impl Parser {
         ArgValue::Variable { .. } => ArgType::VARIABLE,
         ArgValue::GameValue { .. } => ArgType::ANY,
         ArgValue::Condition { .. } => ArgType::CONDITION,
+        ArgValue::Dict { .. } => ArgType::DfrsOnly,
       };
       args.push(Arg {
         value: param.value,
@@ -1929,6 +2001,41 @@ impl Parser {
             _ => {
               return Err(ParserError::InvalidItem {
                 msg: "Invalid name type".into(),
+                range: value_range,
+              })
+            }
+          },
+          "tags" => match *value {
+            ArgValue::Dict { value } => {
+              let mut tags: HashMap<String, String> = HashMap::new();
+              for (key, value) in value {
+                match value {
+                  ArgValue::String { string } => {
+                    tags.insert(key, format!("\"{string}\""));
+                  }
+                  ArgValue::Number { number } => {
+                    tags.insert(key, format!("{number}d"));
+                  }
+                  _ => {
+                    return Err(ParserError::InvalidItem {
+                      msg: "Invalid tag type".into(),
+                      range: value_range,
+                    })
+                  }
+                }
+              }
+              components.push(format!(
+                "\"minecraft:custom_data\":{{PublicBukkitValues:{{{}}}}}",
+                tags
+                  .iter()
+                  .map(|(key, value)| format!("\"hypercube:{key}\":{value}"))
+                  .collect::<Vec<String>>()
+                  .join(",")
+              ));
+            }
+            _ => {
+              return Err(ParserError::InvalidItem {
+                msg: "Invalid tags type".into(),
                 range: value_range,
               })
             }
