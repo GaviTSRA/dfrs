@@ -219,6 +219,9 @@ pub enum ArgValue {
     inverted: bool,
   },
   // DFRS only
+  List {
+    value: Vec<String>,
+  },
   Dict {
     value: HashMap<String, ArgValue>,
   },

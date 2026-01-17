@@ -1195,6 +1195,51 @@ impl Parser {
               ))
             }
           },
+          Token::OpenParenSquare => {
+            let mut values: Vec<String> = vec![];
+            let value_start_pos = token.range.start.clone();
+
+            loop {
+              let token = self.advance_err()?;
+              let value = match token.token {
+                Token::Text { value } => value,
+                _ => {
+                  return Err(Self::invalid_token(
+                    token,
+                    vec![Token::Text {
+                      value: "<any>".into(),
+                    }],
+                  ))
+                }
+              };
+              values.push(value);
+
+              let token = self.advance_err()?;
+              match token.token {
+                Token::Comma => {}
+                Token::CloseParenSquare => break,
+                _ => {
+                  return Err(Self::invalid_token(
+                    token,
+                    vec![Token::Comma, Token::CloseParenSquare],
+                  ))
+                }
+              }
+            }
+
+            let data = Box::new(ArgValue::List { value: values });
+            params.push(ArgValueWithPos {
+              value: ArgValue::Tag {
+                tag: tag_name.clone(),
+                value: data,
+                definition: None,
+                name_range: Range::new(tag_start_pos.clone(), tag_end_pos.clone()),
+                value_range: Range::new(value_start_pos.clone(), token.range.end.clone()),
+              },
+              range: Range::new(tag_start_pos.clone(), token.range.end),
+            });
+            is_value = true;
+          }
           Token::OpenParenCurly => {
             let mut values: HashMap<String, ArgValue> = HashMap::new();
             let value_start_pos = token.range.start.clone();
@@ -1435,6 +1480,7 @@ impl Parser {
         ArgValue::Variable { .. } => ArgType::VARIABLE,
         ArgValue::GameValue { .. } => ArgType::ANY,
         ArgValue::Condition { .. } => ArgType::CONDITION,
+        ArgValue::List { .. } => ArgType::DfrsOnly,
         ArgValue::Dict { .. } => ArgType::DfrsOnly,
       };
       args.push(Arg {
@@ -2005,6 +2051,24 @@ impl Parser {
               })
             }
           },
+          "lore" => match *value {
+            ArgValue::List { value } => {
+              components.push(format!(
+                "\"minecraft:lore\":[{}]",
+                value
+                  .iter()
+                  .map(|line| parse_minimessage(line))
+                  .collect::<Vec<String>>()
+                  .join(",")
+              ));
+            }
+            _ => {
+              return Err(ParserError::InvalidItem {
+                msg: "Invalid lore type".into(),
+                range: value_range,
+              })
+            }
+          },
           "tags" => match *value {
             ArgValue::Dict { value } => {
               let mut tags: HashMap<String, String> = HashMap::new();
@@ -2083,10 +2147,12 @@ impl Parser {
     // DF_NBT here is required for for it to function correctly
     // Without it, the custom_name component is not being parsed
     let item = format!(
-      "{{DF_NBT:3955,id:\"{}\",count:{count},components:{{{}}}}}",
+      "{{DF_NBT:4440,id:\"{}\",count:{count},components:{{{}}}}}",
       id.unwrap(),
       component_data
     );
+
+    println!("{item}");
 
     Ok(ArgValueWithPos {
       value: ArgValue::Item { item },

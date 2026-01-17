@@ -279,6 +279,14 @@ impl<'a> Lexer<'a> {
           result.push(self.token(Token::CloseParen));
           self.advance();
         }
+        '[' => {
+          result.push(self.token(Token::OpenParenSquare));
+          self.advance();
+        }
+        ']' => {
+          result.push(self.token(Token::CloseParenSquare));
+          self.advance();
+        }
         '{' => {
           result.push(self.token(Token::OpenParenCurly));
           self.advance();
@@ -418,6 +426,8 @@ mod tests {
       ("~", Token::Tilde),
       ("(", Token::OpenParen),
       (")", Token::CloseParen),
+      ("[", Token::OpenParenSquare),
+      ("]", Token::CloseParenSquare),
       ("{", Token::OpenParenCurly),
       ("}", Token::CloseParenCurly),
     ]);
@@ -425,7 +435,9 @@ mod tests {
 
   #[test]
   pub fn multiple_tokens() {
-    let result = Lexer::new("+-*/@:!.,=;?$(){}").run().expect("Lexer failed");
+    let result = Lexer::new("+-*/@:!.,=;?$()[]{}")
+      .run()
+      .expect("Lexer failed");
     let tokens: Vec<&Token> = result.iter().map(|t| &t.token).collect();
     assert_eq!(
       tokens,
@@ -445,6 +457,8 @@ mod tests {
         &Token::Dollar,
         &Token::OpenParen,
         &Token::CloseParen,
+        &Token::OpenParenSquare,
+        &Token::CloseParenSquare,
         &Token::OpenParenCurly,
         &Token::CloseParenCurly
       ]

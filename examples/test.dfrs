@@ -3,8 +3,13 @@ fn test1234() {
     id='minecraft:dirt',
     count=2,
     tags={
-      test: 1,
-      test2: 'abc'
-    }
+      example: 'abc',
+      test: 5
+    },
+    lore=[
+      "Line 1",
+      "<green>Second line",
+      "<bold><blue>Testt"
+    ]
   ));
 }
