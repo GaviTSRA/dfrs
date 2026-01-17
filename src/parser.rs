@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use regex::Regex;
+
 use crate::definitions::ARG_TYPES;
 use crate::minimessage::parse_minimessage;
 use crate::node::{ParticleCluster, ParticleData, StartNode, UseNode};
@@ -1247,13 +1249,19 @@ impl Parser {
             loop {
               let token = self.advance_err()?;
               let key = match token.token {
+                Token::String { value } => value,
                 Token::Identifier { value } => value,
                 _ => {
                   return Err(Self::invalid_token(
                     token,
-                    vec![Token::Identifier {
-                      value: "<any>".into(),
-                    }],
+                    vec![
+                      Token::Identifier {
+                        value: "<any>".into(),
+                      },
+                      Token::String {
+                        value: "<any>".into(),
+                      },
+                    ],
                   ))
                 }
               };
@@ -2072,7 +2080,16 @@ impl Parser {
           "tags" => match *value {
             ArgValue::Dict { value } => {
               let mut tags: HashMap<String, String> = HashMap::new();
+              let key_regex = Regex::new("^[a-z0-9-_/.]*$").unwrap();
+
               for (key, value) in value {
+                if !key_regex.is_match(&key) {
+                  return Err(ParserError::InvalidItem {
+                    msg: format!("Invalid tag key '{key}'"),
+                    range: name_range,
+                  });
+                }
+
                 match value {
                   ArgValue::String { string } => {
                     tags.insert(key, format!("\"{string}\""));
@@ -2151,8 +2168,6 @@ impl Parser {
       id.unwrap(),
       component_data
     );
-
-    println!("{item}");
 
     Ok(ArgValueWithPos {
       value: ArgValue::Item { item },
