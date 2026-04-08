@@ -75,10 +75,11 @@ fn event_node(event_node: EventNode) -> Result<String, serde_json::Error> {
   let event_block = Block {
     id: "block".to_owned(),
     sub_action: None,
-    block: if event_node.event_type.unwrap() == ActionType::Player {
-      Some("event".to_owned())
-    } else {
-      Some("entity_event".to_owned())
+    block: match event_node.event_type.unwrap() {
+      ActionType::Player  =>  Some("event".to_owned()),
+      ActionType::Entity  =>  Some("entity_event".to_owned()),
+      ActionType::Game  =>  Some("game_event".to_owned()),
+      event_type => panic!("Received invalid event_type: {event_type:?}")
     },
     action: Some(event_node.event),
     args: Some(Args { items: vec![] }),

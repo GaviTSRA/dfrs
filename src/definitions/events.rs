@@ -70,3 +70,35 @@ impl EntityEvents {
     &self.events
   }
 }
+
+#[derive(Debug)]
+pub struct GameEvents {
+  events: Vec<Event>,
+}
+
+impl GameEvents {
+  pub fn new(action_dump: &RawActionDump) -> GameEvents {
+    let mut events = vec![];
+    for entry in &action_dump.actions {
+      if entry.codeblock_name == "GAME EVENT" {
+        let name = to_dfrs_name(&entry.name.clone());
+        events.push(Event {
+          df_name: entry.name.clone(),
+          dfrs_name: name,
+        })
+      }
+    }
+    GameEvents { events }
+  }
+
+  pub fn get(&self, dfrs_name: String) -> Option<&Event> {
+    self
+      .events
+      .iter()
+      .find(|&action| action.dfrs_name == dfrs_name)
+  }
+
+  pub fn all(&self) -> &Vec<Event> {
+    &self.events
+  }
+}

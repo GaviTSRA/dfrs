@@ -173,6 +173,12 @@ impl Decompiler {
         "event" => {
           self.decompile_event(block, vars, direct_vars);
         }
+        "entity_event" => {
+          self.decompile_event(block, vars, direct_vars);
+        }
+        "game_event" => {
+          self.decompile_event(block, vars, direct_vars);
+        }
         "func" => {
           self.decompile_function(block, vars, direct_vars);
         }

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::compile::compile;
 use crate::definitions::action_dump::{ActionDump, RawActionDump};
-use crate::definitions::events::{EntityEvents, PlayerEvents};
+use crate::definitions::events::{EntityEvents, GameEvents, PlayerEvents};
 use crate::definitions::game_values::GameValues;
 use crate::errors::{format_lexer_error, format_parser_error, format_validator_error};
 use crate::lexer::Lexer;
@@ -23,6 +23,7 @@ struct Backend {
 
   player_events: PlayerEvents,
   entity_events: EntityEvents,
+  game_events: GameEvents,
 
   action_dump: ActionDump,
 
@@ -412,6 +413,14 @@ impl Backend {
               ));
             }
           }
+          for event in self.game_events.all() {
+            if event.dfrs_name.starts_with(&previous) || event.df_name.starts_with(&previous) {
+              events.push(CompletionItem::new_simple(
+                event.dfrs_name.clone(),
+                event.df_name.clone(),
+              ));
+            }
+          }
 
           return Ok(Some(CompletionResponse::Array(events)));
         }
@@ -518,6 +527,7 @@ pub async fn run_lsp() {
 
     player_events: PlayerEvents::new(&ad),
     entity_events: EntityEvents::new(&ad),
+    game_events: GameEvents::new(&ad),
 
     action_dump: ActionDump::new(&ad),
 

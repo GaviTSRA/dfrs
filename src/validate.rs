@@ -1,6 +1,6 @@
 use crate::definitions::action_dump::RawActionDump;
 use crate::definitions::actions::Action;
-use crate::definitions::events::{EntityEvents, PlayerEvents};
+use crate::definitions::events::{EntityEvents, PlayerEvents, GameEvents};
 use crate::definitions::game_values::GameValues;
 use crate::definitions::{DefinedArgBranch, DefinedArgOption};
 use crate::lexer::Lexer;
@@ -17,7 +17,6 @@ use crate::{
 };
 use std::collections::HashMap;
 use std::fs;
-use std::io::Error;
 
 #[derive(Debug)]
 pub enum ValidateError {
@@ -88,6 +87,7 @@ enum PathError {
 pub struct Validator {
   player_events: PlayerEvents,
   entity_events: EntityEvents,
+  game_events: GameEvents,
   action_dump: ActionDump,
   game_values: GameValues,
 
@@ -108,6 +108,7 @@ impl Validator {
     Validator {
       player_events: PlayerEvents::new(&action_dump),
       entity_events: EntityEvents::new(&action_dump),
+      game_events: GameEvents::new(&action_dump),
       action_dump: ActionDump::new(&action_dump),
       game_values: GameValues::new(&action_dump),
       functions: vec![],
@@ -206,9 +207,18 @@ impl Validator {
               event.event_type = Some(ActionType::Entity);
             }
             None => {
-              return Err(ValidateError::UnknownEvent {
-                node: event.clone(),
-              })
+              actual_event = self.game_events.get(event.event.clone());
+              match actual_event {
+                Some(actual) => {
+                  actual.df_name.clone_into(&mut event.event);
+                  event.event_type = Some(ActionType::Game);
+                }
+                None => {
+                  return Err(ValidateError::UnknownEvent {
+                    node: event.clone(),
+                  })
+                }
+              }
             }
           }
         }
