@@ -1,7 +1,6 @@
 use crate::compile::{ArgValueData, Block, Codeline, FunctionDefaultItemData};
 use crate::definitions::action_dump::{ActionDump, RawActionDump};
-use crate::definitions::actions::Action;
-use crate::definitions::{ArgType, DefinedArg, DefinedArgBranch, DefinedArgOption};
+use crate::definitions::DefinedTag;
 use crate::node::{ActionType, ConditionalType};
 use crate::token::{Selector, SELECTORS};
 use crate::utility::{to_camel_case, to_dfrs_name};
@@ -156,9 +155,7 @@ impl Decompiler {
 
   fn decompile_bracket(&mut self, block: Block) {
     match block.direct.unwrap().as_str() {
-      "open" => {
-        self.indent();
-      }
+      "open" => self.indent(),
       "close" => {
         self.unindent();
         self.add("}");
@@ -459,14 +456,14 @@ impl Decompiler {
                 return self.add(&format!(
                   "{scope} {new_name}{var_assignment} = {prefix}{selector}.{}({});",
                   name,
-                  self.decompile_params(new_block, action)
+                  self.decompile_params(new_block, &action.tags)
                 ));
               }
 
               return self.add(&format!(
                 "{prefix}{selector}.{}({});",
                 name,
-                self.decompile_params(block, action)
+                self.decompile_params(block, &action.tags)
               ));
             }
           }
@@ -478,7 +475,7 @@ impl Decompiler {
     self.add(&format!(
       "{prefix}{selector}.{}({});",
       name,
-      self.decompile_params(block, action)
+      self.decompile_params(block, &action.tags)
     ))
   }
 
@@ -511,7 +508,7 @@ impl Decompiler {
     self.add(&format!(
       "{prefix} {inverted}{selector}{}({}) {{",
       name,
-      self.decompile_params(block, &action)
+      self.decompile_params(block, &action.tags)
     ))
   }
 
@@ -521,40 +518,20 @@ impl Decompiler {
     self.add(&format!(
       "repeat {}({}) {{",
       name,
-      self.decompile_params(block, &action)
+      self.decompile_params(block, &action.tags)
     ))
   }
 
   fn decompile_call(&mut self, block: Block) {
-    let mut args = vec![];
-    for _ in &block.args {
-      args.push(DefinedArg {
-        options: vec![DefinedArgOption::new(
-          String::from(""),
-          ArgType::ANY,
-          false,
-          false,
-        )],
-      })
-    }
-    let action = &Action {
-      df_name: "internal".into(),
-      dfrs_name: "internal".into(),
-      aliases: vec![],
-      args: vec![DefinedArgBranch { paths: vec![args] }],
-      tags: vec![],
-      return_type: None,
-      description: "".into(),
-    };
     if block.args.is_some() && block.args.clone().unwrap().items.len() > 0 {
       self.add(&format!(
-        "call(\"{}\", {});",
+        "{}({});",
         to_dfrs_name(&block.data.clone().unwrap()),
-        self.decompile_params(block.clone(), action)
+        self.decompile_params(block.clone(), &vec![])
       ));
     } else {
       self.add(&format!(
-        "call(\"{}\");",
+        "{}();",
         to_dfrs_name(&block.data.clone().unwrap())
       ));
     }
@@ -563,23 +540,23 @@ impl Decompiler {
   fn decompile_start(&mut self, block: Block) {
     let params = self.decompile_params(
       block.clone(),
-      &self.action_dump.start_process_action.clone(),
+      &self.action_dump.start_process_action.clone().tags,
     );
     if &params == "" {
       self.add(&format!(
-        "start(\"{}\");",
+        "{}();",
         to_dfrs_name(&block.data.clone().unwrap())
       ));
     } else {
       self.add(&format!(
-        "start(\"{}\", {});",
+        "{}({});",
         to_dfrs_name(&block.data.clone().unwrap()),
         params
       ));
     }
   }
 
-  fn decompile_params(&self, block: Block, action: &Action) -> String {
+  fn decompile_params(&self, block: Block, tags: &Vec<DefinedTag>) -> String {
     let mut result = String::from("");
 
     if let Some(sub_action_name) = block.sub_action.clone() {
@@ -694,7 +671,7 @@ impl Decompiler {
             result.push_str(&format!("Potion(\"{potion}\", {amplifier}, {duration})"));
           }
           ArgValueData::Tag { tag, option, .. } => {
-            for action_tag in &action.tags {
+            for action_tag in tags {
               if &action_tag.df_name == &tag {
                 if &option != &action_tag.default {
                   if !is_first_iter {
