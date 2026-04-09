@@ -1,4 +1,4 @@
-use crate::node::{ArgValue, ParticleCluster, ParticleData, ProcessNode, StartNode};
+use crate::node::{ArgValue, ParticleCluster, ParticleData, ProcessNode};
 use crate::{
   node::{
     ActionNode, ActionType, CallNode, ConditionalNode, ConditionalType, EventNode, Expression,
@@ -32,7 +32,7 @@ pub fn compile(node: FileNode, debug: bool) -> Vec<CompiledLine> {
     match process_node(process.clone()) {
       Ok(result) => {
         res.push(CompiledLine {
-          name: format!("Process {}", process.name),
+          name: format!("Process {}", process.dfrs_name),
           code: result.clone(),
         });
         if debug {
@@ -226,7 +226,7 @@ fn function_node(function_node: FunctionNode) -> Result<String, serde_json::Erro
 fn process_node(process_node: ProcessNode) -> Result<String, serde_json::Error> {
   let mut codeline = Codeline { blocks: vec![] };
 
-  let items = vec![Arg {
+  let mut items = vec![Arg {
     item: ArgItem {
       data: ArgValueData::Tag {
         action: "dynamic".into(),
@@ -239,6 +239,71 @@ fn process_node(process_node: ProcessNode) -> Result<String, serde_json::Error> 
     slot: 26,
   }];
 
+  for (slot, param) in process_node.params.into_iter().enumerate() {
+    let mut default = None;
+    if let Some(param_default) = param.default {
+      let default_data = arg_val_from_arg(
+        crate::node::Arg {
+          value: param_default.value,
+          index: 0,
+          arg_type: crate::definitions::ArgType::ANY,
+          range: param_default.range,
+        },
+        "".into(),
+        "".into(),
+      )
+      .unwrap()
+      .item;
+
+      default = Some(FunctionDefaultItem {
+        data: match default_data.data {
+          ArgValueData::Simple { name } => FunctionDefaultItemData::Simple { name },
+          ArgValueData::Id { id } => FunctionDefaultItemData::Id { id },
+          ArgValueData::Location { is_block, loc } => {
+            FunctionDefaultItemData::Location { is_block, loc }
+          }
+          ArgValueData::Vector { x, y, z } => FunctionDefaultItemData::Vector { x, y, z },
+          ArgValueData::Sound {
+            sound,
+            variant,
+            volume,
+            pitch,
+          } => FunctionDefaultItemData::Sound {
+            sound,
+            variant,
+            volume,
+            pitch,
+          },
+          ArgValueData::Potion {
+            potion,
+            amplifier,
+            duration,
+          } => FunctionDefaultItemData::Potion {
+            potion,
+            amplifier,
+            duration,
+          },
+          _ => unreachable!(),
+        },
+        id: default_data.id,
+      })
+    }
+
+    items.push(Arg {
+      item: ArgItem {
+        data: ArgValueData::FunctionParam {
+          default_value: default,
+          name: param.name,
+          optional: param.optional,
+          plural: param.multiple,
+          param_type: get_type_str(param.param_type),
+        },
+        id: "pn_el".into(),
+      },
+      slot: slot as i32,
+    });
+  }
+
   let process_block = Block {
     id: "block".to_owned(),
     block: Some("process".to_owned()),
@@ -246,7 +311,7 @@ fn process_node(process_node: ProcessNode) -> Result<String, serde_json::Error> 
     action: None,
     args: Some(Args { items }),
     target: None,
-    data: Some(process_node.name),
+    data: Some(process_node.df_name),
     sub_action: None,
     direct: None,
     bracket_type: None,
@@ -262,7 +327,6 @@ fn process_node(process_node: ProcessNode) -> Result<String, serde_json::Error> 
   }
 
   let res = serde_json::to_string(&codeline)?;
-
   Ok(res)
 }
 
@@ -270,8 +334,13 @@ fn expression_node(node: Expression) -> Option<Vec<Block>> {
   match node {
     Expression::Action { node } => Some(vec![action_node(node)]),
     Expression::Conditional { node } => Some(conditional_node(node)),
-    Expression::Call { node } => Some(vec![call_node(node)]),
-    Expression::Start { node } => Some(vec![start_node(node)]),
+    Expression::Call { node } => { 
+      if node.is_process.unwrap() {
+        Some(vec![start_node(node)])
+       } else { 
+        Some(vec![call_node(node)]) 
+      }
+    },
     Expression::Repeat { node } => Some(repeat_node(node)),
     Expression::Variable { .. } => None,
   }
@@ -429,7 +498,7 @@ fn call_node(node: CallNode) -> Block {
   }
 }
 
-fn start_node(node: StartNode) -> Block {
+fn start_node(node: CallNode) -> Block {
   let mut args: Vec<Arg> = vec![];
 
   for arg in node.args {

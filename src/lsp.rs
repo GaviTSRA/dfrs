@@ -267,9 +267,6 @@ impl Backend {
             return Some(res);
           }
         }
-        Expression::Start { node } => {
-          // TODO
-        }
         Expression::Variable { node } => {
           // TODO
         }

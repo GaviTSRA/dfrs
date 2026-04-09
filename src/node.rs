@@ -43,7 +43,9 @@ pub struct FunctionNode {
 
 #[derive(Clone, Debug)]
 pub struct ProcessNode {
-  pub name: String,
+  pub df_name: String,
+  pub dfrs_name: String,
+  pub params: Vec<FunctionParamNode>,
   pub expressions: Vec<ExpressionNode>,
   pub range: Range,
   pub name_end_pos: Position,
@@ -70,7 +72,6 @@ pub enum Expression {
   Conditional { node: ConditionalNode },
   Variable { node: VariableNode },
   Call { node: CallNode },
-  Start { node: StartNode },
   Repeat { node: RepeatNode },
 }
 
@@ -102,16 +103,10 @@ pub struct ConditionalNode {
 #[derive(Clone, Debug)]
 pub struct CallNode {
   pub name: String,
+  pub is_process: Option<bool>,
   pub args: Vec<Arg>,
   pub range: Range,
   pub is_unsafe_call: bool,
-}
-
-#[derive(Clone, Debug)]
-pub struct StartNode {
-  pub name: String,
-  pub args: Vec<Arg>,
-  pub range: Range,
 }
 
 #[derive(Clone, Debug)]

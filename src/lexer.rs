@@ -699,12 +699,6 @@ mod tests {
         },
       ),
       (
-        "start",
-        Token::Keyword {
-          value: Keyword::Start,
-        },
-      ),
-      (
         "repeat",
         Token::Keyword {
           value: Keyword::Repeat,

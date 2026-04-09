@@ -150,7 +150,6 @@ pub enum Keyword {
   VarSave,
   Function,
   Process,
-  Start,
   Repeat,
   Use,
 }
@@ -175,7 +174,6 @@ impl Display for Keyword {
       Keyword::VarSave => write!(f, "save"),
       Keyword::Function => write!(f, "function"),
       Keyword::Process => write!(f, "process"),
-      Keyword::Start => write!(f, "start"),
       Keyword::Repeat => write!(f, "repeat"),
       Keyword::Use => write!(f, "use"),
     }
@@ -200,7 +198,6 @@ pub static KEYWORDS: phf::Map<&'static str, Keyword> = phf_map! {
     "save" => Keyword::VarSave,
     "fn" => Keyword::Function,
     "proc" => Keyword::Process,
-    "start" => Keyword::Start,
     "repeat" => Keyword::Repeat,
     "use" => Keyword::Use,
 };

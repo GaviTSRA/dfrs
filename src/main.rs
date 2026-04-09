@@ -161,9 +161,6 @@ fn compile_cmd(file: &PathBuf) {
               node::Expression::Call { node } => {
                 println!("{:?} {:?}", node.name, node.args)
               }
-              node::Expression::Start { node } => {
-                println!("{:?} {:?}", node.name, node.args)
-              }
               node::Expression::Repeat { node } => {
                 println!("{:?} {:?}", node.name, node.args)
               }
@@ -197,9 +194,6 @@ fn compile_cmd(file: &PathBuf) {
                 )
               }
               node::Expression::Call { node } => {
-                println!("{:?} {:?}", node.name, node.args)
-              }
-              node::Expression::Start { node } => {
                 println!("{:?} {:?}", node.name, node.args)
               }
               node::Expression::Repeat { node } => {

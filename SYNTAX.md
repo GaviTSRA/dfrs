@@ -161,7 +161,7 @@ If the function is defined in the same file, its parameters are validated.
 Processes can be started as follows:
 
 ```
-start("processName", localVariables="Copy", targetMode="With no targets");
+processName(arg1, arg2, ..., localVariables="Copy", targetMode="With no targets");
 ```
 
 ---

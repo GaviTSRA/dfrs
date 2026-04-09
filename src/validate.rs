@@ -4,7 +4,7 @@ use crate::definitions::events::{EntityEvents, PlayerEvents, GameEvents};
 use crate::definitions::game_values::GameValues;
 use crate::definitions::{DefinedArgBranch, DefinedArgOption};
 use crate::lexer::Lexer;
-use crate::node::{ExpressionNode, FunctionNode, StartNode, VariableVariant};
+use crate::node::{ExpressionNode, FunctionNode, ProcessNode, VariableVariant};
 use crate::parser::Parser;
 use crate::token::{Range, Type};
 use crate::{
@@ -92,6 +92,7 @@ pub struct Validator {
   game_values: GameValues,
 
   functions: Vec<(String, Action)>,
+  processes: Vec<(String, Action)>,
   variable_types: HashMap<String, ArgType>,
   variables_to_set: HashMap<String, ArgType>,
 }
@@ -112,6 +113,7 @@ impl Validator {
       action_dump: ActionDump::new(&action_dump),
       game_values: GameValues::new(&action_dump),
       functions: vec![],
+      processes: vec![],
       variable_types: HashMap::new(),
       variables_to_set: HashMap::new(),
     }
@@ -126,8 +128,18 @@ impl Validator {
     None
   }
 
+  fn get_process(&self, name: &str) -> Option<Action> {
+    for (proc_name, action) in &self.processes {
+      if proc_name == name {
+        return Some(action.clone());
+      }
+    }
+    None
+  }
+
   pub fn validate(&mut self, mut node: FileNode) -> Result<FileNode, ValidateError> {
     let mut functions = vec![];
+    let mut processes = vec![];
 
     for use_statement in node.uses.iter_mut() {
       let data = match fs::read_to_string(use_statement.file.clone()) {
@@ -169,6 +181,11 @@ impl Validator {
         let action = self.get_function_node_action(function);
         functions.push((function.dfrs_name.clone(), action));
       }
+
+      for process in used_node.processes.iter() {
+        let action = self.get_process_node_action(process);
+        processes.push((process.dfrs_name.clone(), action));
+      }
     }
 
     for function in node.functions.iter() {
@@ -176,7 +193,13 @@ impl Validator {
       functions.push((function.dfrs_name.clone(), action));
     }
 
+    for process in node.processes.iter() {
+      let action = self.get_process_node_action(process);
+      processes.push((process.dfrs_name.clone(), action));
+    }
+
     self.functions = functions;
+    self.processes = processes;
 
     for function in node.functions.iter_mut() {
       for expression in function.expressions.iter_mut() {
@@ -271,6 +294,40 @@ impl Validator {
     )
   }
 
+  fn get_process_node_action(&self, process: &ProcessNode) -> Action {
+    let mut args = vec![];
+
+    for param in &process.params {
+      let param_type = match param.param_type {
+        Type::Number => ArgType::NUMBER,
+        Type::String => ArgType::STRING,
+        Type::Text => ArgType::TEXT,
+        Type::Vector => ArgType::VECTOR,
+        Type::Location => ArgType::LOCATION,
+        Type::Particle => ArgType::PARTICLE,
+        Type::Potion => ArgType::POTION,
+        Type::Sound => ArgType::SOUND,
+        Type::Item => ArgType::ITEM,
+        Type::List => ArgType::VARIABLE,
+        Type::Dict => ArgType::VARIABLE,
+        Type::Variable => ArgType::VARIABLE,
+        Type::Any => ArgType::ANY,
+      };
+
+      args.push(DefinedArg::new(vec![DefinedArgOption::new(
+        param.name.clone(),
+        param_type,
+        param.optional,
+        param.multiple,
+      )]));
+    }
+
+    let mut action = self.action_dump.start_process_action.clone();
+    action.args = vec![DefinedArgBranch::new(vec![args])];
+
+    action
+  }
+
   fn validate_expression_node(
     &mut self,
     expression_node: &mut ExpressionNode,
@@ -289,11 +346,6 @@ impl Validator {
       Expression::Call { node } => {
         expression_node.node = Expression::Call {
           node: self.validate_call(node)?,
-        }
-      }
-      Expression::Start { node } => {
-        expression_node.node = Expression::Start {
-          node: self.validate_start(node)?,
         }
       }
       Expression::Repeat { node } => {
@@ -499,12 +551,18 @@ impl Validator {
     }
 
     let action = if let Some(action) = self.get_function(&call_node.name) {
+      call_node.is_process = Some(false);
       action
     } else {
-      return Err(ValidateError::UnknownFunction {
-        name: call_node.name,
-        range: call_node.range,
-      });
+      if let Some(action) = self.get_process(&call_node.name) {
+        call_node.is_process = Some(true);
+        action
+      } else {
+        return Err(ValidateError::UnknownFunction {
+          name: call_node.name,
+          range: call_node.range,
+        });
+      }
     };
     call_node.args = self.validate_args(
       call_node.args,
@@ -513,16 +571,6 @@ impl Validator {
       call_node.range.end.clone(),
     )?;
     Ok(call_node)
-  }
-
-  fn validate_start(&mut self, mut start_node: StartNode) -> Result<StartNode, ValidateError> {
-    start_node.args = self.validate_args(
-      start_node.args,
-      &self.action_dump.start_process_action.clone(),
-      start_node.range.start.clone(),
-      start_node.range.end.clone(),
-    )?;
-    Ok(start_node)
   }
 
   fn validate_repeat_node(
