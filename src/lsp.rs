@@ -7,7 +7,6 @@ use crate::definitions::game_values::GameValues;
 use crate::errors::{format_lexer_error, format_parser_error, format_validator_error};
 use crate::lexer::Lexer;
 use crate::load_config;
-use crate::node::{Expression, ExpressionNode};
 use crate::parser::Parser;
 use crate::token::{Keyword, Token};
 use crate::validate::Validator;
@@ -97,10 +96,12 @@ impl LanguageServer for Backend {
       .clone();
     let rope = self.document_map.get(&uri.to_string()).unwrap();
     let data = rope.to_string();
-    let line = params.text_document_position_params.position.line + 1;
+    let line = params.text_document_position_params.position.line;
     let col = params.text_document_position_params.position.character;
 
-    let mut lexer = Lexer::new(&data);
+    let mut lines = data.lines();
+    let line_data = lines.nth(line as usize).unwrap();
+    let mut lexer = Lexer::new(&line_data);
     let result = lexer.run();
 
     let res = match result {
@@ -110,42 +111,75 @@ impl LanguageServer for Backend {
       }
     };
 
-    let mut parser = Parser::new(res);
-    let res = parser.run();
-    let node = match res {
-      Ok(res) => res,
-      Err(_) => {
-        return Ok(None);
-      }
-    };
+    for (index, token) in res.iter().enumerate() {
+      if token.range.start.col <= col && token.range.end.col >= col && index >= 1 {
+        let token_before_2 = if index >= 2 {
+          Some(&res[index - 2].token)
+        } else {
+          None
+        };
 
-    let validated = match Validator::new().validate(node) {
-      Ok(res) => res,
-      Err(_) => {
-        return Ok(None);
-      }
-    };
+        let token_before_3 = if index >= 3 {
+          Some(&res[index - 3].token)
+        } else {
+          None
+        };
 
-    // TODO hover doesnt work if indented
+        let token_before_4 = if index >= 4 {
+          Some(&res[index - 4].token)
+        } else {
+          None
+        };
 
-    for event in validated.events {
-      match self.check_for_hover(event.expressions, line, col) {
-        Some(res) => return Ok(Some(res)),
-        None => {}
-      }
-    }
+        let action = match &token.token {
+          Token::Identifier { value } => {
+            match (
+              token_before_4,
+              token_before_3,
+              token_before_2,
+              &res[index - 1].token,
+            ) {
+              (_, _, Some(Token::Keyword { value: keyword }), Token::Dot)
+              | (
+                Some(Token::Keyword { value: keyword }),
+                Some(Token::Colon),
+                Some(Token::Identifier { value: _ }),
+                Token::Dot,
+              ) => match keyword {
+                Keyword::P => self.action_dump.player_actions.get(&value),
+                Keyword::E => self.action_dump.entity_actions.get(&value),
+                Keyword::G => self.action_dump.game_actions.get(&value),
+                Keyword::V => self.action_dump.variable_actions.get(&value),
+                Keyword::C => self.action_dump.control_actions.get(&value),
+                Keyword::S => self.action_dump.select_actions.get(&value),
+                _ => return Ok(None),
+              },
+              (_, _, _, Token::Keyword { value: keyword })
+              | (_, _, Some(Token::Keyword { value: keyword }), Token::ExclamationMark) => {
+                match keyword {
+                  Keyword::IfP => self.action_dump.player_conditionals.get(&value),
+                  Keyword::IfE => self.action_dump.entity_conditionals.get(&value),
+                  Keyword::IfG => self.action_dump.game_conditionals.get(&value),
+                  Keyword::IfV => self.action_dump.variable_conditionals.get(&value),
+                  Keyword::Repeat => self.action_dump.repeats.get(&value),
+                  _ => return Ok(None),
+                }
+              }
+              _ => return Ok(None),
+            }
+          }
+          _ => return Ok(None),
+        };
 
-    for event in validated.functions {
-      match self.check_for_hover(event.expressions, line, col) {
-        Some(res) => return Ok(Some(res)),
-        None => {}
-      }
-    }
-
-    for event in validated.processes {
-      match self.check_for_hover(event.expressions, line, col) {
-        Some(res) => return Ok(Some(res)),
-        None => {}
+        if let Some(action) = action {
+          return Ok(Some(Hover {
+            contents: HoverContents::Markup(MarkupContent {
+              kind: MarkupKind::Markdown,
+              value: action.description.clone(),
+            }),
+            range: None,
+          }));
+        }
       }
     }
 
@@ -215,84 +249,6 @@ impl Backend {
     self
       .document_map
       .insert(params.uri.to_string(), rope.clone());
-  }
-
-  fn check_for_hover(
-    &self,
-    expressions: Vec<ExpressionNode>,
-    line: u32,
-    col: u32,
-  ) -> Option<Hover> {
-    for expression in expressions {
-      match expression.node {
-        Expression::Action { node } => {
-          if node.range.start.line == line
-            && node.range.start.col <= col
-            && node.range.end.col >= col
-          {
-            if let Some(action) = node.action {
-              return Some(Hover {
-                contents: HoverContents::Markup(MarkupContent {
-                  kind: MarkupKind::Markdown,
-                  value: action.description,
-                }),
-                range: None,
-              });
-            }
-          }
-        }
-        Expression::Call { node } => {
-          // TODO
-        }
-        Expression::Conditional { node } => {
-          if node.range.start.line == line
-            && node.range.start.col <= col
-            && node.range.end.col >= col
-          {
-            if let Some(action) = node.action {
-              return Some(Hover {
-                contents: HoverContents::Markup(MarkupContent {
-                  kind: MarkupKind::Markdown,
-                  value: action.description,
-                }),
-                range: None,
-              });
-            }
-          }
-
-          if let Some(res) = self.check_for_hover(node.expressions, line, col) {
-            return Some(res);
-          }
-          if let Some(res) = self.check_for_hover(node.else_expressions, line, col) {
-            return Some(res);
-          }
-        }
-        Expression::Variable { node } => {
-          // TODO
-        }
-        Expression::Repeat { node } => {
-          if node.range.start.line == line
-            && node.range.start.col <= col
-            && node.range.end.col >= col
-          {
-            if let Some(action) = node.action {
-              return Some(Hover {
-                contents: HoverContents::Markup(MarkupContent {
-                  kind: MarkupKind::Markdown,
-                  value: action.description,
-                }),
-                range: None,
-              });
-            }
-          }
-
-          if let Some(res) = self.check_for_hover(node.expressions, line, col) {
-            return Some(res);
-          }
-        }
-      }
-    }
-    None
   }
 
   async fn get_completions(
