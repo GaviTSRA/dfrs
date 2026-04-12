@@ -1,8 +1,9 @@
 use std::path::PathBuf;
-use std::{vec};
+use std::vec;
 
 use crate::compile::compile;
 use crate::definitions::action_dump::{ActionDump, RawActionDump};
+use crate::definitions::actions::Action;
 use crate::definitions::events::{EntityEvents, GameEvents, PlayerEvents};
 use crate::definitions::game_values::GameValues;
 use crate::errors::{format_lexer_error, format_parser_error, format_validator_error};
@@ -96,12 +97,10 @@ impl LanguageServer for Backend {
       .uri
       .clone();
     let rope = self.document_map.get(&uri.to_string()).unwrap();
-    let data = rope.to_string();
     let line = params.text_document_position_params.position.line;
     let col = params.text_document_position_params.position.character;
 
-    let mut lines = data.lines();
-    let line_data = lines.nth(line as usize).unwrap();
+    let line_data = rope.line(line as usize).to_string();
     let mut lexer = Lexer::new(&line_data);
     let result = lexer.run();
 
@@ -192,7 +191,7 @@ impl LanguageServer for Backend {
     params: CompletionParams,
   ) -> tower_lsp::jsonrpc::Result<Option<CompletionResponse>> {
     let uri = params.text_document_position.text_document.uri.to_string();
-    let line = params.text_document_position.position.line + 1;
+    let line = params.text_document_position.position.line;
     let col = params.text_document_position.position.character;
     self.get_completions(uri, line, col).await
   }
@@ -259,250 +258,202 @@ impl Backend {
     col: u32,
   ) -> tower_lsp::jsonrpc::Result<Option<CompletionResponse>> {
     let rope = self.document_map.get(&uri).unwrap();
-    let line_string =rope.line((line-1).try_into().unwrap());//gets the current line (-1 from 0 index)
+    let input = rope.line(line as usize).to_string();
 
-    self
-      .client
-      .log_message(MessageType::INFO, format!("{} {}", line, col))
-      .await;
-
-    //let input = &rope.to_string();
-    let input = &line_string.to_string();
-    let mut lexer = Lexer::new(input);
-    let mut tokens = match lexer.run() {
+    let mut lexer = Lexer::new(&input);
+    let tokens = match lexer.run() {
       Ok(res) => res,
       Err(_) => return Ok(None),
     };
 
-    
-    let mut focused_token_index=1;
-    for token in &tokens {
+    for (index, token) in tokens.iter().enumerate() {
+      if token.range.start.col <= col && token.range.end.col >= col {
+        let mut token = &tokens[index].token;
+        let mut previous: Option<String> = None;
 
-      let mut tokencolend=token.range.end.col;//due to words taking up one extra space in range this counters that
-      match &token.token {
-        Token::Keyword { value }=>tokencolend-=1,
-        _=>{}
-      }
+        match token {
+          Token::Identifier { value } => previous = Some(value.clone()),
+          Token::Text { value } => {
+            previous = Some(value.clone());
 
-      if token.range.start.col <= col
-        && tokencolend >= col
-      {
-        break;
-      }
-      focused_token_index=focused_token_index+1;
-    }
-    if focused_token_index>tokens.len()//if the token isnt found
-    {
-      return Ok(None);
-    }
-
-    _=tokens.split_off(focused_token_index);//only has the preivious tokens and allows use of pop
-    let mut token=tokens.pop().unwrap();
-    self
-      .client
-      .log_message(MessageType::INFO, format!("{} {:?}", token.token, tokens))
-      .await;
-
-    let mut is_event = false;
-    // let mut is_player_action = false;
-    // let mut is_entity_action = false;
-    // let mut is_game_action = false;
-    // let mut is_variable_action = false;
-    // let mut is_control_action = false;
-    // let mut is_select_action = false;
-    // let mut is_player_conditional = false;
-    // let mut is_entity_conditional = false;
-    // let mut is_game_conditional = false;
-    // let mut is_variable_conditional = false;
-    let mut is_game_value = false;
-
-    let mut previous = String::from("");//if current is identifier set them equal
-    let mut all = None;
-
-    //if ident, sack it off and throw into prev
-    match token.token.clone() {
-      Token::Identifier { value } => {
-        previous += &value;
-        match tokens.pop(){
-          Some(res)=>token=res,
-          None=>{}
-        }
-      }
-      Token::Text { value }=>// found in the form [Identifier]([text]
-      {
-        previous += &value;
-        match tokens.pop(){
-          Some(res)=>{
-            token=res;
-            match token.token.clone() {
-              Token::OpenParen =>{
-                match tokens.pop(){
-                  Some(res)=>{
-                    token=res;
-                    let mut completion =vec![];
-                    match token.token.clone() {
-                      Token::Identifier { value } =>{
-                        match value.as_str() {
-                          "Potion"=>{ 
-                            for potion in self.action_dump.potions.all() {
-                              if potion.potion.starts_with(&previous) {
-                                completion.push(CompletionItem::new_simple(
-                                  potion.potion.clone(),String::from("dfrs.Potion")
-                                ));
-                              }
-                            }
-                            return Ok(Some(CompletionResponse::Array(completion)));
-                          }
-                          "Sound"=>{
-                            for potion in self.action_dump.sounds.all() {
-                              if potion.sound.starts_with(&previous) {
-                                completion.push(CompletionItem::new_simple(
-                                  potion.sound.clone(),String::from("dfrs.Sound")
-                                ));
-                              }
-                            }
-                            return Ok(Some(CompletionResponse::Array(completion)));
-                          }
-                          "Particle"=>{ 
-                            for potion in self.action_dump.particles.all() {
-                              if potion.particle.starts_with(&previous) {
-                                completion.push(CompletionItem::new_simple(
-                                  potion.particle.clone(),String::from("dfrs.Particle")
-                                ));
-                              }
-                            }
-                            return Ok(Some(CompletionResponse::Array(completion)));
-                          }
-                          _=>{}
-
-                        }
+            if index >= 2 {
+              let token_before_1 = &tokens[index - 1].token;
+              let token_before_2 = &tokens[index - 2].token;
+              if let (Token::Identifier { value: identifier }, Token::OpenParen) =
+                (token_before_2, token_before_1)
+              {
+                let mut completion = vec![];
+                match identifier.as_str() {
+                  "Potion" => {
+                    for potion in self.action_dump.potions.all() {
+                      if potion.potion.starts_with(value) {
+                        completion.push(CompletionItem::new_simple(
+                          potion.potion.clone(),
+                          String::from("Potion"),
+                        ));
                       }
-                      _ =>{}
                     }
+                    return Ok(Some(CompletionResponse::Array(completion)));
                   }
-                  _=>{}
+                  "Sound" => {
+                    for potion in self.action_dump.sounds.all() {
+                      if potion.sound.starts_with(value) {
+                        completion.push(CompletionItem::new_simple(
+                          potion.sound.clone(),
+                          String::from("Sound"),
+                        ));
+                      }
+                    }
+                    return Ok(Some(CompletionResponse::Array(completion)));
+                  }
+                  "Particle" => {
+                    for potion in self.action_dump.particles.all() {
+                      if potion.particle.starts_with(value) {
+                        completion.push(CompletionItem::new_simple(
+                          potion.particle.clone(),
+                          String::from("Particle"),
+                        ));
+                      }
+                    }
+                    return Ok(Some(CompletionResponse::Array(completion)));
+                  }
+                  _ => {}
                 }
               }
-              _ =>{}
             }
           }
-          None=>{}
+          _ => {}
         }
-      
-        //consumes this token
-      }
-      
-      _ => {}
-    }
-    let mut repeat=true;
-    //need to account for selection
-    
-    while repeat {
-      repeat=false;
-    
-      match &token.token {
-        Token::At => is_event = true,
-        Token::Dollar => is_game_value = true,
-        Token::Dot => match tokens.pop().clone() {
-          Some(last) => match &last.token {
-            Token::Keyword { value } => match value {
-              Keyword::P => all = Some(self.action_dump.player_actions.all()),
-              Keyword::E => all = Some(self.action_dump.entity_actions.all()),
-              Keyword::G => all = Some(self.action_dump.game_actions.all()),
-              Keyword::V => all = Some(self.action_dump.variable_actions.all()),
-              Keyword::C => all = Some(self.action_dump.control_actions.all()),
-              Keyword::S => all = Some(self.action_dump.select_actions.all()),
-              _ => {}
-            },
+
+        let mut token_before_2: Option<&Token> = None;
+        let mut token_before_3: Option<&Token> = None;
+        let mut token_before_4: Option<&Token> = None;
+
+        if previous.is_some() && index >= 1 {
+          token = &tokens[index - 1].token;
+
+          if index >= 2 {
+            token_before_2 = Some(&tokens[index - 2].token);
+          }
+          if index >= 3 {
+            token_before_3 = Some(&tokens[index - 3].token);
+          }
+          if index >= 4 {
+            token_before_4 = Some(&tokens[index - 4].token);
+          }
+        } else {
+          if index >= 1 {
+            token_before_2 = Some(&tokens[index - 1].token);
+          }
+          if index >= 2 {
+            token_before_3 = Some(&tokens[index - 2].token);
+          }
+          if index >= 3 {
+            token_before_4 = Some(&tokens[index - 3].token);
+          }
+
+          previous = Some(String::from(""));
+        }
+
+        let previous = previous.unwrap();
+        let mut actions: Option<&Vec<Action>> = None;
+
+        match (token_before_4, token_before_3, token_before_2, token) {
+          // Events
+          (_, _, _, Token::At) => {
+            let mut events = vec![];
+
+            for event in self.player_events.all() {
+              if event.dfrs_name.starts_with(&previous) || event.df_name.starts_with(&previous) {
+                events.push(CompletionItem::new_simple(
+                  event.dfrs_name.clone(),
+                  String::from("Player Event"),
+                ));
+              }
+            }
+            for event in self.entity_events.all() {
+              if event.dfrs_name.starts_with(&previous) || event.df_name.starts_with(&previous) {
+                events.push(CompletionItem::new_simple(
+                  event.dfrs_name.clone(),
+                  String::from("Entity Event"),
+                ));
+              }
+            }
+            for event in self.game_events.all() {
+              if event.dfrs_name.starts_with(&previous) || event.df_name.starts_with(&previous) {
+                events.push(CompletionItem::new_simple(
+                  event.dfrs_name.clone(),
+                  String::from("Game Event"),
+                ));
+              }
+            }
+
+            return Ok(Some(CompletionResponse::Array(events)));
+          }
+
+          // Actions
+          (_, _, Some(Token::Keyword { value: keyword }), Token::Dot)
+          | (
+            Some(Token::Keyword { value: keyword }),
+            Some(Token::Colon),
+            Some(Token::Identifier { value: _ }),
+            Token::Dot,
+          ) => match keyword {
+            Keyword::P => actions = Some(self.action_dump.player_actions.all()),
+            Keyword::E => actions = Some(self.action_dump.entity_actions.all()),
+            Keyword::G => actions = Some(self.action_dump.game_actions.all()),
+            Keyword::V => actions = Some(self.action_dump.variable_actions.all()),
+            Keyword::C => actions = Some(self.action_dump.control_actions.all()),
+            Keyword::S => actions = Some(self.action_dump.select_actions.all()),
             _ => {}
           },
-          _ => {}
-        },
-        Token::Keyword { value } => {
-            match value {
-              Keyword::IfP => {all = Some(self.action_dump.player_conditionals.all()) ;break;},
-              Keyword::IfE => {all = Some(self.action_dump.entity_conditionals.all());break;},
-              Keyword::IfG => {all = Some(self.action_dump.game_conditionals.all());break;},
-              Keyword::IfV => {all = Some(self.action_dump.variable_conditionals.all());break;},
-              Keyword::Repeat=> {all=Some(self.action_dump.repeats.all());break;},
-              _ => {
-                previous += &value.to_string();
-                repeat=true;
-              },//if action or something, treat token as identifier, then repeat
+
+          // Conditionals, Repeat
+          (_, _, _, Token::Keyword { value: keyword })
+          | (_, _, Some(Token::Keyword { value: keyword }), Token::ExclamationMark) => {
+            match keyword {
+              Keyword::IfP => actions = Some(self.action_dump.player_conditionals.all()),
+              Keyword::IfE => actions = Some(self.action_dump.entity_conditionals.all()),
+              Keyword::IfG => actions = Some(self.action_dump.game_conditionals.all()),
+              Keyword::IfV => actions = Some(self.action_dump.variable_conditionals.all()),
+              Keyword::Repeat => actions = Some(self.action_dump.repeats.all()),
+              _ => {}
             }
           }
-        _ => {}
-      }
-      if repeat
-      {
-        match tokens.pop(){
-          Some(res)=>token=res,
-          None=>{break;}
+
+          // Game Values
+          (_, _, _, Token::Dollar) => {
+            let mut result = vec![];
+
+            for game_value in self.game_values.all() {
+              if game_value.dfrs_name.starts_with(&previous)
+                || game_value.df_name.starts_with(&previous)
+              {
+                result.push(CompletionItem::new_simple(
+                  game_value.dfrs_name.clone(),
+                  game_value.df_name.clone(),
+                ));
+              }
+            }
+            return Ok(Some(CompletionResponse::Array(result)));
+          }
+          _ => return Ok(None),
+        }
+
+        if let Some(actions) = actions {
+          let mut result = vec![];
+
+          for action in actions {
+            if action.dfrs_name.starts_with(&previous) || action.df_name.starts_with(&previous) {
+              result.push(CompletionItem::new_simple(
+                action.dfrs_name.clone(),
+                action.df_name.clone(),
+              ));
+            }
+          }
+          return Ok(Some(CompletionResponse::Array(result)));
         }
       }
-    }
-
-
-    if is_event {
-      let mut events = vec![];//would make sense to change the detail to be the event type 
-
-      for event in self.player_events.all() {
-        if event.dfrs_name.starts_with(&previous) || event.df_name.starts_with(&previous) {
-          events.push(CompletionItem::new_simple(
-            event.dfrs_name.clone(),
-            event.df_name.clone(),
-          ));
-        }
-      }
-      for event in self.entity_events.all() {
-        if event.dfrs_name.starts_with(&previous) || event.df_name.starts_with(&previous) {
-          events.push(CompletionItem::new_simple(
-            event.dfrs_name.clone(),
-            event.df_name.clone(),
-          ));
-        }
-      }
-      for event in self.game_events.all() {
-        if event.dfrs_name.starts_with(&previous) || event.df_name.starts_with(&previous) {
-          events.push(CompletionItem::new_simple(
-            event.dfrs_name.clone(),
-            event.df_name.clone(),
-          ));
-        }
-      }
-
-      return Ok(Some(CompletionResponse::Array(events)));
-    }
-
-    if all.is_some() {
-      let mut actions = vec![];
-
-      for action in all.unwrap() {
-        if action.dfrs_name.starts_with(&previous) || action.df_name.starts_with(&previous) {
-          actions.push(CompletionItem::new_simple(
-            action.dfrs_name.clone(),
-            action.df_name.clone(),
-          ));
-        }
-      }
-      return Ok(Some(CompletionResponse::Array(actions)));
-    }
-
-    if is_game_value {
-      let game_values = self.game_values.all();
-      let mut result = vec![];
-
-      for game_value in game_values {
-        if game_value.dfrs_name.starts_with(&previous)
-          || game_value.df_name.starts_with(&previous)
-        {
-          result.push(CompletionItem::new_simple(
-            game_value.dfrs_name.clone(),
-            game_value.df_name.clone(),
-          ));
-        }
-      }
-      return Ok(Some(CompletionResponse::Array(result)));
     }
 
     Ok(None)
