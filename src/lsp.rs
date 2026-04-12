@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::{vec};
 
 use crate::compile::compile;
 use crate::definitions::action_dump::{ActionDump, RawActionDump};
@@ -258,210 +259,250 @@ impl Backend {
     col: u32,
   ) -> tower_lsp::jsonrpc::Result<Option<CompletionResponse>> {
     let rope = self.document_map.get(&uri).unwrap();
+    let line_string =rope.line((line-1).try_into().unwrap());//gets the current line (-1 from 0 index)
 
     self
       .client
       .log_message(MessageType::INFO, format!("{} {}", line, col))
       .await;
 
-    let input = &rope.to_string();
+    //let input = &rope.to_string();
+    let input = &line_string.to_string();
     let mut lexer = Lexer::new(input);
-    let tokens = match lexer.run() {
+    let mut tokens = match lexer.run() {
       Ok(res) => res,
       Err(_) => return Ok(None),
     };
 
-    let mut last_token: Option<crate::token::TokenWithPos> = None;
-    for token in tokens {
-      if token.range.start.line == line
-        && token.range.start.col <= col
-        && token.range.end.col >= col
+    
+    let mut focused_token_index=1;
+    for token in &tokens {
+
+      let mut tokencolend=token.range.end.col;//due to words taking up one extra space in range this counters that
+      match &token.token {
+        Token::Keyword { value }=>tokencolend-=1,
+        _=>{}
+      }
+
+      if token.range.start.col <= col
+        && tokencolend >= col
       {
-        let mut is_event = false;
-        let mut is_player_action = false;
-        let mut is_entity_action = false;
-        let mut is_game_action = false;
-        let mut is_variable_action = false;
-        let mut is_control_action = false;
-        let mut is_select_action = false;
-        let mut is_player_conditional = false;
-        let mut is_entity_conditional = false;
-        let mut is_game_conditional = false;
-        let mut is_variable_conditional = false;
-        let mut is_game_value = false;
+        break;
+      }
+      focused_token_index=focused_token_index+1;
+    }
+    if focused_token_index>tokens.len()//if the token isnt found
+    {
+      return Ok(None);
+    }
 
-        let mut previous = String::from("");
-        match &token.token {
-          Token::At => is_event = true,
-          Token::Dollar => is_game_value = true,
-          Token::Dot => match last_token.clone() {
-            Some(last) => match last.token {
-              Token::Keyword { value } => match value {
-                Keyword::P => is_player_action = true,
-                Keyword::E => is_entity_action = true,
-                Keyword::G => is_game_action = true,
-                Keyword::V => is_variable_action = true,
-                Keyword::C => is_control_action = true,
-                Keyword::S => is_select_action = true,
-                _ => {}
-              },
-              _ => {}
-            },
-            None => {}
-          },
-          _ => {}
-        }
-        if last_token.is_some() {
-          match last_token.unwrap().token {
-            Token::At => {
-              is_event = true;
-              match token.token.clone() {
-                Token::Identifier { value } => previous += &value,
-                _ => {}
-              }
-            }
-            Token::Dollar => {
-              is_game_value = true;
-              match token.token.clone() {
-                Token::Identifier { value } => previous += &value,
-                _ => {}
-              }
-            }
-            Token::Keyword { value } => {
-              let mut found = true;
-              match value {
-                Keyword::IfP => is_player_conditional = true,
-                Keyword::IfE => is_entity_conditional = true,
-                Keyword::IfG => is_game_conditional = true,
-                Keyword::IfV => is_variable_conditional = true,
-                _ => found = false,
-              }
-              if found {
-                match token.token.clone() {
-                  Token::Identifier { value } => previous += &value,
-                  _ => {}
-                }
-              }
-            }
-            _ => {}
-          }
-        }
+    _=tokens.split_off(focused_token_index);//only has the preivious tokens and allows use of pop
+    let mut token=tokens.pop().unwrap();
+    self
+      .client
+      .log_message(MessageType::INFO, format!("{} {:?}", token.token, tokens))
+      .await;
 
-        if is_event {
-          let mut events = vec![];
+    let mut is_event = false;
+    // let mut is_player_action = false;
+    // let mut is_entity_action = false;
+    // let mut is_game_action = false;
+    // let mut is_variable_action = false;
+    // let mut is_control_action = false;
+    // let mut is_select_action = false;
+    // let mut is_player_conditional = false;
+    // let mut is_entity_conditional = false;
+    // let mut is_game_conditional = false;
+    // let mut is_variable_conditional = false;
+    let mut is_game_value = false;
 
-          for event in self.player_events.all() {
-            if event.dfrs_name.starts_with(&previous) || event.df_name.starts_with(&previous) {
-              events.push(CompletionItem::new_simple(
-                event.dfrs_name.clone(),
-                event.df_name.clone(),
-              ));
-            }
-          }
-          for event in self.entity_events.all() {
-            if event.dfrs_name.starts_with(&previous) || event.df_name.starts_with(&previous) {
-              events.push(CompletionItem::new_simple(
-                event.dfrs_name.clone(),
-                event.df_name.clone(),
-              ));
-            }
-          }
-          for event in self.game_events.all() {
-            if event.dfrs_name.starts_with(&previous) || event.df_name.starts_with(&previous) {
-              events.push(CompletionItem::new_simple(
-                event.dfrs_name.clone(),
-                event.df_name.clone(),
-              ));
-            }
-          }
+    let mut previous = String::from("");//if current is identifier set them equal
+    let mut all = None;
 
-          return Ok(Some(CompletionResponse::Array(events)));
-        }
-
-        let mut all = None;
-        if is_player_action {
-          all = Some(self.action_dump.player_actions.all());
-        }
-        if is_entity_action {
-          all = Some(self.action_dump.entity_actions.all());
-        }
-        if is_game_action {
-          all = Some(self.action_dump.game_actions.all());
-        }
-        if is_variable_action {
-          all = Some(self.action_dump.variable_actions.all());
-        }
-        if is_control_action {
-          all = Some(self.action_dump.control_actions.all());
-        }
-        if is_select_action {
-          all = Some(self.action_dump.select_actions.all());
-        }
-        if is_player_conditional {
-          all = Some(self.action_dump.player_conditionals.all());
-        }
-        if is_entity_conditional {
-          all = Some(self.action_dump.entity_conditionals.all());
-        }
-        if is_game_conditional {
-          all = Some(self.action_dump.game_conditionals.all());
-        }
-        if is_variable_conditional {
-          all = Some(self.action_dump.variable_conditionals.all());
-        }
-
-        self
-          .client
-          .log_message(
-            MessageType::INFO,
-            format!(
-              "ev {} pa {} ea {} ga {} va {} pc {} ec {} gc {} vc {} vl {}",
-              is_event,
-              is_player_action,
-              is_entity_action,
-              is_game_action,
-              is_variable_action,
-              is_player_conditional,
-              is_entity_conditional,
-              is_game_conditional,
-              is_variable_conditional,
-              is_game_value
-            ),
-          )
-          .await;
-
-        if all.is_some() {
-          let mut actions = vec![];
-
-          for action in all.unwrap() {
-            if action.dfrs_name.starts_with(&previous) || action.df_name.starts_with(&previous) {
-              actions.push(CompletionItem::new_simple(
-                action.dfrs_name.clone(),
-                action.df_name.clone(),
-              ));
-            }
-          }
-          return Ok(Some(CompletionResponse::Array(actions)));
-        }
-
-        if is_game_value {
-          let game_values = self.game_values.all();
-          let mut result = vec![];
-
-          for game_value in game_values {
-            if game_value.dfrs_name.starts_with(&previous)
-              || game_value.df_name.starts_with(&previous)
-            {
-              result.push(CompletionItem::new_simple(
-                game_value.dfrs_name.clone(),
-                game_value.df_name.clone(),
-              ));
-            }
-          }
-          return Ok(Some(CompletionResponse::Array(result)));
+    //if ident, sack it off and throw into prev
+    match token.token.clone() {
+      Token::Identifier { value } => {
+        previous += &value;
+        match tokens.pop(){
+          Some(res)=>token=res,
+          None=>{}
         }
       }
-      last_token = Some(token);
+      Token::Text { value }=>// found in the form [Identifier]([text]
+      {
+        previous += &value;
+        match tokens.pop(){
+          Some(res)=>{
+            token=res;
+            match token.token.clone() {
+              Token::OpenParen =>{
+                match tokens.pop(){
+                  Some(res)=>{
+                    token=res;
+                    let mut completion =vec![];
+                    match token.token.clone() {
+                      Token::Identifier { value } =>{
+                        match value.as_str() {
+                          "Potion"=>{ 
+                            for potion in self.action_dump.potions.all() {
+                              if potion.potion.starts_with(&previous) {
+                                completion.push(CompletionItem::new_simple(
+                                  potion.potion.clone(),String::from("dfrs.Potion")
+                                ));
+                              }
+                            }
+                            return Ok(Some(CompletionResponse::Array(completion)));
+                          }
+                          "Sound"=>{
+                            for potion in self.action_dump.sounds.all() {
+                              if potion.sound.starts_with(&previous) {
+                                completion.push(CompletionItem::new_simple(
+                                  potion.sound.clone(),String::from("dfrs.Sound")
+                                ));
+                              }
+                            }
+                            return Ok(Some(CompletionResponse::Array(completion)));
+                          }
+                          "Particle"=>{ 
+                            for potion in self.action_dump.particles.all() {
+                              if potion.particle.starts_with(&previous) {
+                                completion.push(CompletionItem::new_simple(
+                                  potion.particle.clone(),String::from("dfrs.Particle")
+                                ));
+                              }
+                            }
+                            return Ok(Some(CompletionResponse::Array(completion)));
+                          }
+                          _=>{}
+
+                        }
+                      }
+                      _ =>{}
+                    }
+                  }
+                  _=>{}
+                }
+              }
+              _ =>{}
+            }
+          }
+          None=>{}
+        }
+      
+        //consumes this token
+      }
+      
+      _ => {}
+    }
+    let mut repeat=true;
+    //need to account for selection
+    
+    while repeat {
+      repeat=false;
+    
+      match &token.token {
+        Token::At => is_event = true,
+        Token::Dollar => is_game_value = true,
+        Token::Dot => match tokens.pop().clone() {
+          Some(last) => match &last.token {
+            Token::Keyword { value } => match value {
+              Keyword::P => all = Some(self.action_dump.player_actions.all()),
+              Keyword::E => all = Some(self.action_dump.entity_actions.all()),
+              Keyword::G => all = Some(self.action_dump.game_actions.all()),
+              Keyword::V => all = Some(self.action_dump.variable_actions.all()),
+              Keyword::C => all = Some(self.action_dump.control_actions.all()),
+              Keyword::S => all = Some(self.action_dump.select_actions.all()),
+              _ => {}
+            },
+            _ => {}
+          },
+          _ => {}
+        },
+        Token::Keyword { value } => {
+            match value {
+              Keyword::IfP => {all = Some(self.action_dump.player_conditionals.all()) ;break;},
+              Keyword::IfE => {all = Some(self.action_dump.entity_conditionals.all());break;},
+              Keyword::IfG => {all = Some(self.action_dump.game_conditionals.all());break;},
+              Keyword::IfV => {all = Some(self.action_dump.variable_conditionals.all());break;},
+              Keyword::Repeat=> {all=Some(self.action_dump.repeats.all());break;},
+              _ => {
+                previous += &value.to_string();
+                repeat=true;
+              },//if action or something, treat token as identifier, then repeat
+            }
+          }
+        _ => {}
+      }
+      if repeat
+      {
+        match tokens.pop(){
+          Some(res)=>token=res,
+          None=>{break;}
+        }
+      }
+    }
+
+
+    if is_event {
+      let mut events = vec![];//would make sense to change the detail to be the event type 
+
+      for event in self.player_events.all() {
+        if event.dfrs_name.starts_with(&previous) || event.df_name.starts_with(&previous) {
+          events.push(CompletionItem::new_simple(
+            event.dfrs_name.clone(),
+            event.df_name.clone(),
+          ));
+        }
+      }
+      for event in self.entity_events.all() {
+        if event.dfrs_name.starts_with(&previous) || event.df_name.starts_with(&previous) {
+          events.push(CompletionItem::new_simple(
+            event.dfrs_name.clone(),
+            event.df_name.clone(),
+          ));
+        }
+      }
+      for event in self.game_events.all() {
+        if event.dfrs_name.starts_with(&previous) || event.df_name.starts_with(&previous) {
+          events.push(CompletionItem::new_simple(
+            event.dfrs_name.clone(),
+            event.df_name.clone(),
+          ));
+        }
+      }
+
+      return Ok(Some(CompletionResponse::Array(events)));
+    }
+
+    if all.is_some() {
+      let mut actions = vec![];
+
+      for action in all.unwrap() {
+        if action.dfrs_name.starts_with(&previous) || action.df_name.starts_with(&previous) {
+          actions.push(CompletionItem::new_simple(
+            action.dfrs_name.clone(),
+            action.df_name.clone(),
+          ));
+        }
+      }
+      return Ok(Some(CompletionResponse::Array(actions)));
+    }
+
+    if is_game_value {
+      let game_values = self.game_values.all();
+      let mut result = vec![];
+
+      for game_value in game_values {
+        if game_value.dfrs_name.starts_with(&previous)
+          || game_value.df_name.starts_with(&previous)
+        {
+          result.push(CompletionItem::new_simple(
+            game_value.dfrs_name.clone(),
+            game_value.df_name.clone(),
+          ));
+        }
+      }
+      return Ok(Some(CompletionResponse::Array(result)));
     }
 
     Ok(None)
