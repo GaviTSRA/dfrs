@@ -322,6 +322,7 @@ impl Backend {
               }
             }
           }
+          Token::Keyword { value } => previous = Some(format!("{}", value.clone())),
           _ => {}
         }
 
