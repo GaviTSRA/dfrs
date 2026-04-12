@@ -1,6 +1,6 @@
 use crate::definitions::action_dump::RawActionDump;
 use crate::definitions::actions::Action;
-use crate::definitions::events::{EntityEvents, PlayerEvents, GameEvents};
+use crate::definitions::events::{EntityEvents, GameEvents, PlayerEvents};
 use crate::definitions::game_values::GameValues;
 use crate::definitions::{DefinedArgBranch, DefinedArgOption};
 use crate::lexer::Lexer;
@@ -547,6 +547,7 @@ impl Validator {
 
   fn validate_call(&mut self, mut call_node: CallNode) -> Result<CallNode, ValidateError> {
     if call_node.is_unsafe_call {
+      call_node.is_process = Some(false);
       return Ok(call_node);
     }
 
