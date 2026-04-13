@@ -24,7 +24,7 @@ pub struct RawActionDump {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct ADParticle {
-  particle: String,
+  pub particle: String,
   icon: ADIcon,
   category: Option<String>,
   fields: Vec<String>,
@@ -41,7 +41,7 @@ impl DFRSValue for ADParticle {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct ADSound {
-  sound: String,
+  pub sound: String,
   icon: ADIcon,
 }
 
@@ -56,7 +56,7 @@ impl DFRSValue for ADSound {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct ADPotion {
-  potion: String,
+  pub potion: String,
   icon: ADIcon,
 }
 
