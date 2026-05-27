@@ -910,7 +910,7 @@ impl Validator {
           }
 
           if let ArgValue::GameValue {
-            df_name,
+            df_name: _,
             dfrs_name,
             selector,
             selector_end_pos,
@@ -1034,7 +1034,33 @@ impl Validator {
 
     if let Some(plural_type) = &previous_plural {
       while node_args.len() > 0 {
-        let current_arg = node_args.get(0).unwrap();
+        let mut current_arg = node_args.get(0).unwrap().clone();
+        if let ArgValue::GameValue {
+          df_name: _,
+          dfrs_name,
+          selector,
+          selector_end_pos,
+        } = current_arg.value.clone()
+        {
+          let actual_game_value = self.game_values.get(dfrs_name.clone());
+          match actual_game_value {
+            Some(res) => {
+              current_arg.value = ArgValue::GameValue {
+                df_name: Some(res.df_name.clone()),
+                dfrs_name,
+                selector,
+                selector_end_pos,
+              };
+              current_arg.arg_type = res.value_type.clone();
+            }
+            None => {
+              return Err(PathError::UnknownGameValue {
+                game_value: dfrs_name,
+                range: current_arg.range,
+              })
+            }
+          }
+        }
         let arg_type = match &current_arg.arg_type {
           ArgType::VARIABLE => match &current_arg.value {
             ArgValue::Variable { var_type, name, .. } => {
@@ -1077,10 +1103,10 @@ impl Validator {
         };
 
         if plural_type == arg_type || plural_type == &ArgType::ANY || arg_type == &ArgType::ANY {
-          let mut ok_arg = node_args.remove(0);
-          ok_arg.index = *index;
+          node_args.remove(0);
+          current_arg.index = *index;
+          args.push(current_arg);
           *index += 1;
-          args.push(ok_arg);
         } else {
           break;
         }
